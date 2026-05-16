@@ -8,13 +8,36 @@ import { RegisterPage } from "../features/auth/RegisterPage";
 import { ResetPasswordPage } from "../features/auth/ResetPasswordPage";
 import { VerifyOtpPage } from "../features/auth/VerifyOtpPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { BankAccountsPage } from "../features/company/BankAccountsPage";
+import { BranchesPage } from "../features/company/BranchesPage";
+import { BrandingPage } from "../features/company/BrandingPage";
+import { CompanyProfilePage } from "../features/company/CompanyProfilePage";
+import { FinancialYearsPage } from "../features/company/FinancialYearsPage";
+import { InvoiceSettingsPage } from "../features/company/InvoiceSettingsPage";
+import { PreferencesPage } from "../features/company/PreferencesPage";
+import { TaxSettingsPage } from "../features/company/TaxSettingsPage";
 import { InvitesPage } from "../features/settings/InvitesPage";
 import { ProfilePage } from "../features/settings/ProfilePage";
 import { RolesPermissionsPage } from "../features/settings/RolesPermissionsPage";
 import { SecurityPage } from "../features/settings/SecurityPage";
 import { UsersPage } from "../features/settings/UsersPage";
 import { UnauthorizedPage } from "../features/shared/UnauthorizedPage";
+import { useAuth } from "../providers/AuthProvider";
 import { PermissionRoute, ProtectedRoute, PublicOnlyRoute } from "./guards";
+
+const SettingsIndexRedirect = () => {
+  const auth = useAuth();
+
+  if (auth.hasPermission("settings.manage")) {
+    return <Navigate to="/app/settings/company/profile" replace />;
+  }
+
+  if (auth.hasPermission(["user.view", "user.manage"])) {
+    return <Navigate to="/app/settings/users" replace />;
+  }
+
+  return <Navigate to="/app/settings/profile" replace />;
+};
 
 export const AppRouter = () => (
   <BrowserRouter>
@@ -37,6 +60,71 @@ export const AppRouter = () => (
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route path="settings" element={<SettingsIndexRedirect />} />
+        <Route
+          path="settings/company/profile"
+          element={
+            <PermissionRoute permissions={["settings.manage"]}>
+              <CompanyProfilePage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="settings/company/tax"
+          element={
+            <PermissionRoute permissions={["settings.manage"]}>
+              <TaxSettingsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="settings/company/financial-years"
+          element={
+            <PermissionRoute permissions={["settings.manage"]}>
+              <FinancialYearsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="settings/company/banks"
+          element={
+            <PermissionRoute permissions={["settings.manage"]}>
+              <BankAccountsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="settings/company/invoice-settings"
+          element={
+            <PermissionRoute permissions={["settings.manage"]}>
+              <InvoiceSettingsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="settings/company/branding"
+          element={
+            <PermissionRoute permissions={["settings.manage"]}>
+              <BrandingPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="settings/company/branches"
+          element={
+            <PermissionRoute permissions={["settings.manage"]}>
+              <BranchesPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="settings/company/preferences"
+          element={
+            <PermissionRoute permissions={["settings.manage"]}>
+              <PreferencesPage />
+            </PermissionRoute>
+          }
+        />
         <Route
           path="settings/users"
           element={

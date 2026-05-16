@@ -28,6 +28,7 @@ type AuthContextValue = {
   hasPermission: (permission: PermissionKey | PermissionKey[]) => boolean;
   setSession: (payload: { accessToken: string; user: User; company: Company | null; permissions: PermissionKey[] }) => void;
   updateUser: (user: User) => void;
+  updateCompany: (company: Company | null) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -141,6 +142,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       },
       setSession,
       updateUser: (nextUser) => setUser(nextUser),
+      updateCompany: (nextCompany) => setCompany(nextCompany),
     }),
     [accessToken, company, isInitializing, login, logout, logoutAll, permissions, refreshSession, setSession, user],
   );

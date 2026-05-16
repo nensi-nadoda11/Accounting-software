@@ -1,5 +1,6 @@
 export * from "./audit-logs";
 export * from "./companies";
+export * from "./company-settings";
 export * from "./otp-verifications";
 export * from "./sessions";
 export * from "./user-invites";

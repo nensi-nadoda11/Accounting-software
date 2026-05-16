@@ -52,12 +52,26 @@ export type PermissionKey =
 export interface Company {
   id: string;
   name: string;
+  legalName: string | null;
+  businessType: string | null;
+  industryType: string | null;
   gstNumber: string | null;
+  panNumber: string | null;
+  cinNumber: string | null;
+  email: string | null;
+  mobileNumber: string | null;
+  website: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
   city: string | null;
   state: string | null;
+  pincode: string | null;
+  country: string;
+  timezone: string;
+  currency: string;
+  language: string;
   status: CompanyStatus;
+  setupCompletedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

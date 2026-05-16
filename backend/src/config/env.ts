@@ -33,7 +33,10 @@ const envSchema = z.object({
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive(),
   OTP_HASH_SECRET: z.string().min(32),
   INVITE_EXPIRY_HOURS: z.coerce.number().int().positive(),
-  PASSWORD_RESET_EXPIRY_MINUTES: z.coerce.number().int().positive()
+  PASSWORD_RESET_EXPIRY_MINUTES: z.coerce.number().int().positive(),
+  UPLOAD_DIR: z.string().trim().min(1).default("uploads"),
+  MAX_UPLOAD_MB: z.coerce.number().positive().default(2),
+  PUBLIC_UPLOAD_BASE_URL: z.string().trim().min(1).default("/uploads")
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -8,12 +8,9 @@ export const SubTabs = () => {
   const location = useLocation();
   const { hasPermission } = useAuth();
 
-  const tabs = SETTINGS_TABS.filter((tab) => {
-    if (tab.href.includes("users") || tab.href.includes("invites") || tab.href.includes("roles-permissions")) {
-      return hasPermission(["user.view", "user.manage"]);
-    }
-    return true;
-  });
+  const tabs = SETTINGS_TABS.filter((tab) =>
+    "permissions" in tab ? hasPermission(Array.from(tab.permissions)) : true,
+  );
 
   return (
     <div className="border-b border-slate-200 bg-white/90">

@@ -5,13 +5,21 @@ export const TOP_NAV_ITEMS = [
   { label: "Purchases", href: "/app?menu=purchases", menu: "purchases" },
   { label: "Inventory", href: "/app?menu=inventory", menu: "inventory" },
   { label: "Reports", href: "/app?menu=reports", menu: "reports" },
-  { label: "Settings", href: "/app/settings/users", menu: "settings" },
+  { label: "Settings", href: "/app/settings", menu: "settings" },
 ] as const;
 
 export const SETTINGS_TABS = [
-  { label: "Users", href: "/app/settings/users" },
-  { label: "Invites", href: "/app/settings/invites" },
-  { label: "Roles & Permissions", href: "/app/settings/roles-permissions" },
+  { label: "Company Profile", href: "/app/settings/company/profile", permissions: ["settings.manage"] },
+  { label: "Tax & GST", href: "/app/settings/company/tax", permissions: ["settings.manage"] },
+  { label: "Financial Year", href: "/app/settings/company/financial-years", permissions: ["settings.manage"] },
+  { label: "Banks", href: "/app/settings/company/banks", permissions: ["settings.manage"] },
+  { label: "Invoice Settings", href: "/app/settings/company/invoice-settings", permissions: ["settings.manage"] },
+  { label: "Branding", href: "/app/settings/company/branding", permissions: ["settings.manage"] },
+  { label: "Branches", href: "/app/settings/company/branches", permissions: ["settings.manage"] },
+  { label: "Preferences", href: "/app/settings/company/preferences", permissions: ["settings.manage"] },
+  { label: "Users", href: "/app/settings/users", permissions: ["user.view", "user.manage"] },
+  { label: "Invites", href: "/app/settings/invites", permissions: ["user.view", "user.manage"] },
+  { label: "Roles & Permissions", href: "/app/settings/roles-permissions", permissions: ["user.view", "user.manage"] },
   { label: "Profile", href: "/app/settings/profile" },
   { label: "Security", href: "/app/settings/security" },
 ] as const;

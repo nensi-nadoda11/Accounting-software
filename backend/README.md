@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1: authentication, roles, invites, permissions, sessions, profile management, audit logs, and Drizzle migrations.
+Production-oriented backend for Module 1 and Module 2: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, and Drizzle migrations.
 
 ## Stack
 
@@ -25,6 +25,7 @@ src/
   modules/
     audit-logs/
     auth/
+    company/
     companies/
     permissions/
     users/
@@ -112,6 +113,39 @@ All routes are mounted under:
 - `PATCH /api/v1/profile`
 - `POST /api/v1/profile/change-password`
 
+## Implemented Module 2 APIs
+
+All company setup routes require authentication, company access, and `settings.manage` permission (admins already have it).
+
+- `GET /api/v1/company/profile`
+- `PATCH /api/v1/company/profile`
+- `GET /api/v1/company/tax-settings`
+- `PATCH /api/v1/company/tax-settings`
+- `GET /api/v1/company/financial-years`
+- `POST /api/v1/company/financial-years`
+- `PATCH /api/v1/company/financial-years/:id`
+- `POST /api/v1/company/financial-years/:id/activate`
+- `POST /api/v1/company/financial-years/:id/lock`
+- `GET /api/v1/company/bank-accounts`
+- `POST /api/v1/company/bank-accounts`
+- `PATCH /api/v1/company/bank-accounts/:id`
+- `DELETE /api/v1/company/bank-accounts/:id`
+- `POST /api/v1/company/bank-accounts/:id/default`
+- `GET /api/v1/company/invoice-settings`
+- `PATCH /api/v1/company/invoice-settings`
+- `GET /api/v1/company/invoice-settings/preview-number`
+- `GET /api/v1/company/branding`
+- `POST /api/v1/company/branding/upload`
+- `DELETE /api/v1/company/branding/:type`
+- `GET /api/v1/company/branches`
+- `POST /api/v1/company/branches`
+- `PATCH /api/v1/company/branches/:id`
+- `DELETE /api/v1/company/branches/:id`
+- `GET /api/v1/company/preferences`
+- `PATCH /api/v1/company/preferences`
+- `GET /api/v1/company/setup-status`
+- `POST /api/v1/company/complete-setup`
+
 ## Security
 
 - Helmet enabled
@@ -131,3 +165,6 @@ All routes are mounted under:
 - Admin permissions are derived from the full permission catalog.
 - Refresh sessions are stored in the `sessions` table with hashed refresh tokens.
 - Cleanup job removes expired OTPs and sessions and marks pending invites as expired.
+- Branding uploads use multipart form-data with `file` and `type` (`logo`, `invoiceLogo`, `signature`, `stamp`, `favicon`).
+- Uploaded files are served from `PUBLIC_UPLOAD_BASE_URL`, backed by `UPLOAD_DIR`.
+- The backend applies Drizzle migrations automatically on startup, including the Module 2 company setup schema.

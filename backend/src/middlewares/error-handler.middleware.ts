@@ -42,6 +42,21 @@ export const errorHandler = (
       return;
     }
 
+    if (constraint.includes("company_branches_company_branch_code_unique_idx")) {
+      response.status(409).json(errorResponse("A branch with this code already exists"));
+      return;
+    }
+
+    if (constraint.includes("company_financial_years_active_company_unique_idx")) {
+      response.status(409).json(errorResponse("Only one active financial year is allowed per company"));
+      return;
+    }
+
+    if (constraint.includes("company_bank_accounts_default_active_unique_idx")) {
+      response.status(409).json(errorResponse("Only one active default bank account is allowed per company"));
+      return;
+    }
+
     response.status(409).json(errorResponse("Duplicate record already exists"));
     return;
   }
@@ -53,6 +68,11 @@ export const errorHandler = (
 
   if (databaseError?.code === "22P02") {
     response.status(400).json(errorResponse("Invalid input provided. Please review the submitted data."));
+    return;
+  }
+
+  if (databaseError?.code === "23514" && databaseError.constraint?.includes("company_financial_years_date_check")) {
+    response.status(400).json(errorResponse("End date must be greater than start date"));
     return;
   }
 

@@ -4,6 +4,7 @@ export * from "./company-settings";
 export * from "./customers";
 export * from "./otp-verifications";
 export * from "./sessions";
+export * from "./suppliers";
 export * from "./user-invites";
 export * from "./user-permissions";
 export * from "./users";

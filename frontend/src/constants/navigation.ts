@@ -2,7 +2,7 @@ export const TOP_NAV_ITEMS = [
   { label: "Dashboard", href: "/app?menu=dashboard", menu: "dashboard" },
   { label: "Accounting", href: "/app?menu=accounting", menu: "accounting" },
   { label: "Sales", href: "/app/sales/customers", menu: "sales" },
-  { label: "Purchases", href: "/app?menu=purchases", menu: "purchases" },
+  { label: "Purchases", href: "/app/purchases/suppliers", menu: "purchases" },
   { label: "Inventory", href: "/app?menu=inventory", menu: "inventory" },
   { label: "Reports", href: "/app?menu=reports", menu: "reports" },
   { label: "Settings", href: "/app/settings", menu: "settings" },
@@ -22,4 +22,8 @@ export const SETTINGS_TABS = [
   { label: "Roles & Permissions", href: "/app/settings/roles-permissions", permissions: ["user.view", "user.manage"] },
   { label: "Profile", href: "/app/settings/profile" },
   { label: "Security", href: "/app/settings/security" },
+] as const;
+
+export const PURCHASES_TABS = [
+  { label: "Suppliers", href: "/app/purchases/suppliers", permissions: ["supplier.view"] },
 ] as const;

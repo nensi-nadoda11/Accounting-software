@@ -18,6 +18,8 @@ export type PermissionKey =
   | "supplier.create"
   | "supplier.update"
   | "supplier.delete"
+  | "supplier.ledger.view"
+  | "supplier.export"
   | "product.view"
   | "product.create"
   | "product.update"

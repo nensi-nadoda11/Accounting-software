@@ -21,6 +21,7 @@ import { InvitesPage } from "../features/settings/InvitesPage";
 import { ProfilePage } from "../features/settings/ProfilePage";
 import { RolesPermissionsPage } from "../features/settings/RolesPermissionsPage";
 import { SecurityPage } from "../features/settings/SecurityPage";
+import { SuppliersPage } from "../features/suppliers/SuppliersPage";
 import { UsersPage } from "../features/settings/UsersPage";
 import { UnauthorizedPage } from "../features/shared/UnauthorizedPage";
 import { useAuth } from "../providers/AuthProvider";
@@ -66,6 +67,14 @@ export const AppRouter = () => (
           element={
             <PermissionRoute permissions={["customer.view"]}>
               <CustomersPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="purchases/suppliers"
+          element={
+            <PermissionRoute permissions={["supplier.view"]}>
+              <SuppliersPage />
             </PermissionRoute>
           }
         />

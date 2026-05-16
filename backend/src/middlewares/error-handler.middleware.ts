@@ -57,6 +57,21 @@ export const errorHandler = (
       return;
     }
 
+    if (constraint.includes("suppliers_company_supplier_code_unique_idx")) {
+      response.status(409).json(errorResponse("A supplier with this code already exists"));
+      return;
+    }
+
+    if (constraint.includes("suppliers_company_mobile_unique_idx")) {
+      response.status(409).json(errorResponse("A supplier with this mobile number already exists"));
+      return;
+    }
+
+    if (constraint.includes("suppliers_company_email_unique_idx")) {
+      response.status(409).json(errorResponse("A supplier with this email already exists"));
+      return;
+    }
+
     if (constraint.includes("company_branches_company_branch_code_unique_idx")) {
       response.status(409).json(errorResponse("A branch with this code already exists"));
       return;

@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1, Module 2, and Module 4: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, and customer management APIs.
+Production-oriented backend for Module 1, Module 2, Module 4, and Module 5: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, and supplier/vendor management APIs.
 
 ## Stack
 
@@ -29,6 +29,7 @@ src/
     companies/
     customers/
     permissions/
+    suppliers/
     users/
   routes/
   services/
@@ -164,6 +165,25 @@ All customer routes require authentication, company access, and permission-based
 - `GET /api/v1/customers/export`
 - `GET /api/v1/customers/:id/ledger/export`
 
+## Implemented Module 5 APIs
+
+All supplier routes require authentication, company access, and permission-based access control.
+
+- `GET /api/v1/suppliers`
+- `POST /api/v1/suppliers`
+- `GET /api/v1/suppliers/:id`
+- `PATCH /api/v1/suppliers/:id`
+- `DELETE /api/v1/suppliers/:id`
+- `PATCH /api/v1/suppliers/:id/status`
+- `PATCH /api/v1/suppliers/:id/blacklist`
+- `PATCH /api/v1/suppliers/:id/preferred`
+- `GET /api/v1/suppliers/:id/ledger`
+- `GET /api/v1/suppliers/:id/purchases`
+- `GET /api/v1/suppliers/:id/payments`
+- `GET /api/v1/suppliers/:id/outstanding`
+- `GET /api/v1/suppliers/export`
+- `GET /api/v1/suppliers/:id/ledger/export`
+
 ## Security
 
 - Helmet enabled
@@ -186,4 +206,6 @@ All customer routes require authentication, company access, and permission-based
 - Branding uploads use multipart form-data with `file` and `type` (`logo`, `invoiceLogo`, `signature`, `stamp`, `favicon`).
 - Uploaded files are served from `PUBLIC_UPLOAD_BASE_URL`, backed by `UPLOAD_DIR`.
 - Customer exports are available as CSV now; the service interface is structured so XLSX/PDF can be added later without changing routes.
+- Supplier exports are available as CSV now; the service interface is structured so XLSX/PDF can be added later without changing routes.
+- Supplier purchase history, payment history, and ledger repositories are future-ready and return safe empty paginated results until purchase/payment tables are added.
 - The backend applies Drizzle migrations automatically on startup, including the Module 2 company setup schema.

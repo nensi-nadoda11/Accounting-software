@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { SETTINGS_TABS } from "../../constants/navigation";
+import { PURCHASES_TABS, SETTINGS_TABS } from "../../constants/navigation";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../providers/AuthProvider";
 
@@ -8,9 +8,15 @@ export const SubTabs = () => {
   const location = useLocation();
   const { hasPermission } = useAuth();
 
-  const tabs = SETTINGS_TABS.filter((tab) =>
+  const sourceTabs = location.pathname.startsWith("/app/purchases") ? PURCHASES_TABS : SETTINGS_TABS;
+
+  const tabs = sourceTabs.filter((tab) =>
     "permissions" in tab ? hasPermission(Array.from(tab.permissions)) : true,
   );
+
+  if (!tabs.length) {
+    return null;
+  }
 
   return (
     <div className="border-b border-slate-200 bg-white/90">

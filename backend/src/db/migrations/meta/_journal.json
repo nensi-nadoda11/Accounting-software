@@ -22,6 +22,13 @@
       "when": 1778906758307,
       "tag": "0002_customer_management_module",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778910529097,
+      "tag": "0003_supplier_management_module",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,13 @@
       "when": 1778825568141,
       "tag": "0001_company_setup_module",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778906758307,
+      "tag": "0002_customer_management_module",
+      "breakpoints": true
     }
   ]
 }

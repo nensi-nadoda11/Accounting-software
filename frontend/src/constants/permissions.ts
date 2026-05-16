@@ -5,6 +5,8 @@ export const ALL_PERMISSIONS: PermissionKey[] = [
   "customer.create",
   "customer.update",
   "customer.delete",
+  "customer.ledger.view",
+  "customer.export",
   "supplier.view",
   "supplier.create",
   "supplier.update",
@@ -44,7 +46,10 @@ export const ALL_PERMISSIONS: PermissionKey[] = [
 ];
 
 export const PERMISSION_GROUPS: Array<{ label: string; permissions: PermissionKey[] }> = [
-  { label: "Customer", permissions: ["customer.view", "customer.create", "customer.update", "customer.delete"] },
+  {
+    label: "Customer",
+    permissions: ["customer.view", "customer.create", "customer.update", "customer.delete", "customer.ledger.view", "customer.export"],
+  },
   { label: "Supplier", permissions: ["supplier.view", "supplier.create", "supplier.update", "supplier.delete"] },
   { label: "Product", permissions: ["product.view", "product.create", "product.update", "product.delete"] },
   { label: "Inventory", permissions: ["inventory.view", "inventory.manage"] },
@@ -65,6 +70,9 @@ export const PERMISSION_GROUPS: Array<{ label: string; permissions: PermissionKe
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
   admin: [...ALL_PERMISSIONS],
   accountant: [
+    "customer.view",
+    "customer.ledger.view",
+    "customer.export",
     "accounting.view",
     "accounting.manage",
     "payment.view",

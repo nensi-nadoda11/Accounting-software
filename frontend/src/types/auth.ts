@@ -12,6 +12,8 @@ export type PermissionKey =
   | "customer.create"
   | "customer.update"
   | "customer.delete"
+  | "customer.ledger.view"
+  | "customer.export"
   | "supplier.view"
   | "supplier.create"
   | "supplier.update"

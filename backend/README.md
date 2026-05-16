@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1 and Module 2: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, and Drizzle migrations.
+Production-oriented backend for Module 1, Module 2, and Module 4: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, and customer management APIs.
 
 ## Stack
 
@@ -27,6 +27,7 @@ src/
     auth/
     company/
     companies/
+    customers/
     permissions/
     users/
   routes/
@@ -146,6 +147,23 @@ All company setup routes require authentication, company access, and `settings.m
 - `GET /api/v1/company/setup-status`
 - `POST /api/v1/company/complete-setup`
 
+## Implemented Module 4 APIs
+
+All customer routes require authentication, company access, and permission-based access control.
+
+- `GET /api/v1/customers`
+- `POST /api/v1/customers`
+- `GET /api/v1/customers/:id`
+- `PATCH /api/v1/customers/:id`
+- `DELETE /api/v1/customers/:id`
+- `PATCH /api/v1/customers/:id/status`
+- `PATCH /api/v1/customers/:id/blacklist`
+- `GET /api/v1/customers/:id/ledger`
+- `GET /api/v1/customers/:id/payments`
+- `GET /api/v1/customers/:id/outstanding`
+- `GET /api/v1/customers/export`
+- `GET /api/v1/customers/:id/ledger/export`
+
 ## Security
 
 - Helmet enabled
@@ -167,4 +185,5 @@ All company setup routes require authentication, company access, and `settings.m
 - Cleanup job removes expired OTPs and sessions and marks pending invites as expired.
 - Branding uploads use multipart form-data with `file` and `type` (`logo`, `invoiceLogo`, `signature`, `stamp`, `favicon`).
 - Uploaded files are served from `PUBLIC_UPLOAD_BASE_URL`, backed by `UPLOAD_DIR`.
+- Customer exports are available as CSV now; the service interface is structured so XLSX/PDF can be added later without changing routes.
 - The backend applies Drizzle migrations automatically on startup, including the Module 2 company setup schema.

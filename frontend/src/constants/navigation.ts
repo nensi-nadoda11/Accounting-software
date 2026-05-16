@@ -1,7 +1,7 @@
 export const TOP_NAV_ITEMS = [
   { label: "Dashboard", href: "/app?menu=dashboard", menu: "dashboard" },
   { label: "Accounting", href: "/app?menu=accounting", menu: "accounting" },
-  { label: "Sales", href: "/app?menu=sales", menu: "sales" },
+  { label: "Sales", href: "/app/sales/customers", menu: "sales" },
   { label: "Purchases", href: "/app?menu=purchases", menu: "purchases" },
   { label: "Inventory", href: "/app?menu=inventory", menu: "inventory" },
   { label: "Reports", href: "/app?menu=reports", menu: "reports" },

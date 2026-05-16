@@ -7,6 +7,7 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { ResetPasswordPage } from "../features/auth/ResetPasswordPage";
 import { VerifyOtpPage } from "../features/auth/VerifyOtpPage";
+import { CustomersPage } from "../features/customers/CustomersPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { BankAccountsPage } from "../features/company/BankAccountsPage";
 import { BranchesPage } from "../features/company/BranchesPage";
@@ -60,6 +61,14 @@ export const AppRouter = () => (
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route
+          path="sales/customers"
+          element={
+            <PermissionRoute permissions={["customer.view"]}>
+              <CustomersPage />
+            </PermissionRoute>
+          }
+        />
         <Route path="settings" element={<SettingsIndexRedirect />} />
         <Route
           path="settings/company/profile"

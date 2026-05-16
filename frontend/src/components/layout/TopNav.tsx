@@ -5,9 +5,10 @@ import { cn } from "../../lib/utils";
 
 export const TopNav = () => {
   const location = useLocation();
+  const section = location.pathname.replace(/^\/app\/?/, "").split("/")[0];
   const activeMenu = location.pathname.startsWith("/app/settings")
     ? "settings"
-    : new URLSearchParams(location.search).get("menu") || "dashboard";
+    : section || new URLSearchParams(location.search).get("menu") || "dashboard";
 
   return (
     <div className="border-b border-slate-200 bg-white">

@@ -3,6 +3,8 @@ export const ALL_PERMISSIONS = [
   "customer.create",
   "customer.update",
   "customer.delete",
+  "customer.ledger.view",
+  "customer.export",
   "supplier.view",
   "supplier.create",
   "supplier.update",
@@ -44,6 +46,9 @@ export const ALL_PERMISSIONS = [
 export type PermissionKey = (typeof ALL_PERMISSIONS)[number];
 
 const accountantPermissions: PermissionKey[] = [
+  "customer.view",
+  "customer.ledger.view",
+  "customer.export",
   "accounting.view",
   "accounting.manage",
   "payment.view",
@@ -81,6 +86,8 @@ const staffPermissions: PermissionKey[] = [
 ];
 
 const auditorPermissions: PermissionKey[] = [
+  "customer.view",
+  "customer.ledger.view",
   "report.view",
   "audit.view",
   "accounting.view",

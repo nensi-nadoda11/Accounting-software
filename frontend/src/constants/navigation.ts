@@ -3,7 +3,7 @@ export const TOP_NAV_ITEMS = [
   { label: "Accounting", href: "/app?menu=accounting", menu: "accounting" },
   { label: "Sales", href: "/app/sales/customers", menu: "sales" },
   { label: "Purchases", href: "/app/purchases/suppliers", menu: "purchases" },
-  { label: "Inventory", href: "/app/inventory/products", menu: "inventory" },
+  { label: "Inventory", href: "/app/inventory/stock", menu: "inventory" },
   { label: "Reports", href: "/app?menu=reports", menu: "reports" },
   { label: "Settings", href: "/app/settings", menu: "settings" },
 ] as const;
@@ -29,6 +29,11 @@ export const PURCHASES_TABS = [
 ] as const;
 
 export const INVENTORY_TABS = [
+  {
+    label: "Stock",
+    href: "/app/inventory/stock",
+    permissions: ["inventory.view", "warehouse.manage", "batch.view", "inventory.valuation.view"],
+  },
   {
     label: "Products",
     href: "/app/inventory/products",

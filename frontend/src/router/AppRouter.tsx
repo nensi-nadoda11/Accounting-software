@@ -15,6 +15,7 @@ import { BrandingPage } from "../features/company/BrandingPage";
 import { CompanyProfilePage } from "../features/company/CompanyProfilePage";
 import { FinancialYearsPage } from "../features/company/FinancialYearsPage";
 import { InvoiceSettingsPage } from "../features/company/InvoiceSettingsPage";
+import { InventoryStockPage } from "../features/inventory/InventoryStockPage";
 import { PreferencesPage } from "../features/company/PreferencesPage";
 import { TaxSettingsPage } from "../features/company/TaxSettingsPage";
 import { ProductsPage } from "../features/products/ProductsPage";
@@ -76,6 +77,14 @@ export const AppRouter = () => (
           element={
             <PermissionRoute permissions={["supplier.view"]}>
               <SuppliersPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="inventory/stock"
+          element={
+            <PermissionRoute permissions={["inventory.view", "warehouse.manage", "batch.view", "inventory.valuation.view"]}>
+              <InventoryStockPage />
             </PermissionRoute>
           }
         />

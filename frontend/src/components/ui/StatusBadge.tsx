@@ -5,6 +5,7 @@ const statusToneMap = {
   inactive: "neutral",
   blocked: "danger",
   deleted: "danger",
+  expired: "danger",
   locked: "warning",
   default: "info",
   completed: "success",
@@ -12,6 +13,12 @@ const statusToneMap = {
   suspended: "danger",
   disabled: "danger",
   invited: "info",
+  low: "success",
+  medium: "warning",
+  high: "warning",
+  critical: "danger",
+  read: "neutral",
+  unread: "info",
 } as const;
 
 export const StatusBadge = ({

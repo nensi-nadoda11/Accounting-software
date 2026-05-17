@@ -72,6 +72,53 @@ export const errorHandler = (
       return;
     }
 
+    if (constraint.includes("products_company_product_code_unique_idx")) {
+      response.status(409).json(errorResponse("A product with this code already exists"));
+      return;
+    }
+
+    if (constraint.includes("products_company_sku_unique_idx")) {
+      response.status(409).json(errorResponse("A product with this SKU already exists"));
+      return;
+    }
+
+    if (constraint.includes("products_company_barcode_unique_idx")) {
+      response.status(409).json(errorResponse("A product with this barcode already exists"));
+      return;
+    }
+
+    if (constraint.includes("product_categories_company_category_code_unique_idx")) {
+      response.status(409).json(errorResponse("A category with this code already exists"));
+      return;
+    }
+
+    if (constraint.includes("product_categories_company_name_unique_idx")) {
+      response.status(409).json(errorResponse("A category with this name already exists"));
+      return;
+    }
+
+    if (constraint.includes("product_units_company_symbol_unique_idx")) {
+      response.status(409).json(errorResponse("A unit with this symbol already exists"));
+      return;
+    }
+
+    if (constraint.includes("warehouses_company_warehouse_code_unique_idx")) {
+      response.status(409).json(errorResponse("A warehouse with this code already exists"));
+      return;
+    }
+
+    if (constraint.includes("warehouses_company_default_active_unique_idx")) {
+      response.status(409).json(errorResponse("Only one active default warehouse is allowed per company"));
+      return;
+    }
+
+    if (constraint.includes("product_batches_company_product_warehouse_batch_unique_idx")) {
+      response
+        .status(409)
+        .json(errorResponse("A batch with this number already exists for the selected product and warehouse"));
+      return;
+    }
+
     if (constraint.includes("company_branches_company_branch_code_unique_idx")) {
       response.status(409).json(errorResponse("A branch with this code already exists"));
       return;

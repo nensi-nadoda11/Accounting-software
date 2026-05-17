@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1, Module 2, Module 4, and Module 5: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, and supplier/vendor management APIs.
+Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, and Module 7: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, and inventory/stock management APIs.
 
 ## Stack
 
@@ -28,6 +28,8 @@ src/
     company/
     companies/
     customers/
+    inventory/
+    products/
     permissions/
     suppliers/
     users/
@@ -184,6 +186,56 @@ All supplier routes require authentication, company access, and permission-based
 - `GET /api/v1/suppliers/export`
 - `GET /api/v1/suppliers/:id/ledger/export`
 
+## Implemented Module 6 APIs
+
+All product routes require authentication, company access, and permission-based access control.
+
+- `GET /api/v1/products`
+- `POST /api/v1/products`
+- `GET /api/v1/products/lookup`
+- `GET /api/v1/products/export`
+- `GET /api/v1/products/:id`
+- `PATCH /api/v1/products/:id`
+- `DELETE /api/v1/products/:id`
+- `GET /api/v1/products/:id/price-history`
+- `GET /api/v1/products/:id/stock-summary`
+- `POST /api/v1/products/:id/generate-barcode`
+- `GET /api/v1/products/categories`
+- `POST /api/v1/products/categories`
+- `PATCH /api/v1/products/categories/:id`
+- `DELETE /api/v1/products/categories/:id`
+- `GET /api/v1/products/units`
+- `POST /api/v1/products/units`
+- `PATCH /api/v1/products/units/:id`
+- `DELETE /api/v1/products/units/:id`
+
+## Implemented Module 7 APIs
+
+All inventory routes require authentication, company access, and permission-based access control.
+
+- `GET /api/v1/inventory/warehouses`
+- `POST /api/v1/inventory/warehouses`
+- `PATCH /api/v1/inventory/warehouses/:id`
+- `DELETE /api/v1/inventory/warehouses/:id`
+- `POST /api/v1/inventory/warehouses/:id/default`
+- `GET /api/v1/inventory/stock`
+- `GET /api/v1/inventory/stock/:productId`
+- `GET /api/v1/inventory/stock/summary`
+- `GET /api/v1/inventory/stock/export`
+- `GET /api/v1/inventory/batches`
+- `POST /api/v1/inventory/batches`
+- `PATCH /api/v1/inventory/batches/:id`
+- `POST /api/v1/inventory/opening-stock`
+- `POST /api/v1/inventory/adjustments`
+- `GET /api/v1/inventory/adjustments`
+- `GET /api/v1/inventory/movements`
+- `GET /api/v1/inventory/movements/export`
+- `GET /api/v1/inventory/alerts`
+- `PATCH /api/v1/inventory/alerts/:id/read`
+- `POST /api/v1/inventory/alerts/recalculate`
+- `GET /api/v1/inventory/valuation`
+- `GET /api/v1/inventory/valuation/export`
+
 ## Security
 
 - Helmet enabled
@@ -208,4 +260,8 @@ All supplier routes require authentication, company access, and permission-based
 - Customer exports are available as CSV now; the service interface is structured so XLSX/PDF can be added later without changing routes.
 - Supplier exports are available as CSV now; the service interface is structured so XLSX/PDF can be added later without changing routes.
 - Supplier purchase history, payment history, and ledger repositories are future-ready and return safe empty paginated results until purchase/payment tables are added.
+- Product exports are available as CSV now; the interface is structured so XLSX/PDF can be added later without changing routes.
+- Product stock summary returns safe opening-stock-based data until inventory transaction tables are added.
+- Inventory exports and valuation exports are available as CSV now; the route contracts are structured so XLSX/PDF can be added later without changing the APIs.
+- Inventory alert expiry windows use `INVENTORY_EXPIRY_ALERT_DAYS` and default to 30 days.
 - The backend applies Drizzle migrations automatically on startup, including the Module 2 company setup schema.

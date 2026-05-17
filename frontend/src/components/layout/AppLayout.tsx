@@ -12,7 +12,9 @@ export const AppLayout = () => {
   const { logout, user } = useAuth();
   const toast = useToast();
   const showSubTabs =
-    location.pathname.startsWith("/app/settings") || location.pathname.startsWith("/app/purchases");
+    location.pathname.startsWith("/app/settings") ||
+    location.pathname.startsWith("/app/purchases") ||
+    location.pathname.startsWith("/app/inventory");
 
   return (
     <div className="min-h-screen bg-[#F7FAFA]">

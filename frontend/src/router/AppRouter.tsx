@@ -17,6 +17,7 @@ import { FinancialYearsPage } from "../features/company/FinancialYearsPage";
 import { InvoiceSettingsPage } from "../features/company/InvoiceSettingsPage";
 import { PreferencesPage } from "../features/company/PreferencesPage";
 import { TaxSettingsPage } from "../features/company/TaxSettingsPage";
+import { ProductsPage } from "../features/products/ProductsPage";
 import { InvitesPage } from "../features/settings/InvitesPage";
 import { ProfilePage } from "../features/settings/ProfilePage";
 import { RolesPermissionsPage } from "../features/settings/RolesPermissionsPage";
@@ -75,6 +76,14 @@ export const AppRouter = () => (
           element={
             <PermissionRoute permissions={["supplier.view"]}>
               <SuppliersPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="inventory/products"
+          element={
+            <PermissionRoute permissions={["product.view"]}>
+              <ProductsPage />
             </PermissionRoute>
           }
         />

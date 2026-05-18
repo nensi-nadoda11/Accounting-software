@@ -17,6 +17,7 @@ import { FinancialYearsPage } from "../features/company/FinancialYearsPage";
 import { InvoiceSettingsPage } from "../features/company/InvoiceSettingsPage";
 import { InventoryStockPage } from "../features/inventory/InventoryStockPage";
 import { PreferencesPage } from "../features/company/PreferencesPage";
+import { PurchasePage } from "../features/purchases/PurchasePage";
 import { TaxSettingsPage } from "../features/company/TaxSettingsPage";
 import { ProductsPage } from "../features/products/ProductsPage";
 import { InvitesPage } from "../features/settings/InvitesPage";
@@ -69,6 +70,38 @@ export const AppRouter = () => (
           element={
             <PermissionRoute permissions={["customer.view"]}>
               <CustomersPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="purchases/invoices"
+          element={
+            <PermissionRoute permissions={["purchase.view"]}>
+              <PurchasePage tab="invoices" />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="purchases/new"
+          element={
+            <PermissionRoute permissions={["purchase.create", "purchase.update"]}>
+              <PurchasePage tab="new" />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="purchases/returns"
+          element={
+            <PermissionRoute permissions={["purchase.view", "purchase.return"]}>
+              <PurchasePage tab="returns" />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="purchases/payments"
+          element={
+            <PermissionRoute permissions={["purchase.payment.view", "purchase.payment.manage"]}>
+              <PurchasePage tab="payments" />
             </PermissionRoute>
           }
         />

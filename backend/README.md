@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, and Module 7: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, and inventory/stock management APIs.
+Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, and Module 8: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, and purchase management APIs.
 
 ## Stack
 
@@ -29,6 +29,7 @@ src/
     companies/
     customers/
     inventory/
+    purchases/
     products/
     permissions/
     suppliers/
@@ -236,6 +237,27 @@ All inventory routes require authentication, company access, and permission-base
 - `GET /api/v1/inventory/valuation`
 - `GET /api/v1/inventory/valuation/export`
 
+## Implemented Module 8 APIs
+
+All purchase routes require authentication, company access, and permission-based access control.
+
+- `GET /api/v1/purchases`
+- `POST /api/v1/purchases`
+- `GET /api/v1/purchases/export`
+- `GET /api/v1/purchases/:id`
+- `PATCH /api/v1/purchases/:id`
+- `DELETE /api/v1/purchases/:id`
+- `POST /api/v1/purchases/:id/post`
+- `POST /api/v1/purchases/:id/cancel`
+- `GET /api/v1/purchases/:id/payments`
+- `POST /api/v1/purchases/:id/payments`
+- `GET /api/v1/purchases/:id/pdf`
+- `GET /api/v1/purchases/returns`
+- `POST /api/v1/purchases/returns`
+- `GET /api/v1/purchases/returns/export`
+- `GET /api/v1/purchases/returns/:id`
+- `GET /api/v1/purchases/returns/:id/pdf`
+
 ## Security
 
 - Helmet enabled
@@ -259,9 +281,10 @@ All inventory routes require authentication, company access, and permission-base
 - Uploaded files are served from `PUBLIC_UPLOAD_BASE_URL`, backed by `UPLOAD_DIR`.
 - Customer exports are available as CSV now; the service interface is structured so XLSX/PDF can be added later without changing routes.
 - Supplier exports are available as CSV now; the service interface is structured so XLSX/PDF can be added later without changing routes.
-- Supplier purchase history, payment history, and ledger repositories are future-ready and return safe empty paginated results until purchase/payment tables are added.
+- Supplier purchase history, payment history, outstanding totals, and ledger views now read from the purchase invoices, purchase returns, and purchase payments tables.
 - Product exports are available as CSV now; the interface is structured so XLSX/PDF can be added later without changing routes.
 - Product stock summary returns safe opening-stock-based data until inventory transaction tables are added.
 - Inventory exports and valuation exports are available as CSV now; the route contracts are structured so XLSX/PDF can be added later without changing the APIs.
 - Inventory alert expiry windows use `INVENTORY_EXPIRY_ALERT_DAYS` and default to 30 days.
+- Purchase exports are available as CSV now. The `/pdf` routes currently return CSV fallback files until a PDF renderer is introduced.
 - The backend applies Drizzle migrations automatically on startup, including the Module 2 company setup schema.

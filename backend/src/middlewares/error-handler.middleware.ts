@@ -119,6 +119,21 @@ export const errorHandler = (
       return;
     }
 
+    if (constraint.includes("purchase_invoices_company_purchase_number_unique_idx")) {
+      response.status(409).json(errorResponse("A purchase with this number already exists"));
+      return;
+    }
+
+    if (constraint.includes("purchase_invoices_company_supplier_supplier_invoice_unique_idx")) {
+      response.status(409).json(errorResponse("This supplier invoice number is already recorded for the supplier"));
+      return;
+    }
+
+    if (constraint.includes("purchase_returns_company_return_number_unique_idx")) {
+      response.status(409).json(errorResponse("A purchase return with this number already exists"));
+      return;
+    }
+
     if (constraint.includes("company_branches_company_branch_code_unique_idx")) {
       response.status(409).json(errorResponse("A branch with this code already exists"));
       return;

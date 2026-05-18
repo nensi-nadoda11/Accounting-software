@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../db";
-import { suppliers } from "../../db/schema";
+import { purchaseInvoices, purchasePayments, purchaseReturns, suppliers } from "../../db/schema";
 
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbExecutor = typeof db | TransactionClient;
@@ -298,89 +298,286 @@ class SuppliersRepository {
   }
 
   public async getSupplierTransactionTotals(
-    _companyId: string,
-    _supplierId: string
+    companyId: string,
+    supplierId: string
   ): Promise<SupplierTransactionTotals> {
+    const [purchaseRow] = await db
+      .select({
+        totalPurchases: sql<string>`coalesce(sum(${purchaseInvoices.grandTotal}), 0)`,
+        overduePayable: sql<string>`coalesce(sum(case when ${purchaseInvoices.dueDate} < current_date and ${purchaseInvoices.dueAmount} > 0 then ${purchaseInvoices.dueAmount} else 0 end), 0)`,
+        dueInvoicesCount: sql<number>`coalesce(sum(case when ${purchaseInvoices.dueAmount} > 0 then 1 else 0 end), 0)`
+      })
+      .from(purchaseInvoices)
+      .where(
+        and(
+          eq(purchaseInvoices.companyId, companyId),
+          eq(purchaseInvoices.supplierId, supplierId),
+          isNull(purchaseInvoices.deletedAt),
+          or(eq(purchaseInvoices.purchaseStatus, "posted"), eq(purchaseInvoices.purchaseStatus, "returned"))!
+        )
+      );
+
+    const [returnRow] = await db
+      .select({
+        totalPurchaseReturns: sql<string>`coalesce(sum(${purchaseReturns.grandTotal}), 0)`
+      })
+      .from(purchaseReturns)
+      .where(and(eq(purchaseReturns.companyId, companyId), eq(purchaseReturns.supplierId, supplierId)));
+
+    const [paymentRow] = await db
+      .select({
+        totalPaymentsMade: sql<string>`coalesce(sum(${purchasePayments.amount}), 0)`
+      })
+      .from(purchasePayments)
+      .where(and(eq(purchasePayments.companyId, companyId), eq(purchasePayments.supplierId, supplierId)));
+
     return {
-      totalPurchases: "0.00",
-      totalPurchaseReturns: "0.00",
-      totalPaymentsMade: "0.00",
+      totalPurchases: purchaseRow?.totalPurchases ?? "0.00",
+      totalPurchaseReturns: returnRow?.totalPurchaseReturns ?? "0.00",
+      totalPaymentsMade: paymentRow?.totalPaymentsMade ?? "0.00",
       debitAdjustments: "0.00",
       creditAdjustments: "0.00",
-      overduePayable: "0.00",
-      dueInvoicesCount: 0
+      overduePayable: purchaseRow?.overduePayable ?? "0.00",
+      dueInvoicesCount: purchaseRow?.dueInvoicesCount ?? 0
     };
   }
 
-  public async hasLinkedTransactions(_companyId: string, _supplierId: string): Promise<boolean> {
-    return false;
+  public async hasLinkedTransactions(companyId: string, supplierId: string): Promise<boolean> {
+    const [invoiceRow, returnRow, paymentRow] = await Promise.all([
+      db
+        .select({ id: purchaseInvoices.id })
+        .from(purchaseInvoices)
+        .where(and(eq(purchaseInvoices.companyId, companyId), eq(purchaseInvoices.supplierId, supplierId), isNull(purchaseInvoices.deletedAt)))
+        .limit(1),
+      db
+        .select({ id: purchaseReturns.id })
+        .from(purchaseReturns)
+        .where(and(eq(purchaseReturns.companyId, companyId), eq(purchaseReturns.supplierId, supplierId)))
+        .limit(1),
+      db
+        .select({ id: purchasePayments.id })
+        .from(purchasePayments)
+        .where(and(eq(purchasePayments.companyId, companyId), eq(purchasePayments.supplierId, supplierId)))
+        .limit(1)
+    ]);
+
+    return Boolean(invoiceRow[0] || returnRow[0] || paymentRow[0]);
   }
 
   public async listLedgerTransactions(
-    _companyId: string,
-    _supplierId: string,
-    _filters?: {
+    companyId: string,
+    supplierId: string,
+    filters?: {
       dateFrom?: Date | undefined;
       dateTo?: Date | undefined;
       transactionType?: string | undefined;
     }
   ) {
+    const purchaseConditions: SQL[] = [
+      eq(purchaseInvoices.companyId, companyId),
+      eq(purchaseInvoices.supplierId, supplierId),
+      isNull(purchaseInvoices.deletedAt),
+      or(eq(purchaseInvoices.purchaseStatus, "posted"), eq(purchaseInvoices.purchaseStatus, "returned"))!
+    ];
+
+    if (filters?.dateFrom) {
+      purchaseConditions.push(sql`${purchaseInvoices.invoiceDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      purchaseConditions.push(sql`${purchaseInvoices.invoiceDate} <= ${filters.dateTo}`);
+    }
+
+    const returnConditions: SQL[] = [eq(purchaseReturns.companyId, companyId), eq(purchaseReturns.supplierId, supplierId)];
+    if (filters?.dateFrom) {
+      returnConditions.push(sql`${purchaseReturns.returnDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      returnConditions.push(sql`${purchaseReturns.returnDate} <= ${filters.dateTo}`);
+    }
+
+    const paymentConditions: SQL[] = [eq(purchasePayments.companyId, companyId), eq(purchasePayments.supplierId, supplierId)];
+    if (filters?.dateFrom) {
+      paymentConditions.push(sql`${purchasePayments.paymentDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      paymentConditions.push(sql`${purchasePayments.paymentDate} <= ${filters.dateTo}`);
+    }
+
+    const [purchaseRows, returnRows, paymentRows] = await Promise.all([
+      !filters?.transactionType || filters.transactionType === "purchase"
+        ? db
+            .select({
+              date: purchaseInvoices.invoiceDate,
+              transactionType: sql<string>`'purchase'`,
+              referenceNo: purchaseInvoices.purchaseNumber,
+              description: sql<string>`concat('Purchase invoice ', ${purchaseInvoices.purchaseNumber})`,
+              debit: sql<string>`'0.00'`,
+              credit: purchaseInvoices.grandTotal,
+              paymentMode: sql<string | null>`null`,
+              remarks: purchaseInvoices.notes
+            })
+            .from(purchaseInvoices)
+            .where(and(...purchaseConditions))
+        : Promise.resolve([]),
+      !filters?.transactionType || filters.transactionType === "purchase_return"
+        ? db
+            .select({
+              date: purchaseReturns.returnDate,
+              transactionType: sql<string>`'purchase_return'`,
+              referenceNo: purchaseReturns.returnNumber,
+              description: sql<string>`concat('Purchase return ', ${purchaseReturns.returnNumber})`,
+              debit: purchaseReturns.grandTotal,
+              credit: sql<string>`'0.00'`,
+              paymentMode: sql<string | null>`null`,
+              remarks: purchaseReturns.notes
+            })
+            .from(purchaseReturns)
+            .where(and(...returnConditions))
+        : Promise.resolve([]),
+      !filters?.transactionType || filters.transactionType === "payment"
+        ? db
+            .select({
+              date: purchasePayments.paymentDate,
+              transactionType: sql<string>`'payment'`,
+              referenceNo: purchasePayments.referenceNumber,
+              description: sql<string>`concat('Purchase payment ', ${purchasePayments.paymentMode})`,
+              debit: purchasePayments.amount,
+              credit: sql<string>`'0.00'`,
+              paymentMode: sql<string | null>`${purchasePayments.paymentMode}`,
+              remarks: purchasePayments.notes
+            })
+            .from(purchasePayments)
+            .where(and(...paymentConditions))
+        : Promise.resolve([])
+    ]);
+
+    const rows = [...purchaseRows, ...returnRows, ...paymentRows]
+      .map((row) => ({
+        ...row,
+        date: new Date(row.date)
+      }))
+      .sort((left, right) => left.date.getTime() - right.date.getTime());
+
     return {
-      rows: [] as Array<{
-        date: Date;
-        transactionType: string;
-        referenceNo: string | null;
-        description: string;
-        debit: string;
-        credit: string;
-        paymentMode: string | null;
-        remarks: string | null;
-      }>,
-      total: 0
+      rows,
+      total: rows.length
     };
   }
 
   public async listPurchaseHistory(
-    _companyId: string,
-    _supplierId: string,
-    _filters?: {
+    companyId: string,
+    supplierId: string,
+    filters?: {
       dateFrom?: Date | undefined;
       dateTo?: Date | undefined;
       status?: string | null | undefined;
     }
   ) {
+    const conditions: SQL[] = [
+      eq(purchaseInvoices.companyId, companyId),
+      eq(purchaseInvoices.supplierId, supplierId),
+      isNull(purchaseInvoices.deletedAt),
+      ne(purchaseInvoices.purchaseStatus, "draft")
+    ];
+
+    if (filters?.dateFrom) {
+      conditions.push(sql`${purchaseInvoices.invoiceDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      conditions.push(sql`${purchaseInvoices.invoiceDate} <= ${filters.dateTo}`);
+    }
+
+    if (filters?.status) {
+      conditions.push(eq(purchaseInvoices.purchaseStatus, filters.status as typeof purchaseInvoices.$inferSelect.purchaseStatus));
+    }
+
+    const rows = await db
+      .select({
+        id: purchaseInvoices.id,
+        date: purchaseInvoices.invoiceDate,
+        referenceNo: purchaseInvoices.purchaseNumber,
+        status: purchaseInvoices.purchaseStatus,
+        grossAmount: purchaseInvoices.grandTotal,
+        returnAmount: sql<string>`coalesce((
+          select sum(${purchaseReturns.grandTotal})
+          from ${purchaseReturns}
+          where ${purchaseReturns.purchaseInvoiceId} = ${purchaseInvoices.id}
+        ), 0)`,
+        remarks: purchaseInvoices.notes
+      })
+      .from(purchaseInvoices)
+      .where(and(...conditions))
+      .orderBy(desc(purchaseInvoices.invoiceDate), desc(purchaseInvoices.createdAt));
+
+    const [purchaseTotals, returnTotals] = await Promise.all([
+      db
+        .select({
+          totalPurchases: sql<string>`coalesce(sum(${purchaseInvoices.grandTotal}), 0)`,
+          total: count()
+        })
+        .from(purchaseInvoices)
+        .where(and(...conditions)),
+      db
+        .select({
+          totalPurchaseReturns: sql<string>`coalesce(sum(${purchaseReturns.grandTotal}), 0)`
+        })
+        .from(purchaseReturns)
+        .innerJoin(purchaseInvoices, eq(purchaseReturns.purchaseInvoiceId, purchaseInvoices.id))
+        .where(and(eq(purchaseReturns.companyId, companyId), eq(purchaseReturns.supplierId, supplierId)))
+    ]);
+
     return {
-      rows: [] as Array<{
-        id: string;
-        date: Date;
-        referenceNo: string | null;
-        status: string | null;
-        grossAmount: string;
-        returnAmount: string;
-        remarks: string | null;
-      }>,
-      total: 0,
-      totalPurchases: "0.00",
-      totalPurchaseReturns: "0.00"
+      rows,
+      total: purchaseTotals[0]?.total ?? 0,
+      totalPurchases: purchaseTotals[0]?.totalPurchases ?? "0.00",
+      totalPurchaseReturns: returnTotals[0]?.totalPurchaseReturns ?? "0.00"
     };
   }
 
   public async listPaymentHistory(
-    _companyId: string,
-    _supplierId: string,
-    _filters?: { dateFrom?: Date | undefined; dateTo?: Date | undefined }
+    companyId: string,
+    supplierId: string,
+    filters?: { dateFrom?: Date | undefined; dateTo?: Date | undefined }
   ) {
+    const conditions: SQL[] = [eq(purchasePayments.companyId, companyId), eq(purchasePayments.supplierId, supplierId)];
+
+    if (filters?.dateFrom) {
+      conditions.push(sql`${purchasePayments.paymentDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      conditions.push(sql`${purchasePayments.paymentDate} <= ${filters.dateTo}`);
+    }
+
+    const rows = await db
+      .select({
+        id: purchasePayments.id,
+        date: purchasePayments.paymentDate,
+        referenceNo: purchasePayments.referenceNumber,
+        amount: purchasePayments.amount,
+        paymentMode: sql<string | null>`${purchasePayments.paymentMode}`,
+        remarks: purchasePayments.notes
+      })
+      .from(purchasePayments)
+      .where(and(...conditions))
+      .orderBy(desc(purchasePayments.paymentDate), desc(purchasePayments.createdAt));
+
+    const [totalRow] = await db
+      .select({
+        total: count(),
+        totalAmount: sql<string>`coalesce(sum(${purchasePayments.amount}), 0)`
+      })
+      .from(purchasePayments)
+      .where(and(...conditions));
+
     return {
-      rows: [] as Array<{
-        id: string;
-        date: Date;
-        referenceNo: string | null;
-        amount: string;
-        paymentMode: string | null;
-        remarks: string | null;
-      }>,
-      total: 0,
-      totalAmount: "0.00"
+      rows,
+      total: totalRow?.total ?? 0,
+      totalAmount: totalRow?.totalAmount ?? "0.00"
     };
   }
 }

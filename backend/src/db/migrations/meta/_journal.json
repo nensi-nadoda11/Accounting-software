@@ -43,6 +43,13 @@
       "when": 1778986049541,
       "tag": "0005_inventory_stock_management_module",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779019200000,
+      "tag": "0006_purchase_management_module",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import customersRoutes from "../modules/customers/customers.routes";
 import inventoryRoutes from "../modules/inventory/inventory.routes";
 import productsRoutes from "../modules/products/products.routes";
 import profileRoutes from "./profile.routes";
+import purchasesRoutes from "../modules/purchases/purchases.routes";
 import suppliersRoutes from "../modules/suppliers/suppliers.routes";
 import usersRoutes from "./users.routes";
 
@@ -15,6 +16,7 @@ router.use("/auth", authRoutes);
 router.use("/company", companyRoutes);
 router.use("/customers", customersRoutes);
 router.use("/inventory", inventoryRoutes);
+router.use("/purchases", purchasesRoutes);
 router.use("/products", productsRoutes);
 router.use("/suppliers", suppliersRoutes);
 router.use("/users", usersRoutes);

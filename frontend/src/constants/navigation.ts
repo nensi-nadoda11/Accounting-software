@@ -2,7 +2,7 @@ export const TOP_NAV_ITEMS = [
   { label: "Dashboard", href: "/app?menu=dashboard", menu: "dashboard" },
   { label: "Accounting", href: "/app?menu=accounting", menu: "accounting" },
   { label: "Sales", href: "/app/sales/customers", menu: "sales" },
-  { label: "Purchases", href: "/app/purchases/suppliers", menu: "purchases" },
+  { label: "Purchases", href: "/app/purchases/invoices", menu: "purchases" },
   { label: "Inventory", href: "/app/inventory/stock", menu: "inventory" },
   { label: "Reports", href: "/app?menu=reports", menu: "reports" },
   { label: "Settings", href: "/app/settings", menu: "settings" },
@@ -25,7 +25,10 @@ export const SETTINGS_TABS = [
 ] as const;
 
 export const PURCHASES_TABS = [
-  { label: "Suppliers", href: "/app/purchases/suppliers", permissions: ["supplier.view"] },
+  { label: "Purchase Invoices", href: "/app/purchases/invoices", permissions: ["purchase.view"] },
+  { label: "New Purchase", href: "/app/purchases/new", permissions: ["purchase.create", "purchase.update"] },
+  { label: "Returns", href: "/app/purchases/returns", permissions: ["purchase.view", "purchase.return"] },
+  { label: "Payments", href: "/app/purchases/payments", permissions: ["purchase.payment.view", "purchase.payment.manage"] },
 ] as const;
 
 export const INVENTORY_TABS = [

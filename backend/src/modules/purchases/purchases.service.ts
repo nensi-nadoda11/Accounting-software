@@ -1,0 +1,1935 @@
+import { db } from "../../db";
+import { auditLogService } from "../audit-logs/audit-log.service";
+import { companyRepository } from "../company/company.repository";
+import { inventoryRepository } from "../inventory/inventory.repository";
+import { inventoryService } from "../inventory/inventory.service";
+import {
+  addDecimals,
+  buildCsvBuffer,
+  compareDecimals,
+  decimalToScaledBigInt,
+  divideMoneyByQuantity,
+  normalizeMoney,
+  normalizeQuantity,
+  scaledBigIntToDecimal,
+  subtractDecimals
+} from "../inventory/inventory.utils";
+import { suppliersRepository } from "../suppliers/suppliers.repository";
+import { AppError } from "../../utils/app-error";
+import { getPagination } from "../../utils/pagination";
+import { purchasesRepository } from "./purchases.repository";
+import type {
+  CreatePurchaseReturnInput,
+  CreatePurchaseInput,
+  ExportPurchaseReturnsQuery,
+  ExportPurchasesQuery,
+  ListPurchasePaymentsQuery,
+  ListPurchaseReturnsQuery,
+  ListPurchasesQuery,
+  RecordPurchasePaymentInput,
+  UpdatePurchaseInput
+} from "./purchases.validator";
+import type { PurchaseActor, PurchaseExportPayload, PurchaseRequestContext } from "./purchases.types";
+import {
+  calculateDueAmount,
+  calculateInvoiceTotals,
+  calculatePaymentStatus,
+  normalizeQuantity as normalizePurchaseQuantity
+} from "./purchases.calculation";
+
+type ProductContextRow = Awaited<ReturnType<typeof inventoryRepository.findProductInventoryContext>>;
+type InvoiceRecord = Awaited<ReturnType<typeof purchasesRepository.findPurchaseById>>;
+type InvoiceItemRow = Awaited<ReturnType<typeof purchasesRepository.listPurchaseInvoiceItems>>[number];
+
+type ResolvedPurchaseItem = {
+  product: NonNullable<ProductContextRow>;
+  warehouseId: string | null;
+  batchId: string | null;
+  batchNumber: string | null;
+  quantity: string;
+  freeQuantity: string;
+  totalStockQuantity: string;
+  purchaseRate: string;
+  priceTaxType: "inclusive" | "exclusive";
+  discountPercent: string;
+  discountAmount: string;
+  gstRate: string;
+  cessRate: string;
+  manufacturingDate: Date | null;
+  expiryDate: Date | null;
+  remarks: string | null;
+  isInterState: boolean;
+};
+
+const pickDefined = <T extends Record<string, unknown>>(value: T): Partial<T> =>
+  Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Partial<T>;
+
+const toDateOnly = (value: Date) => value.toISOString().slice(0, 10);
+const roundHalfUp = (dividend: bigint, divisor: bigint) => {
+  if (divisor === 0n) {
+    throw new Error("Division by zero");
+  }
+
+  const negative = dividend < 0n;
+  const absoluteDividend = negative ? dividend * -1n : dividend;
+  const quotient = absoluteDividend / divisor;
+  const remainder = absoluteDividend % divisor;
+  const rounded = remainder * 2n >= divisor ? quotient + 1n : quotient;
+
+  return negative ? rounded * -1n : rounded;
+};
+
+class PurchasesService {
+  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
+    if (format !== "csv") {
+      throw new AppError("Only CSV export is available right now", 400);
+    }
+  }
+
+  private normalizePrefix(prefix: string | null | undefined, fallback: string) {
+    const base = (prefix?.trim() || fallback).replace(/-+$/, "");
+    return `${base}-`;
+  }
+
+  private buildNextSequenceNumber(previousValue: string | null, prefix: string) {
+    const match = previousValue?.match(/(\d+)$/);
+    const nextNumber = match ? Number(match[1]) + 1 : 1;
+    return `${prefix}${String(Number.isFinite(nextNumber) ? nextNumber : 1).padStart(6, "0")}`;
+  }
+
+  private hasFractionalQuantity(value: string) {
+    return decimalToScaledBigInt(value, 3) % 1000n !== 0n;
+  }
+
+  private normalizeState(value: string | null | undefined) {
+    return value?.trim().toUpperCase() ?? null;
+  }
+
+  private prorateMoney(totalAmount: string | number, totalQuantity: string | number, partialQuantity: string | number) {
+    const totalAmountScaled = decimalToScaledBigInt(totalAmount, 2);
+    const totalQuantityScaled = decimalToScaledBigInt(totalQuantity, 3);
+    const partialQuantityScaled = decimalToScaledBigInt(partialQuantity, 3);
+
+    if (totalQuantityScaled <= 0n || partialQuantityScaled <= 0n) {
+      return "0.00";
+    }
+
+    return scaledBigIntToDecimal(roundHalfUp(totalAmountScaled * partialQuantityScaled, totalQuantityScaled), 2);
+  }
+
+  private mapInvoiceRow(
+    row: NonNullable<Awaited<ReturnType<typeof purchasesRepository.findPurchaseDetail>>>,
+    extras?: {
+      items?: unknown[];
+      payments?: unknown[];
+      returns?: unknown[];
+    }
+  ) {
+    return {
+      id: row.invoice.id,
+      purchaseNumber: row.invoice.purchaseNumber,
+      supplierInvoiceNumber: row.invoice.supplierInvoiceNumber,
+      invoiceDate: row.invoice.invoiceDate,
+      dueDate: row.invoice.dueDate,
+      purchaseStatus: row.invoice.purchaseStatus,
+      paymentStatus: row.invoice.paymentStatus,
+      subtotal: normalizeMoney(row.invoice.subtotal),
+      itemDiscountTotal: normalizeMoney(row.invoice.itemDiscountTotal),
+      invoiceDiscountTotal: normalizeMoney(row.invoice.invoiceDiscountTotal),
+      additionalCharges: normalizeMoney(row.invoice.additionalCharges),
+      freightCharges: normalizeMoney(row.invoice.freightCharges),
+      taxableAmount: normalizeMoney(row.invoice.taxableAmount),
+      cgstTotal: normalizeMoney(row.invoice.cgstTotal),
+      sgstTotal: normalizeMoney(row.invoice.sgstTotal),
+      igstTotal: normalizeMoney(row.invoice.igstTotal),
+      cessTotal: normalizeMoney(row.invoice.cessTotal),
+      gstTotal: normalizeMoney(row.invoice.gstTotal),
+      roundOffAmount: normalizeMoney(row.invoice.roundOffAmount),
+      grandTotal: normalizeMoney(row.invoice.grandTotal),
+      paidAmount: normalizeMoney(row.invoice.paidAmount),
+      dueAmount: normalizeMoney(row.invoice.dueAmount),
+      paymentMode: row.invoice.paymentMode,
+      paymentReference: row.invoice.paymentReference,
+      bankAccountId: row.invoice.bankAccountId,
+      notes: row.invoice.notes,
+      termsConditions: row.invoice.termsConditions,
+      attachmentUrl: row.invoice.attachmentUrl,
+      accountingEventCreated: row.invoice.accountingEventCreated,
+      postedAt: row.invoice.postedAt,
+      cancelledAt: row.invoice.cancelledAt,
+      createdBy: row.invoice.createdBy,
+      updatedBy: row.invoice.updatedBy,
+      createdAt: row.invoice.createdAt,
+      updatedAt: row.invoice.updatedAt,
+      supplier: {
+        id: row.supplier.id,
+        supplierCode: row.supplier.supplierCode,
+        name: row.supplier.name,
+        gstNumber: row.supplier.gstNumber,
+        gstState: row.supplier.gstState,
+        mobile: row.supplier.mobile
+      },
+      warehouse: row.warehouse
+        ? {
+            id: row.warehouse.id,
+            warehouseCode: row.warehouse.warehouseCode,
+            name: row.warehouse.name
+          }
+        : null,
+      ...(extras?.items ? { items: extras.items } : {}),
+      ...(extras?.payments ? { payments: extras.payments } : {}),
+      ...(extras?.returns ? { returns: extras.returns } : {})
+    };
+  }
+
+  private mapInvoiceItemRow(row: InvoiceItemRow) {
+    return {
+      id: row.item.id,
+      lineNumber: row.item.lineNumber,
+      productId: row.item.productId,
+      productNameSnapshot: row.item.productNameSnapshot,
+      skuSnapshot: row.item.skuSnapshot,
+      hsnSacSnapshot: row.item.hsnSacSnapshot,
+      unitSnapshot: row.item.unitSnapshot,
+      quantity: normalizeQuantity(row.item.quantity),
+      freeQuantity: normalizeQuantity(row.item.freeQuantity),
+      purchaseRate: normalizeMoney(row.item.purchaseRate),
+      priceTaxType: row.item.priceTaxType,
+      discountPercent: normalizeMoney(row.item.discountPercent),
+      discountAmount: normalizeMoney(row.item.discountAmount),
+      taxableAmount: normalizeMoney(row.item.taxableAmount),
+      gstRate: normalizeMoney(row.item.gstRate),
+      cgstAmount: normalizeMoney(row.item.cgstAmount),
+      sgstAmount: normalizeMoney(row.item.sgstAmount),
+      igstAmount: normalizeMoney(row.item.igstAmount),
+      cessRate: normalizeMoney(row.item.cessRate),
+      cessAmount: normalizeMoney(row.item.cessAmount),
+      lineTotal: normalizeMoney(row.item.lineTotal),
+      manufacturingDate: row.item.manufacturingDate,
+      expiryDate: row.item.expiryDate,
+      remarks: row.item.remarks,
+      warehouse: row.item.warehouseId
+        ? {
+            id: row.item.warehouseId,
+            name: row.warehouseName,
+            warehouseCode: row.warehouseCode
+          }
+        : null,
+      batch: row.item.batchId
+        ? {
+            id: row.item.batchId,
+            batchNumber: row.batchNumber
+          }
+        : null,
+      product: {
+        id: row.product.id,
+        productCode: row.product.productCode,
+        productType: row.product.productType,
+        stockTrackingEnabled: row.product.stockTrackingEnabled
+      }
+    };
+  }
+
+  private mapPaymentRow(row: typeof import("../../db/schema").purchasePayments.$inferSelect) {
+    return {
+      id: row.id,
+      paymentDate: row.paymentDate,
+      amount: normalizeMoney(row.amount),
+      paymentMode: row.paymentMode,
+      bankAccountId: row.bankAccountId,
+      referenceNumber: row.referenceNumber,
+      notes: row.notes,
+      createdBy: row.createdBy,
+      createdAt: row.createdAt
+    };
+  }
+
+  private mapReturnRow(
+    row:
+      | Awaited<ReturnType<typeof purchasesRepository.listPurchaseReturns>>["rows"][number]
+      | NonNullable<Awaited<ReturnType<typeof purchasesRepository.findPurchaseReturnDetail>>>
+  ) {
+    if ("purchaseReturn" in row && "supplierName" in row) {
+      return {
+        id: row.purchaseReturn.id,
+        returnNumber: row.purchaseReturn.returnNumber,
+        purchaseInvoiceId: row.purchaseReturn.purchaseInvoiceId,
+        purchaseNumber: row.purchaseNumber,
+        supplierId: row.purchaseReturn.supplierId,
+        supplierName: row.supplierName,
+        supplierCode: row.supplierCode,
+        returnDate: row.purchaseReturn.returnDate,
+        grandTotal: normalizeMoney(row.purchaseReturn.grandTotal),
+        gstTotal: normalizeMoney(row.purchaseReturn.gstTotal),
+        subtotal: normalizeMoney(row.purchaseReturn.subtotal),
+        roundOffAmount: normalizeMoney(row.purchaseReturn.roundOffAmount),
+        warehouse: row.purchaseReturn.warehouseId
+          ? {
+              id: row.purchaseReturn.warehouseId,
+              name: row.warehouseName,
+              warehouseCode: row.warehouseCode
+            }
+          : null,
+        notes: row.purchaseReturn.notes,
+        createdAt: row.purchaseReturn.createdAt,
+        updatedAt: row.purchaseReturn.updatedAt
+      };
+    }
+
+    return {
+      id: row.purchaseReturn.id,
+      returnNumber: row.purchaseReturn.returnNumber,
+      purchaseInvoiceId: row.purchaseReturn.purchaseInvoiceId,
+      purchaseNumber: row.invoice.purchaseNumber,
+      supplierId: row.purchaseReturn.supplierId,
+      supplierName: row.supplier.name,
+      supplierCode: row.supplier.supplierCode,
+      returnDate: row.purchaseReturn.returnDate,
+      grandTotal: normalizeMoney(row.purchaseReturn.grandTotal),
+      gstTotal: normalizeMoney(row.purchaseReturn.gstTotal),
+      subtotal: normalizeMoney(row.purchaseReturn.subtotal),
+      roundOffAmount: normalizeMoney(row.purchaseReturn.roundOffAmount),
+      warehouse: row.purchaseReturn.warehouseId && row.warehouse
+        ? {
+            id: row.purchaseReturn.warehouseId,
+            name: row.warehouse.name,
+            warehouseCode: row.warehouse.warehouseCode
+          }
+        : null,
+      notes: row.purchaseReturn.notes,
+      createdAt: row.purchaseReturn.createdAt,
+      updatedAt: row.purchaseReturn.updatedAt
+    };
+  }
+
+  private async getSupplierOrThrow(companyId: string, supplierId: string) {
+    const supplier = await suppliersRepository.findById(companyId, supplierId);
+    if (!supplier) {
+      throw new AppError("Supplier not found", 404);
+    }
+
+    if (supplier.status !== "active" || supplier.deletedAt) {
+      throw new AppError("Only active suppliers can be used for purchases", 400);
+    }
+
+    if (supplier.isBlacklisted) {
+      throw new AppError("Blacklisted suppliers cannot be used for purchases", 400);
+    }
+
+    return supplier;
+  }
+
+  private async getBankAccountOrThrow(companyId: string, bankAccountId: string) {
+    const bankAccount = await companyRepository.findBankAccountById(companyId, bankAccountId);
+    if (!bankAccount || !bankAccount.isActive) {
+      throw new AppError("Active bank account not found", 404);
+    }
+
+    return bankAccount;
+  }
+
+  private async getWarehouseOrThrow(companyId: string, warehouseId: string) {
+    const warehouse = await inventoryRepository.findWarehouseById(companyId, warehouseId);
+    if (!warehouse) {
+      throw new AppError("Warehouse not found", 404);
+    }
+
+    if (warehouse.status !== "active" || warehouse.deletedAt) {
+      throw new AppError("Only active warehouses can be used for purchases", 400);
+    }
+
+    return warehouse;
+  }
+
+  private async getPurchaseOrThrow(companyId: string, purchaseId: string, executor?: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+    const purchase = await purchasesRepository.findPurchaseById(companyId, purchaseId, executor);
+    if (!purchase) {
+      throw new AppError("Purchase invoice not found", 404);
+    }
+
+    return purchase;
+  }
+
+  private async getPurchasePrefix(companyId: string) {
+    const settings = await companyRepository.findInvoiceSettingsByCompanyId(companyId);
+    return this.normalizePrefix(settings?.purchaseInvoicePrefix, "PUR");
+  }
+
+  private async getNextPurchaseNumber(companyId: string, executor: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+    await purchasesRepository.acquireScopedLock("purchase-number", companyId, executor);
+    const latest = await purchasesRepository.findLatestPurchaseNumber(companyId, executor);
+    const prefix = await this.getPurchasePrefix(companyId);
+    return this.buildNextSequenceNumber(latest, prefix);
+  }
+
+  private async getNextReturnNumber(companyId: string, executor: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+    await purchasesRepository.acquireScopedLock("purchase-return-number", companyId, executor);
+    const latest = await purchasesRepository.findLatestReturnNumber(companyId, executor);
+    return this.buildNextSequenceNumber(latest, "PR-");
+  }
+
+  private async getCompanyTaxContext(companyId: string) {
+    const [company, taxSettings] = await Promise.all([
+      companyRepository.findCompanyById(companyId),
+      companyRepository.findTaxSettingsByCompanyId(companyId)
+    ]);
+
+    if (!company) {
+      throw new AppError("Company not found", 404);
+    }
+
+    return {
+      company,
+      taxSettings
+    };
+  }
+
+  private async resolvePurchaseItems(
+    companyId: string,
+    supplierState: string | null,
+    invoiceWarehouseId: string | null,
+    items: CreatePurchaseInput["items"] | NonNullable<UpdatePurchaseInput["items"]>
+  ) {
+    const { company } = await this.getCompanyTaxContext(companyId);
+    const companyState = this.normalizeState(company.state);
+    const resolvedItems: ResolvedPurchaseItem[] = [];
+
+    for (const item of items) {
+      const productRow = await inventoryRepository.findProductInventoryContext(companyId, item.productId);
+      if (!productRow) {
+        throw new AppError("Product not found", 404);
+      }
+
+      if (productRow.product.deletedAt || productRow.product.status !== "active") {
+        throw new AppError(`Only active products can be used in purchases: ${productRow.product.name}`, 400);
+      }
+
+      const quantity = normalizePurchaseQuantity(item.quantity);
+      const freeQuantity = normalizePurchaseQuantity(item.freeQuantity ?? 0);
+      const totalStockQuantity = addDecimals(quantity, freeQuantity, 3);
+
+      if (!productRow.unitDecimalAllowed && (this.hasFractionalQuantity(quantity) || this.hasFractionalQuantity(freeQuantity))) {
+        throw new AppError(`Decimal quantity is not allowed for ${productRow.product.name}`, 400);
+      }
+
+      const warehouseId = item.warehouseId ?? invoiceWarehouseId ?? null;
+      if (productRow.product.productType === "goods") {
+        if (!warehouseId) {
+          throw new AppError(`Warehouse is required for goods product ${productRow.product.name}`, 400);
+        }
+
+        await this.getWarehouseOrThrow(companyId, warehouseId);
+      }
+
+      if (productRow.product.productType === "service" && warehouseId) {
+        throw new AppError(`Service product ${productRow.product.name} must not be assigned a warehouse`, 400);
+      }
+
+      if (productRow.product.batchTrackingEnabled && !item.batchId && !item.batchNumber) {
+        throw new AppError(`Batch details are required for ${productRow.product.name}`, 400);
+      }
+
+      if (productRow.product.expiryTrackingEnabled && !item.expiryDate) {
+        throw new AppError(`Expiry date is required for ${productRow.product.name}`, 400);
+      }
+
+      if (item.expiryDate && item.manufacturingDate && item.expiryDate <= item.manufacturingDate) {
+        throw new AppError(`Expiry date must be after manufacturing date for ${productRow.product.name}`, 400);
+      }
+
+      const gstRate =
+        productRow.product.taxType === "taxable"
+          ? normalizeMoney(item.gstRate ?? productRow.product.gstRate)
+          : "0.00";
+      const cessRate =
+        productRow.product.taxType === "taxable"
+          ? normalizeMoney(item.cessRate ?? productRow.product.cessRate)
+          : "0.00";
+
+      resolvedItems.push({
+        product: productRow,
+        warehouseId,
+        batchId: item.batchId ?? null,
+        batchNumber: item.batchNumber ?? null,
+        quantity,
+        freeQuantity,
+        totalStockQuantity,
+        purchaseRate: normalizeMoney(item.purchaseRate),
+        priceTaxType: item.priceTaxType,
+        discountPercent: normalizeMoney(item.discountPercent ?? 0),
+        discountAmount: normalizeMoney(item.discountAmount ?? 0),
+        gstRate,
+        cessRate,
+        manufacturingDate: item.manufacturingDate ?? null,
+        expiryDate: item.expiryDate ?? null,
+        remarks: item.remarks ?? null,
+        isInterState: Boolean(companyState && supplierState && companyState !== supplierState)
+      });
+    }
+
+    return resolvedItems;
+  }
+
+  private buildAccountingPayload(invoice: typeof import("../../db/schema").purchaseInvoices.$inferSelect) {
+    return {
+      entries: [
+        {
+          account: "Purchase",
+          side: "debit",
+          amount: normalizeMoney(invoice.taxableAmount)
+        },
+        {
+          account: "Input GST",
+          side: "debit",
+          amount: normalizeMoney(invoice.gstTotal)
+        },
+        {
+          account: invoice.paidAmount !== "0" ? "Bank/Cash" : "Supplier",
+          side: "credit",
+          amount: normalizeMoney(invoice.grandTotal)
+        }
+      ],
+      roundOff: normalizeMoney(invoice.roundOffAmount),
+      supplierId: invoice.supplierId,
+      purchaseNumber: invoice.purchaseNumber
+    };
+  }
+
+  private async syncInventoryAlerts(actor: PurchaseActor, touched: Array<{ productId: string; warehouseId: string | null; batchId: string | null }>) {
+    const uniqueKeys = new Set<string>();
+    for (const entry of touched) {
+      if (!entry.warehouseId) {
+        continue;
+      }
+
+      const key = `${entry.productId}:${entry.warehouseId}:${entry.batchId ?? ""}`;
+      if (uniqueKeys.has(key)) {
+        continue;
+      }
+
+      uniqueKeys.add(key);
+      await inventoryService.recalculateAlerts(
+        actor,
+        {
+          productId: entry.productId,
+          warehouseId: entry.warehouseId,
+          batchId: entry.batchId ?? undefined
+        },
+        {
+          ipAddress: "",
+          userAgent: ""
+        }
+      );
+    }
+  }
+
+  private async logPurchaseAudit(
+    actor: PurchaseActor,
+    action: string,
+    purchaseId: string,
+    metadata: Record<string, unknown>,
+    context: PurchaseRequestContext
+  ) {
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action,
+      entityType: "purchase_invoice",
+      entityId: purchaseId,
+      metadata,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+  }
+
+  private async buildDraftPayload(
+    actor: PurchaseActor,
+    input: {
+      supplierId: string;
+      supplierInvoiceNumber?: string | null | undefined;
+      invoiceDate: Date;
+      dueDate?: Date | null | undefined;
+      warehouseId: string | null;
+      items: CreatePurchaseInput["items"];
+      invoiceDiscountTotal?: number | null | undefined;
+      additionalCharges?: number | null | undefined;
+      freightCharges?: number | null | undefined;
+      paidAmount?: number | null | undefined;
+      paymentMode?: CreatePurchaseInput["paymentMode"];
+      paymentReference?: string | null | undefined;
+      bankAccountId?: string | null | undefined;
+      notes?: string | null | undefined;
+      termsConditions?: string | null | undefined;
+      attachmentUrl?: string | null | undefined;
+    },
+    executor: Parameters<Parameters<typeof db.transaction>[0]>[0],
+    existingPurchaseId?: string
+  ) {
+    const supplier = await this.getSupplierOrThrow(actor.companyId, input.supplierId);
+    const invoiceWarehouseId = input.warehouseId ?? null;
+    if (invoiceWarehouseId) {
+      await this.getWarehouseOrThrow(actor.companyId, invoiceWarehouseId);
+    }
+
+    if (input.bankAccountId) {
+      await this.getBankAccountOrThrow(actor.companyId, input.bankAccountId);
+    }
+
+    if (input.supplierInvoiceNumber) {
+      const duplicate = await purchasesRepository.findSupplierInvoiceDuplicate(
+        actor.companyId,
+        supplier.id,
+        input.supplierInvoiceNumber,
+        existingPurchaseId,
+        executor
+      );
+
+      if (duplicate) {
+        throw new AppError("Supplier invoice number already exists for this supplier", 409);
+      }
+    }
+
+    const items = await this.resolvePurchaseItems(
+      actor.companyId,
+      this.normalizeState(supplier.gstState ?? supplier.billingState ?? supplier.shippingState),
+      invoiceWarehouseId,
+      input.items
+    );
+
+    const totals = calculateInvoiceTotals({
+      items: items.map((item) => ({
+        quantity: item.quantity,
+        purchaseRate: item.purchaseRate,
+        priceTaxType: item.priceTaxType,
+        discountPercent: item.discountPercent,
+        discountAmount: item.discountAmount,
+        gstRate: item.gstRate,
+        cessRate: item.cessRate,
+        isInterState: item.isInterState
+      })),
+      invoiceDiscountTotal: input.invoiceDiscountTotal ?? 0,
+      additionalCharges: input.additionalCharges ?? 0,
+      freightCharges: input.freightCharges ?? 0,
+      roundOffEnabled: true
+    });
+
+    const paidAmount = normalizeMoney(input.paidAmount ?? 0);
+    if (compareDecimals(paidAmount, totals.grandTotal, 2) > 0) {
+      throw new AppError("Paid amount cannot exceed grand total", 400);
+    }
+
+    const dueAmount = calculateDueAmount(totals.grandTotal, paidAmount);
+    const paymentStatus = calculatePaymentStatus({
+      grandTotal: totals.grandTotal,
+      paidAmount,
+      dueDate: input.dueDate ?? null,
+      asOf: new Date()
+    });
+
+    return {
+      supplier,
+      resolvedItems: items,
+      calculatedItems: totals.lines,
+      invoiceTotals: totals,
+      paidAmount,
+      dueAmount,
+      paymentStatus
+    };
+  }
+
+  private async postPurchaseInTransaction(
+    actor: PurchaseActor,
+    purchase: typeof import("../../db/schema").purchaseInvoices.$inferSelect,
+    items: Awaited<ReturnType<typeof purchasesRepository.listPurchaseInvoiceItems>>,
+    executor: Parameters<Parameters<typeof db.transaction>[0]>[0]
+  ) {
+    if (purchase.purchaseStatus !== "draft") {
+      throw new AppError("Only draft purchases can be posted", 400);
+    }
+
+    const stockTouch = await inventoryService.receivePurchaseStock(
+      actor,
+      {
+        movementDate: new Date(purchase.invoiceDate),
+        referenceType: "purchase_invoice",
+        referenceId: purchase.id,
+        referenceNumber: purchase.purchaseNumber,
+        remarks: purchase.notes,
+        items: items.map((row) => ({
+          productId: row.item.productId,
+          warehouseId: row.item.warehouseId,
+          batchId: row.item.batchId,
+          batchNumber: row.batchNumber,
+          manufacturingDate: row.item.manufacturingDate,
+          expiryDate: row.item.expiryDate,
+          quantity: addDecimals(row.item.quantity, row.item.freeQuantity, 3),
+          rate:
+            compareDecimals(addDecimals(row.item.quantity, row.item.freeQuantity, 3), "0.000", 3) > 0
+              ? divideMoneyByQuantity(row.item.taxableAmount, addDecimals(row.item.quantity, row.item.freeQuantity, 3))
+              : normalizeMoney(row.item.purchaseRate)
+        }))
+      },
+      executor
+    );
+
+    if (compareDecimals(purchase.paidAmount, "0.00", 2) > 0) {
+      const paymentCount = await purchasesRepository.countPurchasePayments(actor.companyId, purchase.id, executor);
+      if (paymentCount === 0) {
+        const paymentMode = purchase.paymentMode;
+        if (!paymentMode) {
+          throw new AppError("Payment mode is required for the initial paid amount", 400);
+        }
+
+        await purchasesRepository.createPurchasePayment(
+          {
+            companyId: actor.companyId,
+            purchaseInvoiceId: purchase.id,
+            supplierId: purchase.supplierId,
+            paymentDate: purchase.invoiceDate,
+            amount: purchase.paidAmount,
+            paymentMode,
+            bankAccountId: purchase.bankAccountId,
+            referenceNumber: purchase.paymentReference,
+            notes: purchase.notes,
+            createdBy: actor.id
+          },
+          executor
+        );
+      }
+    }
+
+    const accountingEvent = await purchasesRepository.createAccountingEvent(
+      {
+        companyId: actor.companyId,
+        eventType: "purchase_posted",
+        referenceType: "purchase_invoice",
+        referenceId: purchase.id,
+        payload: this.buildAccountingPayload(purchase),
+        status: "pending"
+      },
+      executor
+    );
+
+    const updatedInvoice = await purchasesRepository.updatePurchaseInvoice(
+      actor.companyId,
+      purchase.id,
+      {
+        purchaseStatus: "posted",
+        paymentStatus: calculatePaymentStatus({
+          grandTotal: purchase.grandTotal,
+          paidAmount: purchase.paidAmount,
+          dueDate: purchase.dueDate ?? null
+        }),
+        dueAmount: calculateDueAmount(purchase.grandTotal, purchase.paidAmount),
+        accountingEventCreated: Boolean(accountingEvent),
+        postedAt: new Date(),
+        updatedBy: actor.id
+      },
+      executor
+    );
+
+    if (!updatedInvoice) {
+      throw new AppError("Failed to post purchase invoice", 500);
+    }
+
+    return {
+      invoice: updatedInvoice,
+      stockTouch
+    };
+  }
+
+  private async determineReturnedStatus(companyId: string, items: Awaited<ReturnType<typeof purchasesRepository.listPurchaseInvoiceItems>>, executor: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+    for (const row of items) {
+      const returnedQty = await purchasesRepository.getReturnedQuantityByInvoiceItem(companyId, row.item.id, executor);
+      const maxReturnQty = addDecimals(row.item.quantity, row.item.freeQuantity, 3);
+      if (compareDecimals(returnedQty, maxReturnQty, 3) < 0) {
+        return "posted" as const;
+      }
+    }
+
+    return "returned" as const;
+  }
+
+  public async listPurchases(actor: Pick<PurchaseActor, "companyId">, query: ListPurchasesQuery) {
+    const pagination = getPagination(query.page, query.limit);
+    const result = await purchasesRepository.listPurchases({
+      companyId: actor.companyId,
+      page: pagination.page,
+      limit: pagination.limit,
+      search: query.search ?? null,
+      purchaseStatus: query.purchaseStatus,
+      paymentStatus: query.paymentStatus,
+      supplierId: query.supplierId,
+      warehouseId: query.warehouseId,
+      dateFrom: query.dateFrom ?? null,
+      dateTo: query.dateTo ?? null
+    });
+
+    return {
+      items: result.rows.map((row) => ({
+        id: row.invoice.id,
+        purchaseNumber: row.invoice.purchaseNumber,
+        supplierInvoiceNumber: row.invoice.supplierInvoiceNumber,
+        invoiceDate: row.invoice.invoiceDate,
+        dueDate: row.invoice.dueDate,
+        purchaseStatus: row.invoice.purchaseStatus,
+        paymentStatus: row.invoice.paymentStatus,
+        grandTotal: normalizeMoney(row.invoice.grandTotal),
+        paidAmount: normalizeMoney(row.invoice.paidAmount),
+        dueAmount: normalizeMoney(row.invoice.dueAmount),
+        supplier: {
+          id: row.invoice.supplierId,
+          name: row.supplierName,
+          supplierCode: row.supplierCode
+        },
+        warehouse: row.invoice.warehouseId
+          ? {
+              id: row.invoice.warehouseId,
+              name: row.warehouseName,
+              warehouseCode: row.warehouseCode
+            }
+          : null,
+        createdAt: row.invoice.createdAt
+      })),
+      summary: {
+        grandTotal: normalizeMoney(result.summary.grandTotal),
+        paidAmount: normalizeMoney(result.summary.paidAmount),
+        dueAmount: normalizeMoney(result.summary.dueAmount)
+      },
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / pagination.limit) || 1
+      }
+    };
+  }
+
+  public async createPurchase(
+    actor: PurchaseActor,
+    input: CreatePurchaseInput,
+    context: PurchaseRequestContext,
+    options: { canApprove: boolean }
+  ) {
+    if (input.purchaseStatus === "posted" && !options.canApprove) {
+      throw new AppError("You do not have permission to post purchases", 403);
+    }
+
+    const mutation = await db.transaction(async (transaction) => {
+      const draftPayload = await this.buildDraftPayload(
+        actor,
+        {
+          supplierId: input.supplierId,
+          supplierInvoiceNumber: input.supplierInvoiceNumber,
+          invoiceDate: input.invoiceDate,
+          dueDate: input.dueDate ?? null,
+          warehouseId: input.warehouseId ?? null,
+          items: input.items,
+          invoiceDiscountTotal: input.invoiceDiscountTotal,
+          additionalCharges: input.additionalCharges,
+          freightCharges: input.freightCharges,
+          paidAmount: input.paidAmount,
+          paymentMode: input.paymentMode,
+          paymentReference: input.paymentReference,
+          bankAccountId: input.bankAccountId ?? null,
+          notes: input.notes ?? null,
+          termsConditions: input.termsConditions ?? null,
+          attachmentUrl: input.attachmentUrl ?? null
+        },
+        transaction
+      );
+      const purchaseNumber = await this.getNextPurchaseNumber(actor.companyId, transaction);
+
+      const invoice = await purchasesRepository.createPurchaseInvoice(
+        {
+          companyId: actor.companyId,
+          purchaseNumber,
+          supplierId: input.supplierId,
+          supplierInvoiceNumber: input.supplierInvoiceNumber,
+          invoiceDate: input.invoiceDate,
+          dueDate: input.dueDate ?? null,
+          warehouseId: input.warehouseId ?? null,
+          purchaseStatus: "draft",
+          paymentStatus: draftPayload.paymentStatus,
+          subtotal: draftPayload.invoiceTotals.subtotal,
+          itemDiscountTotal: draftPayload.invoiceTotals.itemDiscountTotal,
+          invoiceDiscountTotal: draftPayload.invoiceTotals.invoiceDiscountTotal,
+          additionalCharges: draftPayload.invoiceTotals.additionalCharges,
+          freightCharges: draftPayload.invoiceTotals.freightCharges,
+          taxableAmount: draftPayload.invoiceTotals.taxableAmount,
+          cgstTotal: draftPayload.invoiceTotals.cgstTotal,
+          sgstTotal: draftPayload.invoiceTotals.sgstTotal,
+          igstTotal: draftPayload.invoiceTotals.igstTotal,
+          cessTotal: draftPayload.invoiceTotals.cessTotal,
+          gstTotal: draftPayload.invoiceTotals.gstTotal,
+          roundOffAmount: draftPayload.invoiceTotals.roundOffAmount,
+          grandTotal: draftPayload.invoiceTotals.grandTotal,
+          paidAmount: draftPayload.paidAmount,
+          dueAmount: draftPayload.dueAmount,
+          paymentMode: input.paymentMode ?? null,
+          paymentReference: input.paymentReference ?? null,
+          bankAccountId: input.bankAccountId ?? null,
+          notes: input.notes ?? null,
+          termsConditions: input.termsConditions ?? null,
+          attachmentUrl: input.attachmentUrl ?? null,
+          createdBy: actor.id,
+          updatedBy: actor.id
+        },
+        transaction
+      );
+
+      if (!invoice) {
+        throw new AppError("Failed to create purchase invoice", 500);
+      }
+
+      await purchasesRepository.createPurchaseInvoiceItems(
+        draftPayload.resolvedItems.map((item, index) => ({
+          companyId: actor.companyId,
+          purchaseInvoiceId: invoice.id,
+          productId: item.product.product.id,
+          warehouseId: item.warehouseId,
+          batchId: item.batchId,
+          lineNumber: index + 1,
+          productNameSnapshot: item.product.product.name,
+          skuSnapshot: item.product.product.sku,
+          hsnSacSnapshot: item.product.product.hsnSacCode,
+          unitSnapshot: item.product.unitSymbol ?? item.product.unitName ?? "",
+          quantity: item.quantity,
+          freeQuantity: item.freeQuantity,
+          purchaseRate: item.purchaseRate,
+          priceTaxType: item.priceTaxType,
+          discountPercent: item.discountPercent,
+          discountAmount: draftPayload.calculatedItems[index]!.itemDiscountTotal,
+          taxableAmount: draftPayload.calculatedItems[index]!.taxableAmount,
+          gstRate: item.gstRate,
+          cgstAmount: draftPayload.calculatedItems[index]!.cgstAmount,
+          sgstAmount: draftPayload.calculatedItems[index]!.sgstAmount,
+          igstAmount: draftPayload.calculatedItems[index]!.igstAmount,
+          cessRate: item.cessRate,
+          cessAmount: draftPayload.calculatedItems[index]!.cessAmount,
+          lineTotal: draftPayload.calculatedItems[index]!.lineTotal,
+          manufacturingDate: item.manufacturingDate ?? null,
+          expiryDate: item.expiryDate ?? null,
+          remarks: item.remarks ?? null
+        })),
+        transaction
+      );
+
+      if (input.purchaseStatus === "posted") {
+        const items = await purchasesRepository.listPurchaseInvoiceItems(actor.companyId, invoice.id, transaction);
+        const posted = await this.postPurchaseInTransaction(actor, invoice, items, transaction);
+        return {
+          invoice: posted.invoice,
+          stockTouch: posted.stockTouch,
+          posted: true
+        };
+      }
+
+      return {
+        invoice,
+        stockTouch: [] as Array<{ productId: string; warehouseId: string | null; batchId: string | null }>,
+        posted: false
+      };
+    });
+
+    await this.logPurchaseAudit(
+      actor,
+      "purchase_created",
+      mutation.invoice.id,
+      {
+        purchaseNumber: mutation.invoice.purchaseNumber,
+        status: mutation.invoice.purchaseStatus
+      },
+      context
+    );
+
+    if (mutation.posted) {
+      await this.logPurchaseAudit(
+        actor,
+        "purchase_posted",
+        mutation.invoice.id,
+        {
+          purchaseNumber: mutation.invoice.purchaseNumber
+        },
+        context
+      );
+
+      await auditLogService.log({
+        companyId: actor.companyId,
+        userId: actor.id,
+        action: "purchase_stock_updated",
+        entityType: "purchase_invoice",
+        entityId: mutation.invoice.id,
+        metadata: {
+          purchaseNumber: mutation.invoice.purchaseNumber
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent
+      });
+
+      await auditLogService.log({
+        companyId: actor.companyId,
+        userId: actor.id,
+        action: "purchase_payable_updated",
+        entityType: "purchase_invoice",
+        entityId: mutation.invoice.id,
+        metadata: {
+          dueAmount: normalizeMoney(mutation.invoice.dueAmount)
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent
+      });
+
+      await this.syncInventoryAlerts(actor, mutation.stockTouch);
+    }
+
+    const detail = await this.getPurchase(actor, mutation.invoice.id);
+    return detail;
+  }
+
+  public async getPurchase(actor: Pick<PurchaseActor, "companyId">, purchaseId: string) {
+    const detail = await purchasesRepository.findPurchaseDetail(actor.companyId, purchaseId);
+    if (!detail) {
+      throw new AppError("Purchase invoice not found", 404);
+    }
+
+    const [items, payments, returns] = await Promise.all([
+      purchasesRepository.listPurchaseInvoiceItems(actor.companyId, purchaseId),
+      purchasesRepository.listPurchasePayments(actor.companyId, purchaseId),
+      purchasesRepository.listPurchaseReturns({
+        companyId: actor.companyId,
+        page: 1,
+        limit: 100,
+        purchaseInvoiceId: purchaseId
+      })
+    ]);
+
+    return {
+      invoice: this.mapInvoiceRow(detail, {
+        items: items.map((item) => this.mapInvoiceItemRow(item)),
+        payments: payments.map((payment) => this.mapPaymentRow(payment)),
+        returns: returns.rows.map((entry) => this.mapReturnRow(entry))
+      })
+    };
+  }
+
+  public async updatePurchase(actor: PurchaseActor, purchaseId: string, input: UpdatePurchaseInput, context: PurchaseRequestContext) {
+    const updated = await db.transaction(async (transaction) => {
+      const existing = await this.getPurchaseOrThrow(actor.companyId, purchaseId, transaction);
+      if (existing.purchaseStatus !== "draft") {
+        throw new AppError("Only draft purchases can be edited", 400);
+      }
+
+      const supplierId = input.supplierId ?? existing.supplierId;
+      const invoiceDate = input.invoiceDate ?? existing.invoiceDate;
+      const warehouseId = input.warehouseId !== undefined ? input.warehouseId : existing.warehouseId;
+      const existingItems = await purchasesRepository.listPurchaseInvoiceItems(actor.companyId, purchaseId, transaction);
+
+      const draftPayload = await this.buildDraftPayload(
+        actor,
+        {
+          supplierId,
+          supplierInvoiceNumber: input.supplierInvoiceNumber ?? existing.supplierInvoiceNumber,
+          invoiceDate,
+          dueDate: input.dueDate !== undefined ? input.dueDate : existing.dueDate,
+          warehouseId,
+          items:
+            input.items ??
+            existingItems.map((row) => ({
+              productId: row.item.productId,
+              warehouseId: row.item.warehouseId,
+              batchId: row.item.batchId,
+              batchNumber: row.batchNumber,
+              quantity: Number(row.item.quantity),
+              freeQuantity: Number(row.item.freeQuantity),
+              purchaseRate: Number(row.item.purchaseRate),
+              priceTaxType: row.item.priceTaxType,
+              discountPercent: Number(row.item.discountPercent),
+              discountAmount: Number(row.item.discountAmount),
+              gstRate: Number(row.item.gstRate),
+              cessRate: Number(row.item.cessRate),
+              manufacturingDate: row.item.manufacturingDate,
+              expiryDate: row.item.expiryDate,
+              remarks: row.item.remarks
+            })),
+          invoiceDiscountTotal: input.invoiceDiscountTotal ?? Number(existing.invoiceDiscountTotal),
+          additionalCharges: input.additionalCharges ?? Number(existing.additionalCharges),
+          freightCharges: input.freightCharges ?? Number(existing.freightCharges),
+          paidAmount: Number(existing.paidAmount),
+          paymentMode: existing.paymentMode,
+          paymentReference: existing.paymentReference,
+          bankAccountId: existing.bankAccountId,
+          notes: input.notes !== undefined ? input.notes : existing.notes,
+          termsConditions: input.termsConditions !== undefined ? input.termsConditions : existing.termsConditions,
+          attachmentUrl: input.attachmentUrl !== undefined ? input.attachmentUrl : existing.attachmentUrl
+        },
+        transaction,
+        purchaseId
+      );
+
+      const invoice = await purchasesRepository.updatePurchaseInvoice(
+        actor.companyId,
+        purchaseId,
+        {
+          supplierId,
+          supplierInvoiceNumber: input.supplierInvoiceNumber ?? existing.supplierInvoiceNumber,
+          invoiceDate,
+          dueDate: input.dueDate !== undefined ? input.dueDate : existing.dueDate,
+          warehouseId,
+          paymentStatus: draftPayload.paymentStatus,
+          subtotal: draftPayload.invoiceTotals.subtotal,
+          itemDiscountTotal: draftPayload.invoiceTotals.itemDiscountTotal,
+          invoiceDiscountTotal: draftPayload.invoiceTotals.invoiceDiscountTotal,
+          additionalCharges: draftPayload.invoiceTotals.additionalCharges,
+          freightCharges: draftPayload.invoiceTotals.freightCharges,
+          taxableAmount: draftPayload.invoiceTotals.taxableAmount,
+          cgstTotal: draftPayload.invoiceTotals.cgstTotal,
+          sgstTotal: draftPayload.invoiceTotals.sgstTotal,
+          igstTotal: draftPayload.invoiceTotals.igstTotal,
+          cessTotal: draftPayload.invoiceTotals.cessTotal,
+          gstTotal: draftPayload.invoiceTotals.gstTotal,
+          roundOffAmount: draftPayload.invoiceTotals.roundOffAmount,
+          grandTotal: draftPayload.invoiceTotals.grandTotal,
+          dueAmount: draftPayload.dueAmount,
+          notes: input.notes !== undefined ? input.notes : existing.notes,
+          termsConditions: input.termsConditions !== undefined ? input.termsConditions : existing.termsConditions,
+          attachmentUrl: input.attachmentUrl !== undefined ? input.attachmentUrl : existing.attachmentUrl,
+          updatedBy: actor.id
+        },
+        transaction
+      );
+
+      if (!invoice) {
+        throw new AppError("Failed to update purchase invoice", 500);
+      }
+
+      await purchasesRepository.deletePurchaseInvoiceItems(actor.companyId, purchaseId, transaction);
+      await purchasesRepository.createPurchaseInvoiceItems(
+        draftPayload.resolvedItems.map((item, index) => ({
+          companyId: actor.companyId,
+          purchaseInvoiceId: purchaseId,
+          productId: item.product.product.id,
+          warehouseId: item.warehouseId,
+          batchId: item.batchId,
+          lineNumber: index + 1,
+          productNameSnapshot: item.product.product.name,
+          skuSnapshot: item.product.product.sku,
+          hsnSacSnapshot: item.product.product.hsnSacCode,
+          unitSnapshot: item.product.unitSymbol ?? item.product.unitName ?? "",
+          quantity: item.quantity,
+          freeQuantity: item.freeQuantity,
+          purchaseRate: item.purchaseRate,
+          priceTaxType: item.priceTaxType,
+          discountPercent: item.discountPercent,
+          discountAmount: draftPayload.calculatedItems[index]!.itemDiscountTotal,
+          taxableAmount: draftPayload.calculatedItems[index]!.taxableAmount,
+          gstRate: item.gstRate,
+          cgstAmount: draftPayload.calculatedItems[index]!.cgstAmount,
+          sgstAmount: draftPayload.calculatedItems[index]!.sgstAmount,
+          igstAmount: draftPayload.calculatedItems[index]!.igstAmount,
+          cessRate: item.cessRate,
+          cessAmount: draftPayload.calculatedItems[index]!.cessAmount,
+          lineTotal: draftPayload.calculatedItems[index]!.lineTotal,
+          manufacturingDate: item.manufacturingDate ?? null,
+          expiryDate: item.expiryDate ?? null,
+          remarks: item.remarks ?? null
+        })),
+        transaction
+      );
+
+      return invoice;
+    });
+
+    await this.logPurchaseAudit(
+      actor,
+      "purchase_updated",
+      updated.id,
+      {
+        fields: Object.keys(input)
+      },
+      context
+    );
+
+    return this.getPurchase(actor, updated.id);
+  }
+
+  public async deletePurchase(actor: PurchaseActor, purchaseId: string, context: PurchaseRequestContext) {
+    const deleted = await db.transaction(async (transaction) => {
+      const existing = await this.getPurchaseOrThrow(actor.companyId, purchaseId, transaction);
+      if (existing.purchaseStatus !== "draft") {
+        throw new AppError("Only draft purchases can be deleted", 400);
+      }
+
+      const softDeleted = await purchasesRepository.softDeletePurchaseInvoice(actor.companyId, purchaseId, actor.id, transaction);
+      if (!softDeleted) {
+        throw new AppError("Failed to delete purchase invoice", 500);
+      }
+
+      return softDeleted;
+    });
+
+    await this.logPurchaseAudit(
+      actor,
+      "purchase_deleted",
+      deleted.id,
+      {
+        purchaseNumber: deleted.purchaseNumber
+      },
+      context
+    );
+  }
+
+  public async postPurchase(actor: PurchaseActor, purchaseId: string, context: PurchaseRequestContext) {
+    const mutation = await db.transaction(async (transaction) => {
+      const existing = await this.getPurchaseOrThrow(actor.companyId, purchaseId, transaction);
+      const items = await purchasesRepository.listPurchaseInvoiceItems(actor.companyId, purchaseId, transaction);
+      return this.postPurchaseInTransaction(actor, existing, items, transaction);
+    });
+
+    await this.logPurchaseAudit(
+      actor,
+      "purchase_posted",
+      mutation.invoice.id,
+      {
+        purchaseNumber: mutation.invoice.purchaseNumber
+      },
+      context
+    );
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_stock_updated",
+      entityType: "purchase_invoice",
+      entityId: mutation.invoice.id,
+      metadata: {
+        purchaseNumber: mutation.invoice.purchaseNumber
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_payable_updated",
+      entityType: "purchase_invoice",
+      entityId: mutation.invoice.id,
+      metadata: {
+        dueAmount: normalizeMoney(mutation.invoice.dueAmount)
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    await this.syncInventoryAlerts(actor, mutation.stockTouch);
+    return this.getPurchase(actor, mutation.invoice.id);
+  }
+
+  public async cancelPurchase(actor: PurchaseActor, purchaseId: string, context: PurchaseRequestContext) {
+    const mutation = await db.transaction(async (transaction) => {
+      const existing = await this.getPurchaseOrThrow(actor.companyId, purchaseId, transaction);
+      if (existing.purchaseStatus !== "posted" && existing.purchaseStatus !== "returned") {
+        throw new AppError("Only posted purchases can be cancelled", 400);
+      }
+
+      const [paymentCount, returnCount, items] = await Promise.all([
+        purchasesRepository.countPurchasePayments(actor.companyId, purchaseId, transaction),
+        purchasesRepository.countPurchaseReturns(actor.companyId, purchaseId, transaction),
+        purchasesRepository.listPurchaseInvoiceItems(actor.companyId, purchaseId, transaction)
+      ]);
+
+      if (paymentCount > 0) {
+        throw new AppError("Posted purchases with payments cannot be cancelled", 400);
+      }
+
+      if (returnCount > 0) {
+        throw new AppError("Posted purchases with returns cannot be cancelled", 400);
+      }
+
+      const stockTouch = await inventoryService.reducePurchaseStock(
+        actor,
+        {
+          movementDate: new Date(),
+          referenceType: "purchase_invoice_cancel",
+          referenceId: existing.id,
+          referenceNumber: existing.purchaseNumber,
+          remarks: existing.notes,
+          items: items.map((row) => ({
+            productId: row.item.productId,
+            warehouseId: row.item.warehouseId,
+            batchId: row.item.batchId,
+            quantity: addDecimals(row.item.quantity, row.item.freeQuantity, 3),
+            rate:
+              compareDecimals(addDecimals(row.item.quantity, row.item.freeQuantity, 3), "0.000", 3) > 0
+                ? divideMoneyByQuantity(row.item.taxableAmount, addDecimals(row.item.quantity, row.item.freeQuantity, 3))
+                : normalizeMoney(row.item.purchaseRate)
+          }))
+        },
+        transaction
+      );
+
+      await purchasesRepository.createAccountingEvent(
+        {
+          companyId: actor.companyId,
+          eventType: "purchase_cancelled",
+          referenceType: "purchase_invoice",
+          referenceId: existing.id,
+          payload: {
+            purchaseNumber: existing.purchaseNumber,
+            reversedAmount: normalizeMoney(existing.grandTotal)
+          },
+          status: "pending"
+        },
+        transaction
+      );
+
+      const updated = await purchasesRepository.updatePurchaseInvoice(
+        actor.companyId,
+        purchaseId,
+        {
+          purchaseStatus: "cancelled",
+          paymentStatus: "unpaid",
+          dueAmount: "0.00",
+          cancelledAt: new Date(),
+          updatedBy: actor.id
+        },
+        transaction
+      );
+
+      if (!updated) {
+        throw new AppError("Failed to cancel purchase invoice", 500);
+      }
+
+      return {
+        invoice: updated,
+        stockTouch
+      };
+    });
+
+    await this.logPurchaseAudit(
+      actor,
+      "purchase_cancelled",
+      mutation.invoice.id,
+      {
+        purchaseNumber: mutation.invoice.purchaseNumber
+      },
+      context
+    );
+
+    await this.syncInventoryAlerts(actor, mutation.stockTouch);
+    return this.getPurchase(actor, mutation.invoice.id);
+  }
+
+  public async listPayments(actor: Pick<PurchaseActor, "companyId">, purchaseId: string, query: ListPurchasePaymentsQuery) {
+    await this.getPurchaseOrThrow(actor.companyId, purchaseId);
+    const pagination = getPagination(query.page, query.limit);
+    const rows = await purchasesRepository.listPurchasePayments(actor.companyId, purchaseId, pagination.page, pagination.limit);
+    const total = await purchasesRepository.countPurchasePayments(actor.companyId, purchaseId);
+    const totals = await purchasesRepository.getInvoicePaymentTotals(actor.companyId, purchaseId);
+
+    return {
+      items: rows.map((row) => this.mapPaymentRow(row)),
+      totals: {
+        totalAmount: normalizeMoney(totals.totalAmount)
+      },
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        totalPages: Math.ceil(total / pagination.limit) || 1
+      }
+    };
+  }
+
+  public async recordPayment(actor: PurchaseActor, purchaseId: string, input: RecordPurchasePaymentInput, context: PurchaseRequestContext) {
+    const mutation = await db.transaction(async (transaction) => {
+      const existing = await this.getPurchaseOrThrow(actor.companyId, purchaseId, transaction);
+      if (existing.purchaseStatus !== "posted" && existing.purchaseStatus !== "returned") {
+        throw new AppError("Payments can only be recorded for posted purchases", 400);
+      }
+
+      if (input.bankAccountId) {
+        await this.getBankAccountOrThrow(actor.companyId, input.bankAccountId);
+      }
+
+      if (compareDecimals(input.amount, existing.dueAmount, 2) > 0) {
+        throw new AppError("Payment amount cannot exceed current due amount", 400);
+      }
+
+      const payment = await purchasesRepository.createPurchasePayment(
+        {
+          companyId: actor.companyId,
+          purchaseInvoiceId: existing.id,
+          supplierId: existing.supplierId,
+          paymentDate: input.paymentDate,
+          amount: normalizeMoney(input.amount),
+          paymentMode: input.paymentMode,
+          bankAccountId: input.bankAccountId ?? null,
+          referenceNumber: input.referenceNumber ?? null,
+          notes: input.notes ?? null,
+          createdBy: actor.id
+        },
+        transaction
+      );
+
+      if (!payment) {
+        throw new AppError("Failed to record purchase payment", 500);
+      }
+
+      const nextPaidAmount = addDecimals(existing.paidAmount, payment.amount, 2);
+      const nextDueAmount = calculateDueAmount(existing.grandTotal, nextPaidAmount);
+      const nextPaymentStatus = calculatePaymentStatus({
+        grandTotal: existing.grandTotal,
+        paidAmount: nextPaidAmount,
+        dueDate: existing.dueDate ?? null
+      });
+
+      const updatedInvoice = await purchasesRepository.updatePurchaseInvoice(
+        actor.companyId,
+        purchaseId,
+        {
+          paidAmount: nextPaidAmount,
+          dueAmount: nextDueAmount,
+          paymentStatus: nextPaymentStatus,
+          paymentMode: payment.paymentMode,
+          paymentReference: payment.referenceNumber,
+          bankAccountId: payment.bankAccountId,
+          updatedBy: actor.id
+        },
+        transaction
+      );
+
+      if (!updatedInvoice) {
+        throw new AppError("Failed to update purchase after payment", 500);
+      }
+
+      await purchasesRepository.createAccountingEvent(
+        {
+          companyId: actor.companyId,
+          eventType: "purchase_payment_recorded",
+          referenceType: "purchase_payment",
+          referenceId: payment.id,
+          payload: {
+            purchaseInvoiceId: existing.id,
+            purchaseNumber: existing.purchaseNumber,
+            amount: normalizeMoney(payment.amount),
+            paymentMode: payment.paymentMode
+          },
+          status: "pending"
+        },
+        transaction
+      );
+
+      return {
+        payment,
+        invoice: updatedInvoice
+      };
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_payment_recorded",
+      entityType: "purchase_payment",
+      entityId: mutation.payment.id,
+      metadata: {
+        purchaseInvoiceId: purchaseId,
+        amount: normalizeMoney(mutation.payment.amount)
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_payable_updated",
+      entityType: "purchase_invoice",
+      entityId: purchaseId,
+      metadata: {
+        dueAmount: normalizeMoney(mutation.invoice.dueAmount)
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return {
+      payment: this.mapPaymentRow(mutation.payment),
+      invoice: {
+        id: mutation.invoice.id,
+        paidAmount: normalizeMoney(mutation.invoice.paidAmount),
+        dueAmount: normalizeMoney(mutation.invoice.dueAmount),
+        paymentStatus: mutation.invoice.paymentStatus
+      }
+    };
+  }
+
+  public async listReturns(actor: Pick<PurchaseActor, "companyId">, query: ListPurchaseReturnsQuery) {
+    const pagination = getPagination(query.page, query.limit);
+    const result = await purchasesRepository.listPurchaseReturns({
+      companyId: actor.companyId,
+      page: pagination.page,
+      limit: pagination.limit,
+      search: query.search ?? null,
+      supplierId: query.supplierId,
+      purchaseInvoiceId: query.purchaseInvoiceId,
+      warehouseId: query.warehouseId,
+      dateFrom: query.dateFrom ?? null,
+      dateTo: query.dateTo ?? null
+    });
+
+    return {
+      items: result.rows.map((row) => this.mapReturnRow(row)),
+      summary: {
+        grandTotal: normalizeMoney(result.summary.grandTotal)
+      },
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / pagination.limit) || 1
+      }
+    };
+  }
+
+  public async getReturn(actor: Pick<PurchaseActor, "companyId">, purchaseReturnId: string) {
+    const detail = await purchasesRepository.findPurchaseReturnDetail(actor.companyId, purchaseReturnId);
+    if (!detail) {
+      throw new AppError("Purchase return not found", 404);
+    }
+
+    const items = await purchasesRepository.listPurchaseReturnItems(actor.companyId, purchaseReturnId);
+    return {
+      purchaseReturn: {
+        ...this.mapReturnRow(detail),
+        items: items.map((row) => ({
+          id: row.item.id,
+          purchaseInvoiceItemId: row.item.purchaseInvoiceItemId,
+          productId: row.item.productId,
+          productName: row.product.name,
+          productCode: row.product.productCode,
+          quantity: normalizeQuantity(row.item.quantity),
+          returnRate: normalizeMoney(row.item.returnRate),
+          taxableAmount: normalizeMoney(row.item.taxableAmount),
+          gstRate: normalizeMoney(row.item.gstRate),
+          gstAmount: normalizeMoney(row.item.gstAmount),
+          lineTotal: normalizeMoney(row.item.lineTotal)
+        }))
+      }
+    };
+  }
+
+  public async createReturn(actor: PurchaseActor, input: CreatePurchaseReturnInput, context: PurchaseRequestContext) {
+    const mutation = await db.transaction(async (transaction) => {
+      const invoice = await this.getPurchaseOrThrow(actor.companyId, input.purchaseInvoiceId, transaction);
+      if (invoice.purchaseStatus !== "posted" && invoice.purchaseStatus !== "returned") {
+        throw new AppError("Purchase return can only be created for posted purchases", 400);
+      }
+
+      const invoiceItems = await purchasesRepository.listPurchaseInvoiceItems(actor.companyId, invoice.id, transaction);
+      const invoiceItemsMap = new Map(invoiceItems.map((row) => [row.item.id, row]));
+
+      const returnLines: Array<{
+        source: InvoiceItemRow;
+        quantity: string;
+        returnRate: string;
+        taxableAmount: string;
+        gstRate: string;
+        gstAmount: string;
+        lineTotal: string;
+      }> = [];
+
+      for (const item of input.items) {
+        const source = invoiceItemsMap.get(item.purchaseInvoiceItemId);
+        if (!source) {
+          throw new AppError("Purchase return item does not belong to the selected invoice", 400);
+        }
+
+        const requestedQty = normalizePurchaseQuantity(item.quantity);
+        const alreadyReturnedQty = await purchasesRepository.getReturnedQuantityByInvoiceItem(actor.companyId, source.item.id, transaction);
+        const maxReturnQty = addDecimals(source.item.quantity, source.item.freeQuantity, 3);
+        const remainingQty = subtractDecimals(maxReturnQty, alreadyReturnedQty, 3);
+
+        if (compareDecimals(requestedQty, remainingQty, 3) > 0) {
+          throw new AppError(`Return quantity exceeds remaining quantity for ${source.item.productNameSnapshot}`, 400);
+        }
+
+        const effectiveRate =
+          compareDecimals(maxReturnQty, "0.000", 3) > 0
+            ? divideMoneyByQuantity(source.item.taxableAmount, maxReturnQty)
+            : normalizeMoney(source.item.purchaseRate);
+        const taxableAmount = this.prorateMoney(source.item.taxableAmount, maxReturnQty, requestedQty);
+        const gstAmount = this.prorateMoney(
+          addDecimals(addDecimals(source.item.cgstAmount, source.item.sgstAmount, 2), source.item.igstAmount, 2),
+          maxReturnQty,
+          requestedQty
+        );
+        const lineTotal = this.prorateMoney(source.item.lineTotal, maxReturnQty, requestedQty);
+
+        returnLines.push({
+          source,
+          quantity: requestedQty,
+          returnRate: effectiveRate,
+          taxableAmount,
+          gstRate: normalizeMoney(source.item.gstRate),
+          gstAmount,
+          lineTotal
+        });
+      }
+
+      const warehouseId = input.warehouseId ?? invoice.warehouseId ?? null;
+      if (warehouseId) {
+        await this.getWarehouseOrThrow(actor.companyId, warehouseId);
+      }
+
+      let subtotal = "0.00";
+      let gstTotal = "0.00";
+      let grandTotal = "0.00";
+      for (const line of returnLines) {
+        subtotal = addDecimals(subtotal, line.taxableAmount, 2);
+        gstTotal = addDecimals(gstTotal, line.gstAmount, 2);
+        grandTotal = addDecimals(grandTotal, line.lineTotal, 2);
+      }
+
+      const returnNumber = await this.getNextReturnNumber(actor.companyId, transaction);
+      const purchaseReturn = await purchasesRepository.createPurchaseReturn(
+        {
+          companyId: actor.companyId,
+          returnNumber,
+          purchaseInvoiceId: invoice.id,
+          supplierId: invoice.supplierId,
+          returnDate: input.returnDate,
+          warehouseId,
+          subtotal,
+          gstTotal,
+          roundOffAmount: "0.00",
+          grandTotal,
+          notes: input.notes,
+          createdBy: actor.id
+        },
+        transaction
+      );
+
+      if (!purchaseReturn) {
+        throw new AppError("Failed to create purchase return", 500);
+      }
+
+      await purchasesRepository.createPurchaseReturnItems(
+        returnLines.map((line) => ({
+          companyId: actor.companyId,
+          purchaseReturnId: purchaseReturn.id,
+          purchaseInvoiceItemId: line.source.item.id,
+          productId: line.source.item.productId,
+          batchId: line.source.item.batchId,
+          quantity: line.quantity,
+          returnRate: line.returnRate,
+          taxableAmount: line.taxableAmount,
+          gstRate: line.gstRate,
+          gstAmount: line.gstAmount,
+          lineTotal: line.lineTotal
+        })),
+        transaction
+      );
+
+      const stockTouch = await inventoryService.reducePurchaseStock(
+        actor,
+        {
+          movementDate: new Date(input.returnDate),
+          referenceType: "purchase_return",
+          referenceId: purchaseReturn.id,
+          referenceNumber: returnNumber,
+          remarks: input.notes,
+          items: returnLines.map((line) => ({
+            productId: line.source.item.productId,
+            warehouseId: line.source.item.warehouseId ?? warehouseId,
+            batchId: line.source.item.batchId,
+            quantity: line.quantity,
+            rate: line.returnRate
+          }))
+        },
+        transaction
+      );
+
+      await purchasesRepository.createAccountingEvent(
+        {
+          companyId: actor.companyId,
+          eventType: "purchase_return_created",
+          referenceType: "purchase_return",
+          referenceId: purchaseReturn.id,
+          payload: {
+            purchaseInvoiceId: invoice.id,
+            purchaseNumber: invoice.purchaseNumber,
+            returnNumber,
+            amount: grandTotal
+          },
+          status: "pending"
+        },
+        transaction
+      );
+
+      const nextDueAmount = calculateDueAmount(subtractDecimals(invoice.grandTotal, grandTotal, 2), invoice.paidAmount);
+      const nextPaymentStatus = calculatePaymentStatus({
+        grandTotal: subtractDecimals(invoice.grandTotal, grandTotal, 2),
+        paidAmount: invoice.paidAmount,
+        dueDate: invoice.dueDate ?? null
+      });
+      const nextStatus = await this.determineReturnedStatus(actor.companyId, invoiceItems, transaction);
+
+      const updatedInvoice = await purchasesRepository.updatePurchaseInvoice(
+        actor.companyId,
+        invoice.id,
+        {
+          purchaseStatus: nextStatus,
+          dueAmount: nextDueAmount,
+          paymentStatus: nextPaymentStatus,
+          updatedBy: actor.id
+        },
+        transaction
+      );
+
+      if (!updatedInvoice) {
+        throw new AppError("Failed to update purchase after return", 500);
+      }
+
+      return {
+        purchaseReturn,
+        stockTouch
+      };
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_return_created",
+      entityType: "purchase_return",
+      entityId: mutation.purchaseReturn.id,
+      metadata: {
+        returnNumber: mutation.purchaseReturn.returnNumber
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_stock_updated",
+      entityType: "purchase_return",
+      entityId: mutation.purchaseReturn.id,
+      metadata: {
+        returnNumber: mutation.purchaseReturn.returnNumber
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_payable_updated",
+      entityType: "purchase_return",
+      entityId: mutation.purchaseReturn.id,
+      metadata: {
+        grandTotal: normalizeMoney(mutation.purchaseReturn.grandTotal)
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    await this.syncInventoryAlerts(actor, mutation.stockTouch);
+    return this.getReturn(actor, mutation.purchaseReturn.id);
+  }
+
+  public async exportPurchases(
+    actor: PurchaseActor,
+    query: ExportPurchasesQuery,
+    context: PurchaseRequestContext
+  ): Promise<PurchaseExportPayload> {
+    this.ensureCsvFormat(query.format);
+    const rows = await purchasesRepository.listPurchasesForExport({
+      companyId: actor.companyId,
+      search: query.search ?? null,
+      purchaseStatus: query.purchaseStatus,
+      paymentStatus: query.paymentStatus,
+      supplierId: query.supplierId,
+      warehouseId: query.warehouseId,
+      dateFrom: query.dateFrom ?? null,
+      dateTo: query.dateTo ?? null
+    });
+
+    const content = buildCsvBuffer(
+      ["Purchase No", "Supplier", "Supplier Invoice", "Invoice Date", "Status", "Payment Status", "Grand Total", "Paid", "Due"],
+      rows.map((row) => [
+        row.invoice.purchaseNumber,
+        row.supplierName,
+        row.invoice.supplierInvoiceNumber ?? "",
+        row.invoice.invoiceDate.toISOString(),
+        row.invoice.purchaseStatus,
+        row.invoice.paymentStatus,
+        normalizeMoney(row.invoice.grandTotal),
+        normalizeMoney(row.invoice.paidAmount),
+        normalizeMoney(row.invoice.dueAmount)
+      ])
+    );
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_exported",
+      entityType: "purchase_invoice",
+      metadata: {
+        format: query.format,
+        rowCount: rows.length
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return {
+      fileName: `purchases-${new Date().toISOString().slice(0, 10)}.csv`,
+      contentType: "text/csv; charset=utf-8",
+      content
+    };
+  }
+
+  public async generatePurchasePdf(
+    actor: PurchaseActor,
+    purchaseId: string,
+    context: PurchaseRequestContext
+  ): Promise<PurchaseExportPayload> {
+    const detail = await this.getPurchase(actor, purchaseId);
+    const invoice = detail.invoice;
+    const items = (invoice.items ?? []) as Array<ReturnType<PurchasesService["mapInvoiceItemRow"]>>;
+
+    const content = buildCsvBuffer(
+      ["Purchase No", "Supplier", "Invoice Date", "Product", "Qty", "Free Qty", "Rate", "Line Total"],
+      items.map((item) => [
+        invoice.purchaseNumber,
+        invoice.supplier.name,
+        invoice.invoiceDate.toISOString(),
+        item.productNameSnapshot,
+        item.quantity,
+        item.freeQuantity,
+        item.purchaseRate,
+        item.lineTotal
+      ])
+    );
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_pdf_generated",
+      entityType: "purchase_invoice",
+      entityId: purchaseId,
+      metadata: {
+        fallback: "csv"
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return {
+      fileName: `${invoice.purchaseNumber}.csv`,
+      contentType: "text/csv; charset=utf-8",
+      content
+    };
+  }
+
+  public async exportReturns(
+    actor: PurchaseActor,
+    query: ExportPurchaseReturnsQuery,
+    context: PurchaseRequestContext
+  ): Promise<PurchaseExportPayload> {
+    this.ensureCsvFormat(query.format);
+    const rows = await purchasesRepository.listPurchaseReturnsForExport({
+      companyId: actor.companyId,
+      search: query.search ?? null,
+      supplierId: query.supplierId,
+      purchaseInvoiceId: query.purchaseInvoiceId,
+      warehouseId: query.warehouseId,
+      dateFrom: query.dateFrom ?? null,
+      dateTo: query.dateTo ?? null
+    });
+
+    const content = buildCsvBuffer(
+      ["Return No", "Purchase No", "Supplier", "Return Date", "Grand Total"],
+      rows.map((row) => [
+        row.purchaseReturn.returnNumber,
+        row.purchaseNumber ?? "",
+        row.supplierName,
+        row.purchaseReturn.returnDate.toISOString(),
+        normalizeMoney(row.purchaseReturn.grandTotal)
+      ])
+    );
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_exported",
+      entityType: "purchase_return",
+      metadata: {
+        format: query.format,
+        rowCount: rows.length
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return {
+      fileName: `purchase-returns-${new Date().toISOString().slice(0, 10)}.csv`,
+      contentType: "text/csv; charset=utf-8",
+      content
+    };
+  }
+
+  public async generateReturnPdf(
+    actor: PurchaseActor,
+    purchaseReturnId: string,
+    context: PurchaseRequestContext
+  ): Promise<PurchaseExportPayload> {
+    const detail = await this.getReturn(actor, purchaseReturnId);
+    const purchaseReturn = detail.purchaseReturn;
+    const items = purchaseReturn.items as Array<{
+      productName: string;
+      quantity: string;
+      returnRate: string;
+      lineTotal: string;
+    }>;
+
+    const content = buildCsvBuffer(
+      ["Return No", "Purchase No", "Supplier", "Return Date", "Product", "Qty", "Rate", "Line Total"],
+      items.map((item) => [
+        purchaseReturn.returnNumber,
+        purchaseReturn.purchaseNumber ?? "",
+        purchaseReturn.supplierName,
+        purchaseReturn.returnDate.toISOString(),
+        item.productName,
+        item.quantity,
+        item.returnRate,
+        item.lineTotal
+      ])
+    );
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_pdf_generated",
+      entityType: "purchase_return",
+      entityId: purchaseReturnId,
+      metadata: {
+        fallback: "csv"
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return {
+      fileName: `${purchaseReturn.returnNumber}.csv`,
+      contentType: "text/csv; charset=utf-8",
+      content
+    };
+  }
+}
+
+export const purchasesService = new PurchasesService();

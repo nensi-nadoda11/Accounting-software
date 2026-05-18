@@ -1628,6 +1628,163 @@ class InventoryService {
     };
   }
 
+  public async receivePurchaseStock(
+    actor: InventoryActor,
+    input: {
+      movementDate: Date;
+      referenceType: string;
+      referenceId: string;
+      referenceNumber: string;
+      remarks?: string | null | undefined;
+      items: Array<{
+        productId: string;
+        warehouseId: string | null;
+        batchId?: string | null | undefined;
+        batchNumber?: string | null | undefined;
+        manufacturingDate?: Date | null | undefined;
+        expiryDate?: Date | null | undefined;
+        quantity: string;
+        rate: string;
+      }>;
+    },
+    executor: Parameters<Parameters<typeof db.transaction>[0]>[0]
+  ) {
+    const touched: Array<{ productId: string; warehouseId: string | null; batchId: string | null }> = [];
+
+    for (const item of input.items) {
+      const productRow = await this.getProductOrThrow(actor.companyId, item.productId);
+
+      if (productRow.product.productType !== "goods" || !productRow.product.stockTrackingEnabled) {
+        continue;
+      }
+
+      this.assertGoodsInventoryProduct(productRow);
+      if (!item.warehouseId) {
+        throw new AppError("Warehouse is required for goods inventory updates", 400);
+      }
+
+      const warehouse = await this.getWarehouseOrThrow(actor.companyId, item.warehouseId);
+      this.assertActiveWarehouse(warehouse);
+      this.assertDecimalQuantityAllowed(item.quantity, Boolean(productRow.unitDecimalAllowed));
+
+      const batch = await this.resolveBatchForMutation(
+        {
+          companyId: actor.companyId,
+          actorId: actor.id,
+          product: productRow.product,
+          warehouse,
+          batchId: item.batchId ?? null,
+          batchNumber: item.batchNumber ?? null,
+          manufacturingDate: item.manufacturingDate ?? null,
+          expiryDate: item.expiryDate ?? null,
+          purchaseRate: Number(item.rate),
+          saleRate: Number(productRow.product.salePrice)
+        },
+        executor
+      );
+
+      await this.applyStockMutation(
+        actor,
+        {
+          product: productRow.product,
+          warehouse,
+          batch,
+          movementType: "purchase",
+          movementDate: input.movementDate,
+          inQuantity: normalizeQuantity(item.quantity),
+          outQuantity: "0.000",
+          rate: normalizeMoney(item.rate),
+          remarks: input.remarks ?? null,
+          referenceType: input.referenceType,
+          referenceId: input.referenceId,
+          referenceNumber: input.referenceNumber,
+          allowNegativeStock: false
+        },
+        executor
+      );
+
+      touched.push({
+        productId: productRow.product.id,
+        warehouseId: warehouse.id,
+        batchId: batch?.id ?? null
+      });
+    }
+
+    return touched;
+  }
+
+  public async reducePurchaseStock(
+    actor: InventoryActor,
+    input: {
+      movementDate: Date;
+      referenceType: string;
+      referenceId: string;
+      referenceNumber: string;
+      remarks?: string | null | undefined;
+      items: Array<{
+        productId: string;
+        warehouseId: string | null;
+        batchId?: string | null | undefined;
+        quantity: string;
+        rate: string;
+      }>;
+    },
+    executor: Parameters<Parameters<typeof db.transaction>[0]>[0]
+  ) {
+    const touched: Array<{ productId: string; warehouseId: string | null; batchId: string | null }> = [];
+
+    for (const item of input.items) {
+      const productRow = await this.getProductOrThrow(actor.companyId, item.productId);
+
+      if (productRow.product.productType !== "goods" || !productRow.product.stockTrackingEnabled) {
+        continue;
+      }
+
+      this.assertGoodsInventoryProduct(productRow);
+      if (!item.warehouseId) {
+        throw new AppError("Warehouse is required for goods inventory updates", 400);
+      }
+
+      const warehouse = await this.getWarehouseOrThrow(actor.companyId, item.warehouseId);
+      this.assertActiveWarehouse(warehouse);
+      this.assertDecimalQuantityAllowed(item.quantity, Boolean(productRow.unitDecimalAllowed));
+
+      const batch = item.batchId ? (await this.getBatchOrThrow(actor.companyId, item.batchId)).batch : null;
+
+      if (batch && (batch.productId !== productRow.product.id || batch.warehouseId !== warehouse.id)) {
+        throw new AppError("Batch does not belong to the selected product and warehouse", 400);
+      }
+
+      await this.applyStockMutation(
+        actor,
+        {
+          product: productRow.product,
+          warehouse,
+          batch,
+          movementType: "purchase_return",
+          movementDate: input.movementDate,
+          inQuantity: "0.000",
+          outQuantity: normalizeQuantity(item.quantity),
+          rate: normalizeMoney(item.rate),
+          remarks: input.remarks ?? null,
+          referenceType: input.referenceType,
+          referenceId: input.referenceId,
+          referenceNumber: input.referenceNumber,
+          allowNegativeStock: productRow.product.negativeStockAllowed
+        },
+        executor
+      );
+
+      touched.push({
+        productId: productRow.product.id,
+        warehouseId: warehouse.id,
+        batchId: batch?.id ?? null
+      });
+    }
+
+    return touched;
+  }
+
   public async listAdjustments(actor: Pick<InventoryActor, "companyId">, query: ListAdjustmentsQuery) {
     const pagination = getPagination(query.page, query.limit);
     const result = await inventoryRepository.listAdjustments({

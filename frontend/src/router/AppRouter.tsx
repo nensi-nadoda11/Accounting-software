@@ -7,6 +7,7 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { ResetPasswordPage } from "../features/auth/ResetPasswordPage";
 import { VerifyOtpPage } from "../features/auth/VerifyOtpPage";
+import { PaymentsPage } from "../features/payments/PaymentsPage";
 import { CustomersPage } from "../features/customers/CustomersPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { BankAccountsPage } from "../features/company/BankAccountsPage";
@@ -66,6 +67,25 @@ export const AppRouter = () => (
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route
+          path="accounting/payments"
+          element={
+            <PermissionRoute
+              permissions={[
+                "payment.view",
+                "payment.receive",
+                "payment.pay",
+                "payment.update",
+                "payment.cancel",
+                "payment.export",
+                "payment.receipt.print",
+                "payment.reminder.manage",
+              ]}
+            >
+              <PaymentsPage />
+            </PermissionRoute>
+          }
+        />
         <Route
           path="sales/invoices"
           element={

@@ -24,6 +24,23 @@ export const SETTINGS_TABS = [
   { label: "Security", href: "/app/settings/security" },
 ] as const;
 
+export const ACCOUNTING_TABS = [
+  {
+    label: "Payments",
+    href: "/app/accounting/payments",
+    permissions: [
+      "payment.view",
+      "payment.receive",
+      "payment.pay",
+      "payment.update",
+      "payment.cancel",
+      "payment.export",
+      "payment.receipt.print",
+      "payment.reminder.manage",
+    ],
+  },
+] as const;
+
 export const PURCHASES_TABS = [
   { label: "Suppliers", href: "/app/purchases/suppliers", permissions: ["supplier.view"] },
   { label: "Purchase Invoices", href: "/app/purchases/invoices", permissions: ["purchase.view"] },

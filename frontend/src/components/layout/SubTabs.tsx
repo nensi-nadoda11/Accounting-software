@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { INVENTORY_TABS, PURCHASES_TABS, SALES_TABS, SETTINGS_TABS } from "../../constants/navigation";
+import { ACCOUNTING_TABS, INVENTORY_TABS, PURCHASES_TABS, SALES_TABS, SETTINGS_TABS } from "../../constants/navigation";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../providers/AuthProvider";
 
@@ -14,6 +14,8 @@ export const SubTabs = () => {
     ? PURCHASES_TABS
     : location.pathname.startsWith("/app/inventory")
       ? INVENTORY_TABS
+      : location.pathname.startsWith("/app/accounting")
+        ? ACCOUNTING_TABS
       : SETTINGS_TABS;
 
   const tabs = sourceTabs.filter((tab) =>

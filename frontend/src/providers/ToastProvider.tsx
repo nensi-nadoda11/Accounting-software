@@ -25,7 +25,13 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
 
   const push = useCallback((title: string, tone: Toast["tone"]) => {
     const id = Date.now() + Math.random();
-    setToasts((current) => [...current, { id, title, tone }]);
+    setToasts((current) => {
+      if (current.some((toast) => toast.title === title && toast.tone === tone)) {
+        return current;
+      }
+
+      return [...current, { id, title, tone }];
+    });
     window.setTimeout(() => removeToast(id), 3600);
   }, [removeToast]);
 

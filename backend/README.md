@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, Module 8, Module 9, Module 10, and Module 11: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, purchase management APIs, sales/invoice billing APIs, payments APIs, and accounting-core APIs.
+Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, Module 8, Module 9, Module 10, Module 11, and Module 12: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, purchase management APIs, sales/invoice billing APIs, payments APIs, accounting-core APIs, and expense management APIs.
 
 ## Stack
 
@@ -30,6 +30,7 @@ src/
     customers/
     inventory/
     accounting/
+    expenses/
     payments/
     sales/
     purchases/
@@ -343,6 +344,32 @@ All sales routes require authentication, company access, and permission-based ac
 - `POST /api/v1/accounting/period-locks`
 - `DELETE /api/v1/accounting/period-locks/:id`
 
+## Implemented Module 12 APIs
+
+- `GET /api/v1/expenses`
+- `POST /api/v1/expenses`
+- `GET /api/v1/expenses/export`
+- `GET /api/v1/expenses/:id`
+- `PATCH /api/v1/expenses/:id`
+- `DELETE /api/v1/expenses/:id`
+- `POST /api/v1/expenses/:id/post`
+- `POST /api/v1/expenses/:id/cancel`
+- `POST /api/v1/expenses/:id/attachments`
+- `DELETE /api/v1/expenses/:id/attachments/:attachmentId`
+- `GET /api/v1/expenses/categories`
+- `POST /api/v1/expenses/categories`
+- `PATCH /api/v1/expenses/categories/:id`
+- `DELETE /api/v1/expenses/categories/:id`
+- `GET /api/v1/expenses/recurring`
+- `POST /api/v1/expenses/recurring`
+- `PATCH /api/v1/expenses/recurring/:id`
+- `POST /api/v1/expenses/recurring/:id/run`
+- `POST /api/v1/expenses/recurring/run-due`
+- `GET /api/v1/expenses/reports/category-wise`
+- `GET /api/v1/expenses/reports/monthly`
+- `GET /api/v1/expenses/reports/payment-mode`
+- `GET /api/v1/expenses/reports/gst`
+
 ## Security
 
 - Helmet enabled
@@ -371,9 +398,11 @@ All sales routes require authentication, company access, and permission-based ac
 - Product stock summary returns safe opening-stock-based data until inventory transaction tables are added.
 - Inventory exports and valuation exports are available as CSV now; the route contracts are structured so XLSX/PDF can be added later without changing the APIs.
 - Inventory alert expiry windows use `INVENTORY_EXPIRY_ALERT_DAYS` and default to 30 days.
+- Expense receipt uploads use `EXPENSE_UPLOAD_DIR`, `EXPENSE_MAX_UPLOAD_MB`, and `EXPENSE_MAX_ATTACHMENTS`.
 - Purchase exports are available as CSV now. The `/pdf` routes currently return CSV fallback files until a PDF renderer is introduced.
 - Sales exports are available as CSV now. The sales PDF endpoint currently returns structured invoice data until a PDF renderer is introduced.
 - Payments and accounting exports are available as CSV now; the API contracts are structured so XLSX/PDF can be added later without changing the routes.
 - Module 11 accounting reports are generated strictly from posted journal entry lines, with posted journals remaining immutable and corrections flowing through reversal entries.
+- Module 12 expense posting creates and posts accounting events inside the same transaction so posted expenses immediately affect journals and P&L safely.
 - Customer outstanding, ledger, and payment history now include sales invoices, sales returns, and sales payments.
 - The backend applies Drizzle migrations automatically on startup, including the Module 2 company setup schema.

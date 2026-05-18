@@ -64,6 +64,20 @@
       "when": 1779091200000,
       "tag": "0008_accounting_core_module",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779120000000,
+      "tag": "0009_expense_management_module",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779206400000,
+      "tag": "0010_payments_management_module",
+      "breakpoints": true
     }
   ]
 }

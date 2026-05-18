@@ -1,5 +1,6 @@
 import { AmountText } from "../../../components/ui/AmountText";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { InlineErrorState } from "../../../components/ui/InlineErrorState";
 import { LoadingState } from "../../../components/ui/LoadingState";
 import { Pagination } from "../../../components/ui/Pagination";
 import { Badge } from "../../../components/ui/Badge";
@@ -10,14 +11,20 @@ import { balanceSideTone, formatAccountingDate, normalBalanceLabels } from "../a
 export const LedgerTable = ({
   data,
   loading,
+  error,
   onPageChange,
 }: {
   data: LedgerResponse | null;
   loading: boolean;
+  error?: string | null;
   onPageChange?: (page: number) => void;
 }) => {
   if (loading) {
     return <LoadingState label="Loading ledger..." />;
+  }
+
+  if (error && !data) {
+    return <InlineErrorState title={error} />;
   }
 
   if (!data) {

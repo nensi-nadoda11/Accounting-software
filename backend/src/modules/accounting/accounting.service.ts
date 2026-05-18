@@ -958,6 +958,76 @@ class AccountingService {
       };
     }
 
+    if (event.eventType === "expense_posted") {
+      const context = await accountingRepository.getExpenseAccountingContext(actor.companyId, event.referenceId, executor);
+      if (!context) {
+        throw new AppError("Expense not found for accounting event", 404);
+      }
+
+      const expenseAccountId = context.expense.expenseAccountId ?? context.category.defaultAccountId;
+      if (!expenseAccountId) {
+        throw new AppError("Expense account is not configured for this expense", 409);
+      }
+
+      const expenseAccount = await accountingRepository.findAccountById(actor.companyId, expenseAccountId, executor);
+      if (!expenseAccount || expenseAccount.status !== "active" || expenseAccount.deletedAt || expenseAccount.accountType !== "expense") {
+        throw new AppError("Expense account is invalid for this expense", 409);
+      }
+
+      const creditAccount =
+        context.expense.paymentMode === "cash"
+          ? await this.getSystemAccount(actor.companyId, "cash", executor)
+          : context.expense.paymentMode === "other"
+            ? await this.getSystemAccount(actor.companyId, "accounts_payable", executor)
+            : await this.getSystemAccount(actor.companyId, "bank", executor);
+      const inputGstAccount =
+        compareDecimals(context.expense.gstAmount, "0.00", 2) > 0
+          ? await this.getSystemAccount(actor.companyId, "input_gst", executor)
+          : null;
+
+      const lines: JournalLineInput[] = [
+        {
+          accountId: expenseAccount.id,
+          debit: normalizeMoney(context.expense.taxableAmount),
+          credit: "0.00",
+          description: `Expense booking ${context.expense.expenseNumber}`
+        }
+      ];
+
+      if (inputGstAccount) {
+        lines.push({
+          accountId: inputGstAccount.id,
+          debit: normalizeMoney(context.expense.gstAmount),
+          credit: "0.00",
+          description: `Input GST ${context.expense.expenseNumber}`
+        });
+      }
+
+      lines.push({
+        accountId: creditAccount.id,
+        debit: "0.00",
+        credit: normalizeMoney(context.expense.totalAmount),
+        referenceType: creditAccount.systemKey === "bank" && context.expense.bankAccountId ? "company_bank_account" : null,
+        referenceId: creditAccount.systemKey === "bank" ? context.expense.bankAccountId : null,
+        description:
+          creditAccount.systemKey === "accounts_payable"
+            ? `Expense payable ${context.expense.expenseNumber}`
+            : `Expense payment ${context.expense.expenseNumber}`
+      });
+
+      return {
+        kind: "journal" as const,
+        entryDate: context.expense.expenseDate,
+        voucherType: "expense" as const,
+        financialYearId: null,
+        referenceType: "expense",
+        referenceId: context.expense.id,
+        referenceNumber: context.expense.expenseNumber,
+        description: `Expense posted ${context.expense.expenseNumber}`,
+        lines
+      };
+    }
+
     if (event.eventType === "sales_return_created") {
       const context = await accountingRepository.getSalesReturnAccountingContext(actor.companyId, event.referenceId, executor);
       if (!context) {
@@ -1221,6 +1291,7 @@ class AccountingService {
     if (
       event.eventType === "sales_invoice_cancelled" ||
       event.eventType === "purchase_cancelled" ||
+      event.eventType === "expense_cancelled" ||
       event.eventType === "customer_payment_reversed" ||
       event.eventType === "supplier_payment_reversed"
     ) {
@@ -2358,77 +2429,66 @@ class AccountingService {
   }
 
   public async postEvent(actor: AccountingActor, eventId: string, context: AccountingRequestContext) {
-    const processed = await db.transaction(async (transaction) => {
-      const event = await accountingRepository.findEventById(actor.companyId, eventId, transaction);
-      if (!event) {
-        throw new AppError("Accounting event not found", 404);
-      }
+    const processed = await db.transaction((transaction) => this.processEvent(actor, eventId, transaction));
 
-      if (event.status === "posted") {
-        return {
-          event,
-          journalEntryId: event.journalEntryId,
-          status: "posted" as const
-        };
-      }
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: processed.status === "posted" ? "accounting_event_posted" : "accounting_event_failed",
+      entityType: "accounting_event",
+      entityId: eventId,
+      metadata: {
+        journalEntryId: processed.journalEntryId,
+        status: processed.status
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
 
-      try {
-        const mapped = await this.mapEventToJournal(actor, event, transaction);
-        if (mapped.kind === "ignored") {
-          const updated = await accountingRepository.updateEvent(
-            actor.companyId,
-            event.id,
-            {
-              status: "ignored",
-              errorMessage: mapped.message,
-              postedAt: new Date()
-            },
-            transaction
-          );
+    return processed;
+  }
 
-          return {
-            event: updated ?? event,
-            journalEntryId: null,
-            status: "ignored" as const
-          };
-        }
+  public async postEventInTransaction(actor: AccountingActor, eventId: string, executor: TransactionClient) {
+    return this.processEvent(actor, eventId, executor);
+  }
 
-        if (mapped.kind === "reversal") {
-          const journal = await this.buildReversalJournal(actor, mapped.sourceJournalId, mapped.reason, mapped.entryDate, transaction);
-          const updated = await accountingRepository.updateEvent(
-            actor.companyId,
-            event.id,
-            {
-              status: "posted",
-              journalEntryId: journal.id,
-              errorMessage: null,
-              postedAt: new Date()
-            },
-            transaction
-          );
+  private async processEvent(actor: AccountingActor, eventId: string, transaction: TransactionClient) {
+    const event = await accountingRepository.findEventById(actor.companyId, eventId, transaction);
+    if (!event) {
+      throw new AppError("Accounting event not found", 404);
+    }
 
-          return {
-            event: updated ?? event,
-            journalEntryId: journal.id,
-            status: "posted" as const
-          };
-        }
+    if (event.status === "posted") {
+      return {
+        event,
+        journalEntryId: event.journalEntryId,
+        status: "posted" as const
+      };
+    }
 
-        const journal = await this.createAndPostJournal(
-          actor,
+    try {
+      const mapped = await this.mapEventToJournal(actor, event, transaction);
+      if (mapped.kind === "ignored") {
+        const updated = await accountingRepository.updateEvent(
+          actor.companyId,
+          event.id,
           {
-            financialYearId: mapped.financialYearId ?? null,
-            entryDate: mapped.entryDate,
-            voucherType: mapped.voucherType,
-            referenceType: mapped.referenceType,
-            referenceId: mapped.referenceId,
-            referenceNumber: mapped.referenceNumber,
-            description: mapped.description,
-            lines: mapped.lines
+            status: "ignored",
+            errorMessage: mapped.message,
+            postedAt: new Date()
           },
           transaction
         );
 
+        return {
+          event: updated ?? event,
+          journalEntryId: null,
+          status: "ignored" as const
+        };
+      }
+
+      if (mapped.kind === "reversal") {
+        const journal = await this.buildReversalJournal(actor, mapped.sourceJournalId, mapped.reason, mapped.entryDate, transaction);
         const updated = await accountingRepository.updateEvent(
           actor.companyId,
           event.id,
@@ -2446,36 +2506,53 @@ class AccountingService {
           journalEntryId: journal.id,
           status: "posted" as const
         };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Accounting event processing failed";
-        await accountingRepository.updateEvent(
-          actor.companyId,
-          event.id,
-          {
-            status: "failed",
-            errorMessage: message
-          },
-          transaction
-        );
-        throw error;
       }
-    });
 
-    await auditLogService.log({
-      companyId: actor.companyId,
-      userId: actor.id,
-      action: processed.status === "posted" ? "accounting_event_posted" : "accounting_event_failed",
-      entityType: "accounting_event",
-      entityId: eventId,
-      metadata: {
-        journalEntryId: processed.journalEntryId,
-        status: processed.status
-      },
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent
-    });
+      const journal = await this.createAndPostJournal(
+        actor,
+        {
+          financialYearId: mapped.financialYearId ?? null,
+          entryDate: mapped.entryDate,
+          voucherType: mapped.voucherType,
+          referenceType: mapped.referenceType,
+          referenceId: mapped.referenceId,
+          referenceNumber: mapped.referenceNumber,
+          description: mapped.description,
+          lines: mapped.lines
+        },
+        transaction
+      );
 
-    return processed;
+      const updated = await accountingRepository.updateEvent(
+        actor.companyId,
+        event.id,
+        {
+          status: "posted",
+          journalEntryId: journal.id,
+          errorMessage: null,
+          postedAt: new Date()
+        },
+        transaction
+      );
+
+      return {
+        event: updated ?? event,
+        journalEntryId: journal.id,
+        status: "posted" as const
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Accounting event processing failed";
+      await accountingRepository.updateEvent(
+        actor.companyId,
+        event.id,
+        {
+          status: "failed",
+          errorMessage: message
+        },
+        transaction
+      );
+      throw error;
+    }
   }
 
   public async postPendingEvents(actor: AccountingActor, input: PostPendingAccountingEventsInput, context: AccountingRequestContext) {

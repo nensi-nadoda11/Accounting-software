@@ -5,6 +5,7 @@ import { TableActionIcons } from "../../../components/ui/TableActionIcons";
 import { Table, TableWrapper } from "../../../components/ui/Table";
 import { AmountText } from "../../../components/ui/AmountText";
 import { Badge } from "../../../components/ui/Badge";
+import { InlineErrorState } from "../../../components/ui/InlineErrorState";
 import { LoadingState } from "../../../components/ui/LoadingState";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
 import type { Account } from "../../../types/accounting";
@@ -14,6 +15,7 @@ export const AccountsTable = ({
   items,
   hierarchy,
   loading,
+  error,
   canManage,
   onView,
   onEdit,
@@ -22,6 +24,7 @@ export const AccountsTable = ({
   items: Account[];
   hierarchy: boolean;
   loading: boolean;
+  error?: string | null;
   canManage: boolean;
   onView: (account: Account) => void;
   onEdit: (account: Account) => void;
@@ -29,6 +32,10 @@ export const AccountsTable = ({
 }) => {
   if (loading) {
     return <LoadingState label="Loading accounts..." />;
+  }
+
+  if (error && !items.length) {
+    return <InlineErrorState title={error} />;
   }
 
   if (!items.length) {

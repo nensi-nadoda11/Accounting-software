@@ -164,6 +164,21 @@ export const errorHandler = (
       return;
     }
 
+    if (constraint.includes("expense_categories_company_category_code_unique_idx")) {
+      response.status(409).json(errorResponse("An expense category with this code already exists"));
+      return;
+    }
+
+    if (constraint.includes("expense_categories_company_name_unique_idx")) {
+      response.status(409).json(errorResponse("An expense category with this name already exists"));
+      return;
+    }
+
+    if (constraint.includes("expenses_company_expense_number_unique_idx")) {
+      response.status(409).json(errorResponse("An expense with this number already exists"));
+      return;
+    }
+
     response.status(409).json(errorResponse("Duplicate record already exists"));
     return;
   }

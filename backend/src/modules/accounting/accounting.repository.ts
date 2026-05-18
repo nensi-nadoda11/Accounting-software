@@ -22,6 +22,8 @@ import {
   companyBankAccounts,
   companyFinancialYears,
   customers,
+  expenseCategories,
+  expenses,
   financialPeriodLocks,
   journalEntries,
   journalEntryLines,
@@ -1025,6 +1027,21 @@ export class AccountingRepository {
       ...returnRow,
       inventoryValue: inventoryRow?.value ?? "0.00"
     };
+  }
+
+  public async getExpenseAccountingContext(companyId: string, expenseId: string, executor?: DbExecutor) {
+    const [row] = await this
+      .getExecutor(executor)
+      .select({
+        expense: expenses,
+        category: expenseCategories
+      })
+      .from(expenses)
+      .innerJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
+      .where(and(eq(expenses.companyId, companyId), eq(expenses.id, expenseId), isNull(expenses.deletedAt)))
+      .limit(1);
+
+    return row ?? null;
   }
 
   public async getPaymentAccountingContext(companyId: string, paymentId: string, executor?: DbExecutor) {

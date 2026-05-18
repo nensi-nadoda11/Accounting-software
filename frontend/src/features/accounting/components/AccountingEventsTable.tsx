@@ -2,6 +2,7 @@ import { Eye, Play } from "lucide-react";
 
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { InlineErrorState } from "../../../components/ui/InlineErrorState";
 import { LoadingState } from "../../../components/ui/LoadingState";
 import { Pagination } from "../../../components/ui/Pagination";
 import { TableActionIcons } from "../../../components/ui/TableActionIcons";
@@ -12,6 +13,7 @@ import { formatAccountingDateTime } from "../accountingUtils";
 export const AccountingEventsTable = ({
   data,
   loading,
+  error,
   canPost,
   postingId,
   onViewPayload,
@@ -20,6 +22,7 @@ export const AccountingEventsTable = ({
 }: {
   data: AccountingEventsResponse | null;
   loading: boolean;
+  error?: string | null;
   canPost: boolean;
   postingId: string | null;
   onViewPayload: (event: AccountingEvent) => void;
@@ -28,6 +31,10 @@ export const AccountingEventsTable = ({
 }) => {
   if (loading) {
     return <LoadingState label="Loading accounting events..." />;
+  }
+
+  if (error && !data) {
+    return <InlineErrorState title={error} />;
   }
 
   if (!data) {

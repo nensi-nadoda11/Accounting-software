@@ -1,6 +1,7 @@
 import { AmountText } from "../../../components/ui/AmountText";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { InlineErrorState } from "../../../components/ui/InlineErrorState";
 import { LoadingState } from "../../../components/ui/LoadingState";
 import { Table, TableWrapper } from "../../../components/ui/Table";
 import type { TrialBalanceResponse } from "../../../types/accounting";
@@ -9,9 +10,21 @@ import { accountTypeLabels } from "../accountingUtils";
 const sideAmount = (amount: string, side: "debit" | "credit", expected: "debit" | "credit") =>
   side === expected ? amount : "0.00";
 
-export const TrialBalanceTable = ({ data, loading }: { data: TrialBalanceResponse | null; loading: boolean }) => {
+export const TrialBalanceTable = ({
+  data,
+  loading,
+  error,
+}: {
+  data: TrialBalanceResponse | null;
+  loading: boolean;
+  error?: string | null;
+}) => {
   if (loading) {
     return <LoadingState label="Loading trial balance..." />;
+  }
+
+  if (error && !data) {
+    return <InlineErrorState title={error} />;
   }
 
   if (!data) {

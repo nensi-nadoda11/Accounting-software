@@ -37,6 +37,9 @@ const envSchema = z.object({
   INVENTORY_EXPIRY_ALERT_DAYS: z.coerce.number().int().positive().default(30),
   UPLOAD_DIR: z.string().trim().min(1).default("uploads"),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(2),
+  EXPENSE_UPLOAD_DIR: z.string().trim().min(1).default("uploads/expenses"),
+  EXPENSE_MAX_UPLOAD_MB: z.coerce.number().positive().default(5),
+  EXPENSE_MAX_ATTACHMENTS: z.coerce.number().int().positive().default(5),
   PUBLIC_UPLOAD_BASE_URL: z.string().trim().min(1).default("/uploads")
 });
 

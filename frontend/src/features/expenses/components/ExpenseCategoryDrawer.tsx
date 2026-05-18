@@ -1,0 +1,107 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+
+import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select";
+import { SideSheet } from "../../../components/ui/SideSheet";
+import { Textarea } from "../../../components/ui/Textarea";
+import type { Account } from "../../../types/accounting";
+import type { ExpenseCategory } from "../../../types/expense";
+import { expenseCategorySchema, type ExpenseCategoryInputValues, type ExpenseCategoryValues } from "../expenseSchemas";
+
+export const ExpenseCategoryDrawer = ({
+  open,
+  category,
+  categories,
+  accounts,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  category: ExpenseCategory | null;
+  categories: ExpenseCategory[];
+  accounts: Account[];
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (values: ExpenseCategoryValues) => Promise<void>;
+}) => {
+  const form = useForm<ExpenseCategoryInputValues, undefined, ExpenseCategoryValues>({
+    resolver: zodResolver(expenseCategorySchema),
+    defaultValues: {
+      name: "",
+      parentId: null,
+      defaultAccountId: null,
+      color: "#10b981",
+      icon: null,
+      description: null,
+      status: "active",
+      currentId: null,
+    },
+  });
+
+  useEffect(() => {
+    form.reset({
+      name: category?.name ?? "",
+      parentId: category?.parentId ?? null,
+      defaultAccountId: category?.defaultAccountId ?? null,
+      color: category?.color ?? "#10b981",
+      icon: category?.icon ?? null,
+      description: category?.description ?? null,
+      status: category?.status === "inactive" ? "inactive" : "active",
+      currentId: category?.id ?? null,
+    });
+  }, [category, form, open]);
+
+  return (
+    <SideSheet
+      open={open}
+      onClose={onClose}
+      title={category ? "Edit Category" : "Add Category"}
+      className="max-w-2xl"
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+          <Button type="button" loading={submitting} onClick={form.handleSubmit(onSubmit)}>
+            Save Category
+          </Button>
+        </>
+      }
+    >
+      <div className="grid gap-4">
+        <Input label="Name" {...form.register("name")} error={form.formState.errors.name?.message} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Select label="Parent" {...form.register("parentId")} error={form.formState.errors.parentId?.message}>
+            <option value="">No parent</option>
+            {categories.filter((item) => item.id !== category?.id && item.status !== "deleted").map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </Select>
+          <Select label="Default Account" {...form.register("defaultAccountId")} error={form.formState.errors.defaultAccountId?.message}>
+            <option value="">None</option>
+            {accounts.filter((item) => item.status === "active").map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.accountCode} • {account.accountName}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Input label="Color" {...form.register("color")} error={form.formState.errors.color?.message} />
+          <Input label="Icon" {...form.register("icon")} error={form.formState.errors.icon?.message} />
+          <Select label="Status" {...form.register("status")} error={form.formState.errors.status?.message}>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+        </div>
+        <Textarea label="Description" rows={4} {...form.register("description")} error={form.formState.errors.description?.message} />
+      </div>
+    </SideSheet>
+  );
+};

@@ -1,6 +1,7 @@
 import { AmountText } from "../../../components/ui/AmountText";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { InlineErrorState } from "../../../components/ui/InlineErrorState";
 import { LoadingState } from "../../../components/ui/LoadingState";
 import { Table, TableWrapper } from "../../../components/ui/Table";
 import type { ProfitLossReport } from "../../../types/accounting";
@@ -44,9 +45,21 @@ const SectionTable = ({
   </div>
 );
 
-export const ProfitLossView = ({ data, loading }: { data: ProfitLossReport | null; loading: boolean }) => {
+export const ProfitLossView = ({
+  data,
+  loading,
+  error,
+}: {
+  data: ProfitLossReport | null;
+  loading: boolean;
+  error?: string | null;
+}) => {
   if (loading) {
     return <LoadingState label="Loading profit & loss..." />;
+  }
+
+  if (error && !data) {
+    return <InlineErrorState title={error} />;
   }
 
   if (!data) {

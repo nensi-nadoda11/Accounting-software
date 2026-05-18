@@ -8,6 +8,7 @@ import { RegisterPage } from "../features/auth/RegisterPage";
 import { ResetPasswordPage } from "../features/auth/ResetPasswordPage";
 import { VerifyOtpPage } from "../features/auth/VerifyOtpPage";
 import { AccountingCorePage } from "../features/accounting/AccountingCorePage";
+import { ExpensesPage } from "../features/expenses/ExpensesPage";
 import { PaymentsPage } from "../features/payments/PaymentsPage";
 import { CustomersPage } from "../features/customers/CustomersPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
@@ -87,6 +88,25 @@ export const AppRouter = () => (
               ]}
             >
               <AccountingCorePage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="accounting/expenses"
+          element={
+            <PermissionRoute
+              permissions={[
+                "expense.view",
+                "expense.create",
+                "expense.update",
+                "expense.delete",
+                "expense.post",
+                "expense.export",
+                "expense.category.manage",
+                "expense.recurring.manage",
+              ]}
+            >
+              <ExpensesPage />
             </PermissionRoute>
           }
         />

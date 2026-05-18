@@ -10,6 +10,7 @@ import { Button } from "../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../components/ui/Card";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { InlineErrorState } from "../../components/ui/InlineErrorState";
 import { Input } from "../../components/ui/Input";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { Modal } from "../../components/ui/Modal";
@@ -151,9 +152,11 @@ export const AccountingCorePage = () => {
 
   const [accountLookup, setAccountLookup] = useState<Account[]>([]);
   const [accountLookupLoading, setAccountLookupLoading] = useState(false);
+  const [accountLookupError, setAccountLookupError] = useState<string | null>(null);
 
   const [accountsData, setAccountsData] = useState<{ items: Account[]; pagination: { page: number; limit: number; total: number; totalPages: number } } | null>(null);
   const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
   const [accountsSearch, setAccountsSearch] = useState("");
   const debouncedAccountsSearch = useDebouncedValue(accountsSearch, 350);
   const [accountsPage, setAccountsPage] = useState(1);
@@ -172,6 +175,7 @@ export const AccountingCorePage = () => {
 
   const [openingBalancesData, setOpeningBalancesData] = useState<{ items: OpeningBalance[]; pagination: { page: number; limit: number; total: number; totalPages: number } } | null>(null);
   const [openingBalancesLoading, setOpeningBalancesLoading] = useState(false);
+  const [openingBalancesError, setOpeningBalancesError] = useState<string | null>(null);
   const [openingBalancesPage, setOpeningBalancesPage] = useState(1);
   const [openingBalanceDrawerOpen, setOpeningBalanceDrawerOpen] = useState(false);
   const [openingBalanceDrawerMode, setOpeningBalanceDrawerMode] = useState<"create" | "edit">("create");
@@ -183,6 +187,7 @@ export const AccountingCorePage = () => {
 
   const [journalsData, setJournalsData] = useState<{ items: JournalEntrySummary[]; pagination: { page: number; limit: number; total: number; totalPages: number } } | null>(null);
   const [journalsLoading, setJournalsLoading] = useState(false);
+  const [journalsError, setJournalsError] = useState<string | null>(null);
   const [journalsSearch, setJournalsSearch] = useState("");
   const debouncedJournalsSearch = useDebouncedValue(journalsSearch, 350);
   const [journalsPage, setJournalsPage] = useState(1);
@@ -217,6 +222,7 @@ export const AccountingCorePage = () => {
   const [ledgerPage, setLedgerPage] = useState(1);
   const [ledgerData, setLedgerData] = useState<LedgerResponse | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [ledgerSearch, setLedgerSearch] = useState("");
 
   const [cashBookDateFrom, setCashBookDateFrom] = useState(getMonthStartInput());
@@ -224,6 +230,7 @@ export const AccountingCorePage = () => {
   const [cashBookPage, setCashBookPage] = useState(1);
   const [cashBookData, setCashBookData] = useState<LedgerResponse | null>(null);
   const [cashBookLoading, setCashBookLoading] = useState(false);
+  const [cashBookError, setCashBookError] = useState<string | null>(null);
 
   const [bankBookDateFrom, setBankBookDateFrom] = useState(getMonthStartInput());
   const [bankBookDateTo, setBankBookDateTo] = useState(getTodayInput());
@@ -231,26 +238,31 @@ export const AccountingCorePage = () => {
   const [bankBookAccountId, setBankBookAccountId] = useState("");
   const [bankBookData, setBankBookData] = useState<LedgerResponse | null>(null);
   const [bankBookLoading, setBankBookLoading] = useState(false);
+  const [bankBookError, setBankBookError] = useState<string | null>(null);
 
   const [trialFinancialYearId, setTrialFinancialYearId] = useState<string | null>(null);
   const [trialDateFrom, setTrialDateFrom] = useState(getMonthStartInput());
   const [trialDateTo, setTrialDateTo] = useState(getTodayInput());
   const [trialData, setTrialData] = useState<TrialBalanceResponse | null>(null);
   const [trialLoading, setTrialLoading] = useState(false);
+  const [trialError, setTrialError] = useState<string | null>(null);
 
   const [profitLossFinancialYearId, setProfitLossFinancialYearId] = useState<string | null>(null);
   const [profitLossDateFrom, setProfitLossDateFrom] = useState(getMonthStartInput());
   const [profitLossDateTo, setProfitLossDateTo] = useState(getTodayInput());
   const [profitLossData, setProfitLossData] = useState<ProfitLossReport | null>(null);
   const [profitLossLoading, setProfitLossLoading] = useState(false);
+  const [profitLossError, setProfitLossError] = useState<string | null>(null);
 
   const [balanceSheetFinancialYearId, setBalanceSheetFinancialYearId] = useState<string | null>(null);
   const [balanceSheetAsOfDate, setBalanceSheetAsOfDate] = useState(getTodayInput());
   const [balanceSheetData, setBalanceSheetData] = useState<BalanceSheetReport | null>(null);
   const [balanceSheetLoading, setBalanceSheetLoading] = useState(false);
+  const [balanceSheetError, setBalanceSheetError] = useState<string | null>(null);
 
   const [eventsData, setEventsData] = useState<AccountingEventsResponse | null>(null);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
   const [eventsPage, setEventsPage] = useState(1);
   const [eventStatusFilter, setEventStatusFilter] = useState<"pending" | "posted" | "failed" | "ignored" | "">("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
@@ -263,6 +275,7 @@ export const AccountingCorePage = () => {
 
   const [periodLocksData, setPeriodLocksData] = useState<PeriodLock[]>([]);
   const [periodLocksLoading, setPeriodLocksLoading] = useState(false);
+  const [periodLocksError, setPeriodLocksError] = useState<string | null>(null);
   const [periodLocksFinancialYearId, setPeriodLocksFinancialYearId] = useState("");
   const [periodLockModalOpen, setPeriodLockModalOpen] = useState(false);
   const [periodLockSaving, setPeriodLockSaving] = useState(false);
@@ -326,6 +339,7 @@ export const AccountingCorePage = () => {
 
     try {
       setAccountLookupLoading(true);
+      setAccountLookupError(null);
       const response = await accountingApi.listAccounts({
         page: 1,
         limit: 200,
@@ -333,7 +347,8 @@ export const AccountingCorePage = () => {
       });
       setAccountLookup(flattenAccounts(response.data.items));
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load account list"));
+      setAccountLookup([]);
+      setAccountLookupError(getErrorMessage(error, "Failed to load account list"));
     } finally {
       setAccountLookupLoading(false);
     }
@@ -353,6 +368,7 @@ export const AccountingCorePage = () => {
     const loadAccounts = async () => {
       try {
         setAccountsLoading(true);
+        setAccountsError(null);
         const response = await accountingApi.listAccounts({
           page: accountsPage,
           limit: PAGE_LIMIT,
@@ -364,7 +380,8 @@ export const AccountingCorePage = () => {
         });
         setAccountsData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load accounts"));
+        setAccountsData(null);
+        setAccountsError(getErrorMessage(error, "Failed to load accounts"));
       } finally {
         setAccountsLoading(false);
       }
@@ -381,13 +398,15 @@ export const AccountingCorePage = () => {
     const loadOpeningBalances = async () => {
       try {
         setOpeningBalancesLoading(true);
+        setOpeningBalancesError(null);
         const response = await accountingApi.listOpeningBalances({
           page: openingBalancesPage,
           limit: 8,
         });
         setOpeningBalancesData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load opening balances"));
+        setOpeningBalancesData(null);
+        setOpeningBalancesError(getErrorMessage(error, "Failed to load opening balances"));
       } finally {
         setOpeningBalancesLoading(false);
       }
@@ -409,6 +428,7 @@ export const AccountingCorePage = () => {
     const loadJournals = async () => {
       try {
         setJournalsLoading(true);
+        setJournalsError(null);
         const response = await accountingApi.listJournals({
           page: journalsPage,
           limit: PAGE_LIMIT,
@@ -421,7 +441,8 @@ export const AccountingCorePage = () => {
         });
         setJournalsData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load journals"));
+        setJournalsData(null);
+        setJournalsError(getErrorMessage(error, "Failed to load journals"));
       } finally {
         setJournalsLoading(false);
       }
@@ -438,12 +459,14 @@ export const AccountingCorePage = () => {
     const parsed = dateRangeSchema.safeParse({ dateFrom: ledgerDateFrom, dateTo: ledgerDateTo });
     if (!parsed.success || !ledgerTargetId) {
       setLedgerData(null);
+      setLedgerError(null);
       return;
     }
 
     const loadLedger = async () => {
       try {
         setLedgerLoading(true);
+        setLedgerError(null);
         const query = {
           page: ledgerPage,
           limit: LEDGER_LIMIT,
@@ -458,7 +481,8 @@ export const AccountingCorePage = () => {
               : await accountingApi.getSupplierLedger(ledgerTargetId, query);
         setLedgerData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load ledger"));
+        setLedgerData(null);
+        setLedgerError(getErrorMessage(error, "Failed to load ledger"));
       } finally {
         setLedgerLoading(false);
       }
@@ -480,6 +504,7 @@ export const AccountingCorePage = () => {
     const loadCashBook = async () => {
       try {
         setCashBookLoading(true);
+        setCashBookError(null);
         const response = await accountingApi.getCashBook({
           page: cashBookPage,
           limit: LEDGER_LIMIT,
@@ -488,7 +513,8 @@ export const AccountingCorePage = () => {
         });
         setCashBookData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load cash book"));
+        setCashBookData(null);
+        setCashBookError(getErrorMessage(error, "Failed to load cash book"));
       } finally {
         setCashBookLoading(false);
       }
@@ -510,6 +536,7 @@ export const AccountingCorePage = () => {
     const loadBankBook = async () => {
       try {
         setBankBookLoading(true);
+        setBankBookError(null);
         const response = await accountingApi.getBankBook({
           page: bankBookPage,
           limit: LEDGER_LIMIT,
@@ -519,7 +546,8 @@ export const AccountingCorePage = () => {
         });
         setBankBookData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load bank book"));
+        setBankBookData(null);
+        setBankBookError(getErrorMessage(error, "Failed to load bank book"));
       } finally {
         setBankBookLoading(false);
       }
@@ -545,6 +573,7 @@ export const AccountingCorePage = () => {
     const loadTrialBalance = async () => {
       try {
         setTrialLoading(true);
+        setTrialError(null);
         const response = await accountingApi.getTrialBalance({
           financialYearId: trialFinancialYearId ?? undefined,
           dateFrom: trialFinancialYearId ? undefined : trialDateFrom,
@@ -552,7 +581,8 @@ export const AccountingCorePage = () => {
         });
         setTrialData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load trial balance"));
+        setTrialData(null);
+        setTrialError(getErrorMessage(error, "Failed to load trial balance"));
       } finally {
         setTrialLoading(false);
       }
@@ -578,6 +608,7 @@ export const AccountingCorePage = () => {
     const loadProfitLoss = async () => {
       try {
         setProfitLossLoading(true);
+        setProfitLossError(null);
         const response = await accountingApi.getProfitLoss({
           financialYearId: profitLossFinancialYearId ?? undefined,
           dateFrom: profitLossFinancialYearId ? undefined : profitLossDateFrom,
@@ -585,7 +616,8 @@ export const AccountingCorePage = () => {
         });
         setProfitLossData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load profit & loss"));
+        setProfitLossData(null);
+        setProfitLossError(getErrorMessage(error, "Failed to load profit & loss"));
       } finally {
         setProfitLossLoading(false);
       }
@@ -610,13 +642,15 @@ export const AccountingCorePage = () => {
     const loadBalanceSheet = async () => {
       try {
         setBalanceSheetLoading(true);
+        setBalanceSheetError(null);
         const response = await accountingApi.getBalanceSheet({
           financialYearId: balanceSheetFinancialYearId ?? undefined,
           asOfDate: balanceSheetAsOfDate || undefined,
         });
         setBalanceSheetData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load balance sheet"));
+        setBalanceSheetData(null);
+        setBalanceSheetError(getErrorMessage(error, "Failed to load balance sheet"));
       } finally {
         setBalanceSheetLoading(false);
       }
@@ -633,6 +667,7 @@ export const AccountingCorePage = () => {
     const loadEvents = async () => {
       try {
         setEventsLoading(true);
+        setEventsError(null);
         const response = await accountingApi.listEvents({
           page: eventsPage,
           limit: PAGE_LIMIT,
@@ -642,7 +677,8 @@ export const AccountingCorePage = () => {
         });
         setEventsData(response.data);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load accounting events"));
+        setEventsData(null);
+        setEventsError(getErrorMessage(error, "Failed to load accounting events"));
       } finally {
         setEventsLoading(false);
       }
@@ -659,12 +695,14 @@ export const AccountingCorePage = () => {
     const loadPeriodLocks = async () => {
       try {
         setPeriodLocksLoading(true);
+        setPeriodLocksError(null);
         const response = await accountingApi.listPeriodLocks({
           financialYearId: periodLocksFinancialYearId || undefined,
         });
         setPeriodLocksData(response.data.items);
       } catch (error) {
-        toast.error(getErrorMessage(error, "Failed to load period locks"));
+        setPeriodLocksData([]);
+        setPeriodLocksError(getErrorMessage(error, "Failed to load period locks"));
       } finally {
         setPeriodLocksLoading(false);
       }
@@ -973,6 +1011,7 @@ export const AccountingCorePage = () => {
               items={accountsData?.items ?? []}
               hierarchy={accountsHierarchy}
               loading={accountsLoading}
+              error={accountsError}
               canManage={canManageChart}
               onView={(account) => void openAccountDrawer("view", account)}
               onEdit={(account) => void openAccountDrawer("edit", account)}
@@ -998,6 +1037,8 @@ export const AccountingCorePage = () => {
               <CardContent className="space-y-3">
                 {openingBalancesLoading ? (
                   <LoadingState label="Loading opening balances..." />
+                ) : openingBalancesError && !openingBalancesData?.items.length ? (
+                  <InlineErrorState title={openingBalancesError} />
                 ) : openingBalancesData?.items.length ? (
                   <>
                     <TableWrapper>
@@ -1086,6 +1127,8 @@ export const AccountingCorePage = () => {
 
             {journalsLoading ? (
               <LoadingState label="Loading journals..." />
+            ) : journalsError && !journalsData?.items.length ? (
+              <InlineErrorState title={journalsError} />
             ) : journalsData?.items.length ? (
               <>
                 <TableWrapper>
@@ -1165,6 +1208,7 @@ export const AccountingCorePage = () => {
 
         {activeTab === "ledger" ? (
           <div className="space-y-4">
+            {ledgerScope === "account" && accountLookupError ? <InlineErrorState title={accountLookupError} /> : null}
             <Card>
               <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                 <Select value={ledgerScope} onChange={(event) => { setLedgerScope(event.target.value as "account" | "customer" | "supplier"); setLedgerTargetId(""); setLedgerPage(1); }}>
@@ -1221,12 +1265,13 @@ export const AccountingCorePage = () => {
                 </div>
               </CardContent>
             </Card>
-            <LedgerTable data={ledgerData} loading={ledgerLoading} onPageChange={setLedgerPage} />
+            <LedgerTable data={ledgerData} loading={ledgerLoading} error={ledgerError} onPageChange={setLedgerPage} />
           </div>
         ) : null}
 
         {activeTab === "cash-book" ? (
           <div className="space-y-4">
+            {accountLookupError ? <InlineErrorState title={accountLookupError} /> : null}
             <Card>
               <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Input type="date" value={cashBookDateFrom} onChange={(event) => { setCashBookDateFrom(event.target.value); setCashBookPage(1); }} />
@@ -1251,7 +1296,7 @@ export const AccountingCorePage = () => {
                 </div>
               </CardContent>
             </Card>
-            <CashBookTable data={cashBookData} loading={cashBookLoading} onPageChange={setCashBookPage} />
+            <CashBookTable data={cashBookData} loading={cashBookLoading} error={cashBookError} onPageChange={setCashBookPage} />
           </div>
         ) : null}
 
@@ -1271,7 +1316,7 @@ export const AccountingCorePage = () => {
                 <Input type="date" value={bankBookDateTo} onChange={(event) => { setBankBookDateTo(event.target.value); setBankBookPage(1); }} />
               </CardContent>
             </Card>
-            <BankBookTable data={bankBookData} loading={bankBookLoading} onPageChange={setBankBookPage} />
+            <BankBookTable data={bankBookData} loading={bankBookLoading} error={bankBookError} onPageChange={setBankBookPage} />
           </div>
         ) : null}
 
@@ -1311,7 +1356,7 @@ export const AccountingCorePage = () => {
                 </div>
               </CardContent>
             </Card>
-            <TrialBalanceTable data={trialData} loading={trialLoading} />
+            <TrialBalanceTable data={trialData} loading={trialLoading} error={trialError} />
           </div>
         ) : null}
 
@@ -1351,7 +1396,7 @@ export const AccountingCorePage = () => {
                 </div>
               </CardContent>
             </Card>
-            <ProfitLossView data={profitLossData} loading={profitLossLoading} />
+            <ProfitLossView data={profitLossData} loading={profitLossLoading} error={profitLossError} />
           </div>
         ) : null}
 
@@ -1389,7 +1434,7 @@ export const AccountingCorePage = () => {
                 </div>
               </CardContent>
             </Card>
-            <BalanceSheetView data={balanceSheetData} loading={balanceSheetLoading} />
+            <BalanceSheetView data={balanceSheetData} loading={balanceSheetLoading} error={balanceSheetError} />
           </div>
         ) : null}
 
@@ -1446,6 +1491,7 @@ export const AccountingCorePage = () => {
             <AccountingEventsTable
               data={eventsData}
               loading={eventsLoading}
+              error={eventsError}
               canPost={canPostJournal}
               postingId={postingEventId}
               onPageChange={setEventsPage}
@@ -1493,6 +1539,8 @@ export const AccountingCorePage = () => {
 
             {periodLocksLoading ? (
               <LoadingState label="Loading period locks..." />
+            ) : periodLocksError && !periodLocksData.length ? (
+              <InlineErrorState title={periodLocksError} />
             ) : periodLocksData.length ? (
               <TableWrapper>
                 <Table>

@@ -57,6 +57,13 @@ export const ALL_PERMISSIONS = [
   "payment.reminder.manage",
   "expense.view",
   "expense.manage",
+  "expense.create",
+  "expense.update",
+  "expense.delete",
+  "expense.post",
+  "expense.export",
+  "expense.category.manage",
+  "expense.recurring.manage",
   "accounting.view",
   "accounting.manage",
   "accounting.journal.create",
@@ -117,6 +124,13 @@ const accountantPermissions: PermissionKey[] = [
   "payment.reminder.manage",
   "expense.view",
   "expense.manage",
+  "expense.create",
+  "expense.update",
+  "expense.delete",
+  "expense.post",
+  "expense.export",
+  "expense.category.manage",
+  "expense.recurring.manage",
   "gst.view",
   "gst.manage",
   "payroll.view",
@@ -154,7 +168,9 @@ const staffPermissions: PermissionKey[] = [
   "sales.create",
   "sales.update",
   "sales.payment.view",
-  "sales.pos.access"
+  "sales.pos.access",
+  "expense.view",
+  "expense.create"
 ];
 
 const auditorPermissions: PermissionKey[] = [
@@ -177,7 +193,8 @@ const auditorPermissions: PermissionKey[] = [
   "purchase.view",
   "purchase.payment.view",
   "sales.view",
-  "sales.payment.view"
+  "sales.payment.view",
+  "expense.view"
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {

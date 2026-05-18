@@ -43,6 +43,20 @@ export const ACCOUNTING_TABS = [
     ],
   },
   {
+    label: "Expenses",
+    href: "/app/accounting/expenses",
+    permissions: [
+      "expense.view",
+      "expense.create",
+      "expense.update",
+      "expense.delete",
+      "expense.post",
+      "expense.export",
+      "expense.category.manage",
+      "expense.recurring.manage",
+    ],
+  },
+  {
     label: "Payments",
     href: "/app/accounting/payments",
     permissions: [

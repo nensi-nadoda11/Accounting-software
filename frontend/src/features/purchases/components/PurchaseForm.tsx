@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useFieldArray, useForm, type UseFormSetError } from "react-hook-form";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Plus, Save } from "lucide-react";
 
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
@@ -9,13 +9,19 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { applyFriendlyFieldErrors } from "../../customers/customerUtils";
+import { getErrorMessage } from "../../../lib/errors";
+import { useAuth } from "../../../providers/AuthProvider";
+import { useToast } from "../../../providers/ToastProvider";
 import { productsApi } from "../../../services/productsApi";
 import { suppliersApi } from "../../../services/suppliersApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../../types/company";
 import type { Warehouse } from "../../../types/inventory";
 import type { Product } from "../../../types/product";
-import type { Supplier } from "../../../types/supplier";
+import type { Supplier, SupplierFormInput } from "../../../types/supplier";
 import type { PurchaseFormInput, PurchaseInvoice, PurchasePaymentMode } from "../../../types/purchase";
+import { SupplierFormDrawer } from "../../suppliers/components/SupplierFormDrawer";
+import { createSupplierPayload } from "../../suppliers/supplierUtils";
+import type { SupplierFormValues } from "../../suppliers/supplierSchemas";
 import { PURCHASE_PAYMENT_MODE_OPTIONS } from "../purchaseOptions";
 import { purchaseFormSchema, type PurchaseFormValues } from "../purchaseSchemas";
 import {
@@ -55,14 +61,19 @@ export const PurchaseForm = ({
     mode: "draft" | "posted",
   ) => Promise<void>;
 }) => {
+  const auth = useAuth();
+  const toast = useToast();
   const [submitMode, setSubmitMode] = useState<"draft" | "posted">("draft");
   const [supplierLookup, setSupplierLookup] = useState<LookupOption[]>([]);
   const [productLookup, setProductLookup] = useState<LookupOption[]>([]);
   const [supplierLookupValue, setSupplierLookupValue] = useState<SupplierLookupValue>(null);
   const [supplierLoading, setSupplierLoading] = useState(false);
+  const [supplierDrawerOpen, setSupplierDrawerOpen] = useState(false);
+  const [submittingSupplier, setSubmittingSupplier] = useState(false);
   const [productLookupLoading, setProductLookupLoading] = useState(false);
   const [supplierDetail, setSupplierDetail] = useState<Supplier | null>(null);
   const [productDetails, setProductDetails] = useState<Record<string, Product>>({});
+  const canCreateSupplier = auth.hasPermission("supplier.create");
 
   const form = useForm<PurchaseFormValues, undefined, PurchaseFormInput>({
     resolver: zodResolver(purchaseFormSchema),
@@ -231,6 +242,38 @@ export const PurchaseForm = ({
   };
 
   const currentPaymentMode = (form.watch("paymentMode") as PurchasePaymentMode | null | undefined) ?? null;
+  const handleSupplierCreated = async (values: SupplierFormInput, setError: UseFormSetError<SupplierFormValues>) => {
+    try {
+      setSubmittingSupplier(true);
+      const response = await suppliersApi.create(createSupplierPayload(values));
+      const supplier = response.data.supplier;
+      const lookupOption: LookupOption = {
+        id: supplier.id,
+        label: supplier.name,
+        description: supplier.supplierCode,
+        meta: supplier.mobile,
+      };
+
+      setSupplierLookup((current) => [lookupOption, ...current.filter((option) => option.id !== supplier.id)]);
+      setSupplierLookupValue(lookupOption);
+      setSupplierDetail(supplier);
+      form.setValue("supplierId", supplier.id, { shouldDirty: true, shouldValidate: true });
+
+      if (!form.getValues("termsConditions")) {
+        form.setValue("termsConditions", supplier.paymentTerms ?? invoiceSettings?.termsAndConditions ?? null, {
+          shouldDirty: true,
+        });
+      }
+
+      setSupplierDrawerOpen(false);
+      toast.success("Supplier created");
+    } catch (error) {
+      applyFriendlyFieldErrors(error, setError);
+      toast.error(getErrorMessage(error, "Failed to save supplier"));
+    } finally {
+      setSubmittingSupplier(false);
+    }
+  };
 
   return (
     <form
@@ -275,21 +318,36 @@ export const PurchaseForm = ({
       <Card>
         <CardHeader title="Header" />
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <AsyncLookupSelect
-            label="Supplier"
-            value={supplierLookupValue}
-            loading={supplierLoading}
-            options={supplierLookup}
-            placeholder="Search supplier"
-            error={form.formState.errors.supplierId?.message}
-            onSearch={loadSuppliers}
-            onSelect={(option) => void handleSupplierSelect(option)}
-            onClear={() => {
-              setSupplierLookupValue(null);
-              setSupplierDetail(null);
-              form.setValue("supplierId", "", { shouldDirty: true, shouldValidate: true });
-            }}
-          />
+          <div className="flex flex-col gap-2">
+            <AsyncLookupSelect
+              label="Supplier"
+              value={supplierLookupValue}
+              loading={supplierLoading}
+              options={supplierLookup}
+              placeholder="Search supplier"
+              error={form.formState.errors.supplierId?.message}
+              onSearch={loadSuppliers}
+              onSelect={(option) => void handleSupplierSelect(option)}
+              onClear={() => {
+                setSupplierLookupValue(null);
+                setSupplierDetail(null);
+                form.setValue("supplierId", "", { shouldDirty: true, shouldValidate: true });
+              }}
+            />
+            {canCreateSupplier ? (
+              <div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-auto px-0 text-emerald-700 hover:bg-transparent hover:text-emerald-800"
+                  onClick={() => setSupplierDrawerOpen(true)}
+                >
+                  <Plus className="mr-2 size-4" />
+                  Add Supplier
+                </Button>
+              </div>
+            ) : null}
+          </div>
           <Input label="Supplier Invoice No" {...form.register("supplierInvoiceNumber")} error={form.formState.errors.supplierInvoiceNumber?.message} />
           <Input type="date" label="Invoice Date" {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
           <Input type="date" label="Due Date" {...form.register("dueDate")} error={form.formState.errors.dueDate?.message} />
@@ -372,6 +430,12 @@ export const PurchaseForm = ({
 
         <PurchaseTotalsPanel totals={preview} />
       </div>
+      <SupplierFormDrawer
+        open={supplierDrawerOpen}
+        onClose={() => setSupplierDrawerOpen(false)}
+        submitting={submittingSupplier}
+        onSubmit={handleSupplierCreated}
+      />
     </form>
   );
 };

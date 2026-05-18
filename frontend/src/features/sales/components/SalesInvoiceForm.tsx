@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useFieldArray, useForm, type UseFormSetError } from "react-hook-form";
-import { ArrowLeft, FileText, Save } from "lucide-react";
+import { ArrowLeft, FileText, Plus, Save } from "lucide-react";
 
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
@@ -9,15 +9,20 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { ToggleSwitch } from "../../../components/ui/ToggleSwitch";
-import { applyFriendlyFieldErrors } from "../../customers/customerUtils";
+import { getErrorMessage } from "../../../lib/errors";
+import { useAuth } from "../../../providers/AuthProvider";
+import { useToast } from "../../../providers/ToastProvider";
 import { customersApi } from "../../../services/customersApi";
 import { inventoryApi } from "../../../services/inventoryApi";
 import { productsApi } from "../../../services/productsApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../../types/company";
-import type { Customer } from "../../../types/customer";
+import type { Customer, CustomerFormInput } from "../../../types/customer";
 import type { Warehouse } from "../../../types/inventory";
 import type { Product } from "../../../types/product";
 import type { SalesFormInput, SalesInvoice, SalesPaymentMode } from "../../../types/sales";
+import { CustomerFormDrawer } from "../../customers/components/CustomerFormDrawer";
+import { applyFriendlyFieldErrors, createCustomerPayload } from "../../customers/customerUtils";
+import type { CustomerFormValues } from "../../customers/customerSchemas";
 import { SALES_PAYMENT_MODE_OPTIONS, SALES_PRICE_TAX_TYPE_OPTIONS } from "../salesOptions";
 import { salesFormSchema, type SalesFormValues } from "../salesSchemas";
 import {
@@ -67,16 +72,21 @@ export const SalesInvoiceForm = ({
   ) => Promise<void>;
   onPrint?: (invoice: SalesInvoice) => void;
 }) => {
+  const auth = useAuth();
+  const toast = useToast();
   const [submitMode, setSubmitMode] = useState<"draft" | "posted">("draft");
   const [customerLookup, setCustomerLookup] = useState<LookupOption[]>([]);
   const [productLookup, setProductLookup] = useState<LookupOption[]>([]);
   const [customerLookupValue, setCustomerLookupValue] = useState<LookupOption | null>(null);
   const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerDrawerOpen, setCustomerDrawerOpen] = useState(false);
+  const [submittingCustomer, setSubmittingCustomer] = useState(false);
   const [productLookupLoading, setProductLookupLoading] = useState(false);
   const [customerDetail, setCustomerDetail] = useState<Customer | null>(null);
   const [productDetails, setProductDetails] = useState<Record<string, Product>>({});
   const [batchOptions, setBatchOptions] = useState<Record<number, BatchOption[]>>({});
   const [loadingBatchIndex, setLoadingBatchIndex] = useState<number | null>(null);
+  const canCreateCustomer = auth.hasPermission("customer.create");
 
   const form = useForm<SalesFormValues, undefined, SalesFormInput>({
     resolver: zodResolver(salesFormSchema),
@@ -312,6 +322,41 @@ export const SalesInvoiceForm = ({
   };
 
   const currentPaymentMode = (form.watch("paymentMode") as SalesPaymentMode | null | undefined) ?? null;
+  const handleCustomerCreated = async (values: CustomerFormInput, setError: UseFormSetError<CustomerFormValues>) => {
+    try {
+      setSubmittingCustomer(true);
+      const response = await customersApi.create(createCustomerPayload(values));
+      const customer = response.data.customer;
+      const lookupOption: LookupOption = {
+        id: customer.id,
+        label: customer.name,
+        description: customer.customerCode,
+        meta: customer.mobile,
+      };
+
+      setCustomerLookup((current) => [lookupOption, ...current.filter((option) => option.id !== customer.id)]);
+      setCustomerLookupValue(lookupOption);
+      setCustomerDetail(customer);
+      form.setValue("customerId", customer.id, { shouldDirty: true, shouldValidate: true });
+      form.setValue("isWalkIn", false, { shouldDirty: true, shouldValidate: true });
+
+      if (!form.getValues("placeOfSupply")) {
+        form.setValue(
+          "placeOfSupply",
+          (customer.shippingState ?? customer.billingState ?? companyProfile?.state ?? null) as string | null,
+          { shouldDirty: true },
+        );
+      }
+
+      setCustomerDrawerOpen(false);
+      toast.success("Customer created");
+    } catch (error) {
+      applyFriendlyFieldErrors(error, setError);
+      toast.error(getErrorMessage(error, "Failed to save customer"));
+    } finally {
+      setSubmittingCustomer(false);
+    }
+  };
 
   return (
     <form
@@ -391,21 +436,36 @@ export const SalesInvoiceForm = ({
         <CardHeader title={mode === "pos" ? "Quick Entry" : "Header"} />
         <CardContent className={`grid gap-4 ${mode === "pos" ? "md:grid-cols-2 xl:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-4"}`}>
           {mode === "invoice" ? (
-            <AsyncLookupSelect
-              label="Customer"
-              value={customerLookupValue}
-              loading={customerLoading}
-              options={customerLookup}
-              placeholder="Search customer"
-              error={form.formState.errors.customerId?.message}
-              onSearch={loadCustomers}
-              onSelect={(option) => void handleCustomerSelect(option)}
-              onClear={() => {
-                setCustomerLookupValue(null);
-                setCustomerDetail(null);
-                form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
-              }}
-            />
+            <div className="flex flex-col gap-2">
+              <AsyncLookupSelect
+                label="Customer"
+                value={customerLookupValue}
+                loading={customerLoading}
+                options={customerLookup}
+                placeholder="Search customer"
+                error={form.formState.errors.customerId?.message}
+                onSearch={loadCustomers}
+                onSelect={(option) => void handleCustomerSelect(option)}
+                onClear={() => {
+                  setCustomerLookupValue(null);
+                  setCustomerDetail(null);
+                  form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
+                }}
+              />
+              {canCreateCustomer ? (
+                <div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto px-0 text-emerald-700 hover:bg-transparent hover:text-emerald-800"
+                    onClick={() => setCustomerDrawerOpen(true)}
+                  >
+                    <Plus className="mr-2 size-4" />
+                    Add Customer
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           ) : null}
           <div className={mode === "pos" ? "xl:col-span-2" : undefined}>
             <ToggleSwitch
@@ -524,6 +584,12 @@ export const SalesInvoiceForm = ({
 
         <SalesTotalsPanel totals={preview} sticky={mode !== "pos"} />
       </div>
+      <CustomerFormDrawer
+        open={customerDrawerOpen}
+        onClose={() => setCustomerDrawerOpen(false)}
+        submitting={submittingCustomer}
+        onSubmit={handleCustomerCreated}
+      />
     </form>
   );
 };

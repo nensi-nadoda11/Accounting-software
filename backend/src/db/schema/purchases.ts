@@ -17,6 +17,7 @@ import {
 
 import { companies } from "./companies";
 import { companyBankAccounts } from "./company-settings";
+import { journalEntries } from "./accounting";
 import { productBatches, warehouses } from "./inventory";
 import { products, productPriceTaxTypeEnum } from "./products";
 import { suppliers } from "./suppliers";
@@ -25,7 +26,7 @@ import { users } from "./users";
 export const purchaseStatusEnum = pgEnum("purchase_status", ["draft", "posted", "cancelled", "returned"]);
 export const purchasePaymentStatusEnum = pgEnum("purchase_payment_status", ["unpaid", "partial", "paid", "overdue"]);
 export const purchasePaymentModeEnum = pgEnum("purchase_payment_mode", ["cash", "bank", "upi", "card", "cheque"]);
-export const accountingEventStatusEnum = pgEnum("accounting_event_status", ["pending", "processed", "failed", "cancelled"]);
+export const accountingEventStatusEnum = pgEnum("accounting_event_status", ["pending", "posted", "failed", "ignored"]);
 
 export const purchaseInvoices = pgTable(
   "purchase_invoices",
@@ -293,11 +294,17 @@ export const accountingEvents = pgTable(
     referenceId: uuid("reference_id").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
     status: accountingEventStatusEnum("status").notNull().default("pending"),
+    errorMessage: text("error_message"),
+    journalEntryId: uuid("journal_entry_id").references(() => journalEntries.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+    ,
+    postedAt: timestamp("posted_at", { withTimezone: true })
   },
   (table) => ({
     companyIdx: index("accounting_events_company_id_idx").on(table.companyId),
     eventTypeIdx: index("accounting_events_event_type_idx").on(table.eventType),
-    referenceIdx: index("accounting_events_reference_idx").on(table.referenceType, table.referenceId)
+    referenceIdx: index("accounting_events_reference_idx").on(table.referenceType, table.referenceId),
+    statusIdx: index("accounting_events_company_status_idx").on(table.companyId, table.status),
+    journalEntryIdx: index("accounting_events_journal_entry_id_idx").on(table.journalEntryId)
   })
 );

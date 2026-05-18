@@ -149,6 +149,21 @@ export const errorHandler = (
       return;
     }
 
+    if (constraint.includes("chart_of_accounts_company_account_code_unique_idx")) {
+      response.status(409).json(errorResponse("An account with this code already exists"));
+      return;
+    }
+
+    if (constraint.includes("chart_of_accounts_company_system_key_unique_idx")) {
+      response.status(409).json(errorResponse("This system account already exists for the company"));
+      return;
+    }
+
+    if (constraint.includes("journal_entries_company_journal_number_unique_idx")) {
+      response.status(409).json(errorResponse("A journal with this number already exists"));
+      return;
+    }
+
     response.status(409).json(errorResponse("Duplicate record already exists"));
     return;
   }
@@ -165,6 +180,11 @@ export const errorHandler = (
 
   if (databaseError?.code === "23514" && databaseError.constraint?.includes("company_financial_years_date_check")) {
     response.status(400).json(errorResponse("End date must be greater than start date"));
+    return;
+  }
+
+  if (databaseError?.code === "23514" && databaseError.constraint?.includes("financial_period_locks_period_check")) {
+    response.status(400).json(errorResponse("Period end must be greater than or equal to period start"));
     return;
   }
 

@@ -1,6 +1,6 @@
 export const TOP_NAV_ITEMS = [
   { label: "Dashboard", href: "/app?menu=dashboard", menu: "dashboard" },
-  { label: "Accounting", href: "/app?menu=accounting", menu: "accounting" },
+  { label: "Accounting", href: "/app/accounting/core", menu: "accounting" },
   { label: "Sales", href: "/app/sales/customers", menu: "sales" },
   { label: "Purchases", href: "/app/purchases/suppliers", menu: "purchases" },
   { label: "Inventory", href: "/app/inventory/stock", menu: "inventory" },
@@ -25,6 +25,23 @@ export const SETTINGS_TABS = [
 ] as const;
 
 export const ACCOUNTING_TABS = [
+  {
+    label: "Core",
+    href: "/app/accounting/core",
+    permissions: [
+      "accounting.view",
+      "accounting.manage",
+      "accounting.journal.create",
+      "accounting.journal.post",
+      "accounting.journal.cancel",
+      "accounting.reports.view",
+      "accounting.export",
+      "chart.manage",
+      "ledger.view",
+      "cashbook.view",
+      "bankbook.view",
+    ],
+  },
   {
     label: "Payments",
     href: "/app/accounting/payments",

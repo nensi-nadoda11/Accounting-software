@@ -236,48 +236,49 @@ class PaymentsService {
   private mapPaymentRow(
     row: Awaited<ReturnType<typeof paymentsRepository.listPayments>>["rows"][number] | NonNullable<Awaited<ReturnType<typeof paymentsRepository.findPaymentDetail>>>
   ) {
-    if ("payment" in row) {
+    if ("customerName" in row || "supplierName" in row) {
+      const listRow = row as Awaited<ReturnType<typeof paymentsRepository.listPayments>>["rows"][number];
       return {
-        id: row.payment.id,
-        paymentNumber: row.payment.paymentNumber,
-        receiptNumber: row.payment.receiptNumber,
-        paymentType: row.payment.paymentType,
-        partyType: row.payment.partyType,
-        partyId: row.payment.partyId,
-        paymentDate: row.payment.paymentDate,
-        amount: normalizeMoney(row.payment.amount),
-        allocatedAmount: normalizeMoney(row.payment.allocatedAmount),
-        unallocatedAmount: normalizeMoney(row.payment.unallocatedAmount),
-        paymentMode: row.payment.paymentMode,
-        referenceNumber: row.payment.referenceNumber,
-        status: row.payment.status,
-        isAdvance: row.payment.isAdvance,
-        chequeNumber: row.payment.chequeNumber,
-        chequeDate: row.payment.chequeDate,
-        chequeBankName: row.payment.chequeBankName,
-        chequeStatus: row.payment.chequeStatus,
-        notes: row.payment.notes,
-        completedAt: row.payment.completedAt,
-        cancelledAt: row.payment.cancelledAt,
-        cancellationReason: row.payment.cancellationReason,
-        receiptGeneratedAt: row.payment.receiptGeneratedAt,
-        accountingEventCreated: row.payment.accountingEventCreated,
+        id: listRow.payment.id,
+        paymentNumber: listRow.payment.paymentNumber,
+        receiptNumber: listRow.payment.receiptNumber,
+        paymentType: listRow.payment.paymentType,
+        partyType: listRow.payment.partyType,
+        partyId: listRow.payment.partyId,
+        paymentDate: listRow.payment.paymentDate,
+        amount: normalizeMoney(listRow.payment.amount),
+        allocatedAmount: normalizeMoney(listRow.payment.allocatedAmount),
+        unallocatedAmount: normalizeMoney(listRow.payment.unallocatedAmount),
+        paymentMode: listRow.payment.paymentMode,
+        referenceNumber: listRow.payment.referenceNumber,
+        status: listRow.payment.status,
+        isAdvance: listRow.payment.isAdvance,
+        chequeNumber: listRow.payment.chequeNumber,
+        chequeDate: listRow.payment.chequeDate,
+        chequeBankName: listRow.payment.chequeBankName,
+        chequeStatus: listRow.payment.chequeStatus,
+        notes: listRow.payment.notes,
+        completedAt: listRow.payment.completedAt,
+        cancelledAt: listRow.payment.cancelledAt,
+        cancellationReason: listRow.payment.cancellationReason,
+        receiptGeneratedAt: listRow.payment.receiptGeneratedAt,
+        accountingEventCreated: listRow.payment.accountingEventCreated,
         paymentAllocationStatus: calculatePaymentStatus({
-          amount: row.payment.amount,
-          allocatedAmount: row.payment.allocatedAmount,
-          unallocatedAmount: row.payment.unallocatedAmount
+          amount: listRow.payment.amount,
+          allocatedAmount: listRow.payment.allocatedAmount,
+          unallocatedAmount: listRow.payment.unallocatedAmount
         }),
         party:
-          row.payment.partyType === "customer"
+          listRow.payment.partyType === "customer"
             ? {
-                id: row.payment.partyId,
-                name: row.customerName ?? null,
-                code: row.customerCode ?? null
+                id: listRow.payment.partyId,
+                name: listRow.customerName ?? null,
+                code: listRow.customerCode ?? null
               }
             : {
-                id: row.payment.partyId,
-                name: row.supplierName ?? null,
-                code: row.supplierCode ?? null
+                id: listRow.payment.partyId,
+                name: listRow.supplierName ?? null,
+                code: listRow.supplierCode ?? null
               }
       };
     }
@@ -420,7 +421,7 @@ class PaymentsService {
         throw new AppError("Allocation reference not found", 404);
       }
 
-      const invoicePartyId = payment.paymentType === "customer_receive" ? invoice.customerId : invoice.supplierId;
+      const invoicePartyId = "customerId" in invoice ? invoice.customerId : invoice.supplierId;
       if (invoicePartyId !== payment.partyId || invoice.partyType !== payment.partyType) {
         throw new AppError("Allocation reference does not belong to the selected party", 400);
       }
@@ -667,7 +668,7 @@ class PaymentsService {
       normalizedAllocations.map((allocation) => ({
         companyId: actor.companyId,
         paymentId: payment.id,
-        allocationType: allocation.allocationType,
+        allocationType: allocation.allocationType as PaymentAllocationType,
         referenceId: allocation.referenceId,
         referenceNumber: allocation.referenceNumber,
         partyType: allocation.partyType,
@@ -1322,7 +1323,7 @@ class PaymentsService {
           chequeBankName: input.chequeBankName,
           chequeStatus: input.paymentMode === "cheque" || existing.paymentMode === "cheque" ? input.chequeStatus : null,
           updatedBy: actor.id
-        }),
+        }) as Partial<typeof import("../../db/schema").payments.$inferInsert>,
         transaction
       );
 

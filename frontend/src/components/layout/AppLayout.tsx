@@ -13,6 +13,7 @@ export const AppLayout = () => {
   const toast = useToast();
   const showSubTabs =
     location.pathname.startsWith("/app/settings") ||
+    location.pathname.startsWith("/app/sales") ||
     location.pathname.startsWith("/app/purchases") ||
     location.pathname.startsWith("/app/inventory");
 

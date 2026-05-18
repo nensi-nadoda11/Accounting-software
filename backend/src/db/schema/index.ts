@@ -6,6 +6,7 @@ export * from "./inventory";
 export * from "./otp-verifications";
 export * from "./purchases";
 export * from "./products";
+export * from "./sales";
 export * from "./sessions";
 export * from "./suppliers";
 export * from "./user-invites";

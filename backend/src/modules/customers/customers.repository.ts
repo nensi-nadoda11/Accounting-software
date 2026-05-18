@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../db";
-import { customers } from "../../db/schema";
+import { customers, salesInvoices, salesPayments, salesReturns } from "../../db/schema";
 
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbExecutor = typeof db | TransactionClient;
@@ -49,10 +49,20 @@ class CustomersRepository {
   }
 
   private getOutstandingSql() {
+    const activeInvoiceClause = sql`
+      ${salesInvoices.companyId} = ${customers.companyId}
+      AND ${salesInvoices.customerId} = ${customers.id}
+      AND ${salesInvoices.deletedAt} IS NULL
+      AND ${salesInvoices.invoiceStatus} IN ('posted', 'partially_returned', 'returned')
+    `;
+
+    const salesDue = sql<string>`coalesce((select sum(${salesInvoices.dueAmount}) from ${salesInvoices} where ${activeInvoiceClause}), 0)`;
+
     return sql<string>`
       CASE
-        WHEN ${customers.openingBalanceType} = 'debit' THEN ${customers.openingBalanceAmount}
-        WHEN ${customers.openingBalanceType} = 'credit' THEN (${customers.openingBalanceAmount} * -1)
+        WHEN ${customers.openingBalanceType} = 'debit' THEN (${customers.openingBalanceAmount} + ${salesDue})
+        WHEN ${customers.openingBalanceType} = 'credit' THEN ((${customers.openingBalanceAmount} * -1) + ${salesDue})
+        WHEN ${customers.openingBalanceType} = 'none' THEN ${salesDue}
         ELSE 0
       END
     `;
@@ -285,65 +295,246 @@ class CustomersRepository {
     const conditions = this.buildListConditions(params);
     const whereClause = and(...conditions);
     const orderBy = this.getListOrderBy(params.sortBy, params.sortOrder);
+    const outstandingAmount = this.getOutstandingSql();
 
-    return db.select().from(customers).where(whereClause).orderBy(...orderBy);
+    return db
+      .select({
+        id: customers.id,
+        customerCode: customers.customerCode,
+        name: customers.name,
+        customerType: customers.customerType,
+        businessName: customers.businessName,
+        mobile: customers.mobile,
+        email: customers.email,
+        gstNumber: customers.gstNumber,
+        taxType: customers.taxType,
+        status: customers.status,
+        isBlacklisted: customers.isBlacklisted,
+        openingBalanceAmount: customers.openingBalanceAmount,
+        openingBalanceType: customers.openingBalanceType,
+        creditLimit: customers.creditLimit,
+        createdAt: customers.createdAt,
+        outstandingAmount
+      })
+      .from(customers)
+      .where(whereClause)
+      .orderBy(...orderBy);
   }
 
-  public async getCustomerTransactionTotals(_companyId: string, _customerId: string): Promise<CustomerTransactionTotals> {
+  public async getCustomerTransactionTotals(
+    companyId: string,
+    customerId: string,
+    excludeInvoiceId?: string
+  ): Promise<CustomerTransactionTotals> {
+    const invoiceConditions: SQL[] = [
+      eq(salesInvoices.companyId, companyId),
+      eq(salesInvoices.customerId, customerId),
+      isNull(salesInvoices.deletedAt),
+      sql`${salesInvoices.invoiceStatus} IN ('posted', 'partially_returned', 'returned')`
+    ];
+
+    if (excludeInvoiceId) {
+      invoiceConditions.push(ne(salesInvoices.id, excludeInvoiceId));
+    }
+
+    const paymentConditions: SQL[] = [eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId)];
+    const returnConditions: SQL[] = [eq(salesReturns.companyId, companyId), eq(salesReturns.customerId, customerId)];
+
+    const [salesRow, returnRow, paymentRow, overdueRow] = await Promise.all([
+      db
+        .select({
+          totalSales: sql<string>`coalesce(sum(${salesInvoices.grandTotal}), 0)`
+        })
+        .from(salesInvoices)
+        .where(and(...invoiceConditions))
+        .then((rows) => rows[0]),
+      db
+        .select({
+          totalReturns: sql<string>`coalesce(sum(${salesReturns.grandTotal}), 0)`
+        })
+        .from(salesReturns)
+        .where(and(...returnConditions))
+        .then((rows) => rows[0]),
+      db
+        .select({
+          totalPayments: sql<string>`coalesce(sum(${salesPayments.amount}), 0)`
+        })
+        .from(salesPayments)
+        .where(and(...paymentConditions))
+        .then((rows) => rows[0]),
+      db
+        .select({
+          overdueAmount: sql<string>`coalesce(sum(${salesInvoices.dueAmount}), 0)`
+        })
+        .from(salesInvoices)
+        .where(
+          and(
+            ...invoiceConditions,
+            sql`${salesInvoices.dueDate} IS NOT NULL AND ${salesInvoices.dueDate} < CURRENT_DATE AND ${salesInvoices.dueAmount} > 0`
+          )
+        )
+        .then((rows) => rows[0])
+    ]);
+
     return {
-      totalSales: "0.00",
-      totalReturns: "0.00",
-      totalPayments: "0.00",
+      totalSales: salesRow?.totalSales ?? "0.00",
+      totalReturns: returnRow?.totalReturns ?? "0.00",
+      totalPayments: paymentRow?.totalPayments ?? "0.00",
       debitAdjustments: "0.00",
       creditAdjustments: "0.00",
-      overdueAmount: "0.00"
+      overdueAmount: overdueRow?.overdueAmount ?? "0.00"
     };
   }
 
-  public async hasLinkedTransactions(_companyId: string, _customerId: string): Promise<boolean> {
-    return false;
+  public async hasLinkedTransactions(companyId: string, customerId: string): Promise<boolean> {
+    const [invoiceRow, paymentRow, returnRow] = await Promise.all([
+      db
+        .select({ value: count() })
+        .from(salesInvoices)
+        .where(and(eq(salesInvoices.companyId, companyId), eq(salesInvoices.customerId, customerId), isNull(salesInvoices.deletedAt)))
+        .then((rows) => rows[0]),
+      db
+        .select({ value: count() })
+        .from(salesPayments)
+        .where(and(eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId)))
+        .then((rows) => rows[0]),
+      db
+        .select({ value: count() })
+        .from(salesReturns)
+        .where(and(eq(salesReturns.companyId, companyId), eq(salesReturns.customerId, customerId)))
+        .then((rows) => rows[0])
+    ]);
+
+    return (invoiceRow?.value ?? 0) > 0 || (paymentRow?.value ?? 0) > 0 || (returnRow?.value ?? 0) > 0;
   }
 
   public async listLedgerTransactions(
-    _companyId: string,
-    _customerId: string,
-    _filters?: {
+    companyId: string,
+    customerId: string,
+    filters?: {
       dateFrom?: Date | undefined;
       dateTo?: Date | undefined;
       transactionType?: string | undefined;
     }
   ) {
+    const invoiceConditions: SQL[] = [
+      eq(salesInvoices.companyId, companyId),
+      eq(salesInvoices.customerId, customerId),
+      isNull(salesInvoices.deletedAt),
+      sql`${salesInvoices.invoiceStatus} IN ('posted', 'partially_returned', 'returned')`
+    ];
+
+    const returnConditions: SQL[] = [eq(salesReturns.companyId, companyId), eq(salesReturns.customerId, customerId)];
+    const paymentConditions: SQL[] = [eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId)];
+
+    if (filters?.dateFrom) {
+      invoiceConditions.push(sql`${salesInvoices.invoiceDate} >= ${filters.dateFrom}`);
+      returnConditions.push(sql`${salesReturns.returnDate} >= ${filters.dateFrom}`);
+      paymentConditions.push(sql`${salesPayments.paymentDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      invoiceConditions.push(sql`${salesInvoices.invoiceDate} <= ${filters.dateTo}`);
+      returnConditions.push(sql`${salesReturns.returnDate} <= ${filters.dateTo}`);
+      paymentConditions.push(sql`${salesPayments.paymentDate} <= ${filters.dateTo}`);
+    }
+
+    const [invoiceRows, returnRows, paymentRows] = await Promise.all([
+      filters?.transactionType && filters.transactionType !== "sale"
+        ? Promise.resolve([])
+        : db
+            .select({
+              date: salesInvoices.invoiceDate,
+              transactionType: sql<string>`'sale'`,
+              referenceNo: salesInvoices.invoiceNumber,
+              description: sql<string>`'Sales invoice posted'`,
+              debit: salesInvoices.grandTotal,
+              credit: sql<string>`'0.00'`,
+              paymentMode: sql<string | null>`null`,
+              remarks: salesInvoices.notes
+            })
+            .from(salesInvoices)
+            .where(and(...invoiceConditions)),
+      filters?.transactionType && filters.transactionType !== "sales_return"
+        ? Promise.resolve([])
+        : db
+            .select({
+              date: salesReturns.returnDate,
+              transactionType: sql<string>`'sales_return'`,
+              referenceNo: salesReturns.returnNumber,
+              description: salesReturns.reason,
+              debit: sql<string>`'0.00'`,
+              credit: salesReturns.grandTotal,
+              paymentMode: sql<string | null>`null`,
+              remarks: salesReturns.notes
+            })
+            .from(salesReturns)
+            .where(and(...returnConditions)),
+      filters?.transactionType && filters.transactionType !== "payment"
+        ? Promise.resolve([])
+        : db
+            .select({
+              date: salesPayments.paymentDate,
+              transactionType: sql<string>`'payment'`,
+              referenceNo: salesPayments.referenceNumber,
+              description: sql<string>`'Payment received'`,
+              debit: sql<string>`'0.00'`,
+              credit: salesPayments.amount,
+              paymentMode: salesPayments.paymentMode,
+              remarks: salesPayments.notes
+            })
+            .from(salesPayments)
+            .where(and(...paymentConditions))
+    ]);
+
+    const rows = [...invoiceRows, ...returnRows, ...paymentRows].sort((left, right) => left.date.getTime() - right.date.getTime());
+
     return {
-      rows: [] as Array<{
-        date: Date;
-        transactionType: string;
-        referenceNo: string | null;
-        description: string;
-        debit: string;
-        credit: string;
-        paymentMode: string | null;
-        remarks: string | null;
-      }>,
-      total: 0
+      rows,
+      total: rows.length
     };
   }
 
   public async listPaymentHistory(
-    _companyId: string,
-    _customerId: string,
-    _filters?: { dateFrom?: Date | undefined; dateTo?: Date | undefined }
+    companyId: string,
+    customerId: string,
+    filters?: { dateFrom?: Date | undefined; dateTo?: Date | undefined }
   ) {
+    const conditions: SQL[] = [eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId)];
+
+    if (filters?.dateFrom) {
+      conditions.push(sql`${salesPayments.paymentDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      conditions.push(sql`${salesPayments.paymentDate} <= ${filters.dateTo}`);
+    }
+
+    const rows = await db
+      .select({
+        id: salesPayments.id,
+        date: salesPayments.paymentDate,
+        referenceNo: salesPayments.referenceNumber,
+        amount: salesPayments.amount,
+        paymentMode: salesPayments.paymentMode,
+        remarks: salesPayments.notes
+      })
+      .from(salesPayments)
+      .where(and(...conditions))
+      .orderBy(desc(salesPayments.paymentDate), desc(salesPayments.createdAt));
+
+    const [summaryRow] = await db
+      .select({
+        totalAmount: sql<string>`coalesce(sum(${salesPayments.amount}), 0)`,
+        total: count()
+      })
+      .from(salesPayments)
+      .where(and(...conditions));
+
     return {
-      rows: [] as Array<{
-        id: string;
-        date: Date;
-        referenceNo: string | null;
-        amount: string;
-        paymentMode: string | null;
-        remarks: string | null;
-      }>,
-      total: 0,
-      totalAmount: "0.00"
+      rows,
+      total: summaryRow?.total ?? 0,
+      totalAmount: summaryRow?.totalAmount ?? "0.00"
     };
   }
 }

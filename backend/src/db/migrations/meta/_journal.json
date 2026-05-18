@@ -50,6 +50,13 @@
       "when": 1779019200000,
       "tag": "0006_purchase_management_module",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779087000000,
+      "tag": "0007_sales_invoice_billing_module",
+      "breakpoints": true
     }
   ]
 }

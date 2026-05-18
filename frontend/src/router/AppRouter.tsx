@@ -18,6 +18,7 @@ import { InvoiceSettingsPage } from "../features/company/InvoiceSettingsPage";
 import { InventoryStockPage } from "../features/inventory/InventoryStockPage";
 import { PreferencesPage } from "../features/company/PreferencesPage";
 import { PurchasePage } from "../features/purchases/PurchasePage";
+import { SalesPage } from "../features/sales/SalesPage";
 import { TaxSettingsPage } from "../features/company/TaxSettingsPage";
 import { ProductsPage } from "../features/products/ProductsPage";
 import { InvitesPage } from "../features/settings/InvitesPage";
@@ -65,6 +66,38 @@ export const AppRouter = () => (
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route
+          path="sales/invoices"
+          element={
+            <PermissionRoute permissions={["sales.view"]}>
+              <SalesPage tab="invoices" />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="sales/pos"
+          element={
+            <PermissionRoute permissions={["sales.create", "sales.pos.access"]}>
+              <SalesPage tab="pos" />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="sales/returns"
+          element={
+            <PermissionRoute permissions={["sales.view", "sales.return"]}>
+              <SalesPage tab="returns" />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="sales/payments"
+          element={
+            <PermissionRoute permissions={["sales.payment.view", "sales.payment.manage"]}>
+              <SalesPage tab="payments" />
+            </PermissionRoute>
+          }
+        />
         <Route
           path="sales/customers"
           element={

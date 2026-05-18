@@ -8,6 +8,7 @@ import productsRoutes from "../modules/products/products.routes";
 import profileRoutes from "./profile.routes";
 import purchasesRoutes from "../modules/purchases/purchases.routes";
 import suppliersRoutes from "../modules/suppliers/suppliers.routes";
+import salesRoutes from "../modules/sales/sales.routes";
 import usersRoutes from "./users.routes";
 
 const router = Router();
@@ -18,6 +19,7 @@ router.use("/customers", customersRoutes);
 router.use("/inventory", inventoryRoutes);
 router.use("/purchases", purchasesRoutes);
 router.use("/products", productsRoutes);
+router.use("/sales", salesRoutes);
 router.use("/suppliers", suppliersRoutes);
 router.use("/users", usersRoutes);
 router.use("/profile", profileRoutes);

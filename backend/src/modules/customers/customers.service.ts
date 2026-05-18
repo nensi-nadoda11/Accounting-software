@@ -562,22 +562,23 @@ class CustomersService {
         isBlacklisted: row.isBlacklisted,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
-        outstandingSummary: this.buildOutstandingSummary(
-          {
-            openingBalanceAmount: row.openingBalanceAmount,
-            openingBalanceType: row.openingBalanceType,
-            creditLimit: row.creditLimit,
-            creditDays: 0
-          },
-          {
-            totalSales: "0.00",
-            totalReturns: "0.00",
-            totalPayments: "0.00",
-            debitAdjustments: "0.00",
-            creditAdjustments: "0.00",
-            overdueAmount: "0.00"
-          }
-        )
+        outstandingSummary: {
+          openingBalance:
+            row.openingBalanceType === "debit"
+              ? normalizeDecimalString(row.openingBalanceAmount)
+              : row.openingBalanceType === "credit"
+                ? normalizeDecimalString(`-${normalizeDecimalString(row.openingBalanceAmount)}`)
+                : "0.00",
+          totalSales: "0.00",
+          totalReturns: "0.00",
+          totalPayments: "0.00",
+          outstandingAmount: normalizeDecimalString(row.outstandingAmount),
+          overdueAmount: "0.00",
+          creditLimit: normalizeDecimalString(row.creditLimit),
+          creditUsedPercentage: "0.00",
+          remainingCreditLimit: "0.00",
+          isCreditLimitExceeded: false
+        }
       })),
       pagination: {
         page: pagination.page,
@@ -1076,15 +1077,6 @@ class CustomersService {
         "Created At"
       ],
       rows.map((customer) => {
-        const summary = this.buildOutstandingSummary(customer, {
-          totalSales: "0.00",
-          totalReturns: "0.00",
-          totalPayments: "0.00",
-          debitAdjustments: "0.00",
-          creditAdjustments: "0.00",
-          overdueAmount: "0.00"
-        });
-
         return [
           customer.customerCode,
           customer.name,
@@ -1097,7 +1089,7 @@ class CustomersService {
           customer.status,
           customer.isBlacklisted ? "yes" : "no",
           normalizeDecimalString(customer.creditLimit),
-          summary.outstandingAmount,
+          normalizeDecimalString(customer.outstandingAmount),
           customer.createdAt.toISOString()
         ];
       })

@@ -41,6 +41,12 @@ export const ALL_PERMISSIONS = [
   "sales.create",
   "sales.update",
   "sales.delete",
+  "sales.return",
+  "sales.export",
+  "sales.payment.view",
+  "sales.payment.manage",
+  "sales.invoice.send",
+  "sales.pos.access",
   "payment.view",
   "payment.receive",
   "payment.pay",
@@ -90,6 +96,9 @@ const accountantPermissions: PermissionKey[] = [
   "report.view",
   "report.export",
   "sales.view",
+  "sales.export",
+  "sales.payment.view",
+  "sales.payment.manage",
   "purchase.view",
   "purchase.export",
   "purchase.payment.view",
@@ -115,7 +124,9 @@ const staffPermissions: PermissionKey[] = [
   "purchase.approve",
   "sales.view",
   "sales.create",
-  "sales.update"
+  "sales.update",
+  "sales.payment.view",
+  "sales.pos.access"
 ];
 
 const auditorPermissions: PermissionKey[] = [
@@ -132,7 +143,9 @@ const auditorPermissions: PermissionKey[] = [
   "accounting.view",
   "gst.view",
   "purchase.view",
-  "purchase.payment.view"
+  "purchase.payment.view",
+  "sales.view",
+  "sales.payment.view"
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {

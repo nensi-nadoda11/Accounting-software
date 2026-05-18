@@ -60,6 +60,15 @@ class EmailService {
     }
   }
 
+  public async sendGenericEmail(input: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<void> {
+    await this.sendEmail(input.to, input.subject, input.html, input.text);
+  }
+
   public async sendOtpEmail(to: string, otp: string, purpose: string, expiryMinutes: number): Promise<void> {
     await this.sendEmail(
       to,

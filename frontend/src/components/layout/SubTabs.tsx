@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { INVENTORY_TABS, PURCHASES_TABS, SETTINGS_TABS } from "../../constants/navigation";
+import { INVENTORY_TABS, PURCHASES_TABS, SALES_TABS, SETTINGS_TABS } from "../../constants/navigation";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../providers/AuthProvider";
 
@@ -8,7 +8,9 @@ export const SubTabs = () => {
   const location = useLocation();
   const { hasPermission } = useAuth();
 
-  const sourceTabs = location.pathname.startsWith("/app/purchases")
+  const sourceTabs = location.pathname.startsWith("/app/sales")
+    ? SALES_TABS
+    : location.pathname.startsWith("/app/purchases")
     ? PURCHASES_TABS
     : location.pathname.startsWith("/app/inventory")
       ? INVENTORY_TABS

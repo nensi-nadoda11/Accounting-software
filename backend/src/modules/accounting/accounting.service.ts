@@ -112,6 +112,21 @@ const subtractMoney = (left: string, right: string) =>
   scaledBigIntToDecimal(decimalToScaledBigInt(left, 2) - decimalToScaledBigInt(right, 2), 2);
 
 class AccountingService {
+  private toDate(value: Date | string | null | undefined, fieldName: string): Date {
+    if (value instanceof Date) {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+
+    throw new AppError(`${fieldName} is invalid`, 400);
+  }
+
   private normalizePrefix(prefix: string) {
     return prefix.replace(/-+$/, "");
   }
@@ -733,8 +748,8 @@ class AccountingService {
     }
 
     return {
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo,
+      dateFrom: this.toDate(query.dateFrom, "dateFrom"),
+      dateTo: this.toDate(query.dateTo, "dateTo"),
       financialYearId: null
     };
   }
@@ -1313,7 +1328,12 @@ class AccountingService {
   }
 
   private async getSystemAccount(companyId: string, systemKey: SystemAccountKey, executor?: TransactionClient) {
-    const account = await accountingRepository.findAccountBySystemKey(companyId, systemKey, executor);
+    let account = await accountingRepository.findAccountBySystemKey(companyId, systemKey, executor);
+    if (!account) {
+      await this.seedMissingSystemAccounts(companyId, executor);
+      account = await accountingRepository.findAccountBySystemKey(companyId, systemKey, executor);
+    }
+
     if (!account) {
       throw new AppError(`Required system account ${systemKey} is missing`, 409);
     }
@@ -1325,9 +1345,55 @@ class AccountingService {
     return account;
   }
 
+  private async seedMissingSystemAccounts(companyId: string, executor?: TransactionClient) {
+    const seedInTransaction = async (transaction: TransactionClient) => {
+      await accountingRepository.acquireScopedLock("seed-default-accounts", companyId, transaction);
+
+      for (const seed of DEFAULT_SYSTEM_ACCOUNTS) {
+        const existing = await accountingRepository.findAccountBySystemKey(companyId, seed.systemKey, transaction);
+        if (existing) {
+          continue;
+        }
+
+        const created = await accountingRepository.createAccount(
+          {
+            companyId,
+            accountCode: seed.accountCode,
+            accountName: seed.accountName,
+            accountType: seed.accountType,
+            accountSubtype: seed.accountSubtype,
+            parentId: null,
+            isSystem: true,
+            systemKey: seed.systemKey,
+            normalBalance: seed.normalBalance,
+            openingBalance: "0.00",
+            openingBalanceType: "none",
+            currentBalance: "0.00",
+            status: "active",
+            description: seed.description,
+            createdBy: null,
+            updatedBy: null
+          },
+          transaction
+        );
+
+        if (!created) {
+          throw new AppError("Failed to seed default accounts", 500);
+        }
+      }
+    };
+
+    if (executor) {
+      await seedInTransaction(executor);
+      return;
+    }
+
+    await db.transaction(seedInTransaction);
+  }
+
   public async listAccounts(actor: Pick<AccountingActor, "companyId">, query: ListAccountsQuery) {
     const pagination = getPagination(query.page, query.limit);
-    const result = await accountingRepository.listAccounts({
+    let result = await accountingRepository.listAccounts({
       companyId: actor.companyId,
       search: query.search ?? null,
       type: query.type,
@@ -1335,6 +1401,18 @@ class AccountingService {
       parentId: query.parentId,
       ...(query.hierarchy ? {} : { page: pagination.page, limit: pagination.limit })
     });
+
+    if (result.total === 0) {
+      await this.seedMissingSystemAccounts(actor.companyId);
+      result = await accountingRepository.listAccounts({
+        companyId: actor.companyId,
+        search: query.search ?? null,
+        type: query.type,
+        status: query.status,
+        parentId: query.parentId,
+        ...(query.hierarchy ? {} : { page: pagination.page, limit: pagination.limit })
+      });
+    }
 
     const mapped = result.rows.map((row) => this.mapAccount(row));
     return {
@@ -1779,6 +1857,8 @@ class AccountingService {
 
   public async listJournals(actor: Pick<AccountingActor, "companyId">, query: ListJournalsQuery) {
     const pagination = getPagination(query.page, query.limit);
+    const dateFrom = query.dateFrom ? this.toDate(query.dateFrom, "dateFrom") : null;
+    const dateTo = query.dateTo ? this.toDate(query.dateTo, "dateTo") : null;
     const result = await accountingRepository.listJournals({
       companyId: actor.companyId,
       page: pagination.page,
@@ -1787,8 +1867,8 @@ class AccountingService {
       voucherType: query.voucherType,
       status: query.status,
       referenceType: query.referenceType ?? null,
-      dateFrom: query.dateFrom ?? null,
-      dateTo: query.dateTo ?? null,
+      dateFrom,
+      dateTo,
       financialYearId: query.financialYearId
     });
 
@@ -2140,14 +2220,16 @@ class AccountingService {
   }
 
   public async getLedger(actor: AccountingActor, accountId: string, query: LedgerQuery, context: AccountingRequestContext) {
+    const dateFrom = this.toDate(query.dateFrom, "dateFrom");
+    const dateTo = this.toDate(query.dateTo, "dateTo");
     const account = await accountingRepository.findAccountById(actor.companyId, accountId);
     if (!account) {
       throw new AppError("Account not found", 404);
     }
 
     const [openingTotals, rows] = await Promise.all([
-      accountingRepository.getLedgerTotalsBeforeDate(actor.companyId, accountId, query.dateFrom!),
-      accountingRepository.listLedgerRows(actor.companyId, accountId, query.dateFrom!, query.dateTo!)
+      accountingRepository.getLedgerTotalsBeforeDate(actor.companyId, accountId, dateFrom),
+      accountingRepository.listLedgerRows(actor.companyId, accountId, dateFrom, dateTo)
     ]);
 
     return this.buildLedgerPayload(
@@ -2156,7 +2238,7 @@ class AccountingService {
       account.normalBalance,
       openingTotals,
       rows,
-      query,
+      { ...query, dateFrom, dateTo },
       "ledger_viewed",
       context
     );
@@ -2169,6 +2251,8 @@ class AccountingService {
     query: LedgerQuery,
     context: AccountingRequestContext
   ) {
+    const dateFrom = this.toDate(query.dateFrom, "dateFrom");
+    const dateTo = this.toDate(query.dateTo, "dateTo");
     const party =
       partyType === "customer"
         ? await customersRepository.findById(actor.companyId, partyId)
@@ -2180,8 +2264,8 @@ class AccountingService {
 
     const normalBalance = partyType === "customer" ? "debit" : "credit";
     const [openingTotals, rows] = await Promise.all([
-      accountingRepository.getPartyLedgerTotalsBeforeDate(actor.companyId, partyType, partyId, query.dateFrom!),
-      accountingRepository.listPartyLedgerRows(actor.companyId, partyType, partyId, query.dateFrom!, query.dateTo!)
+      accountingRepository.getPartyLedgerTotalsBeforeDate(actor.companyId, partyType, partyId, dateFrom),
+      accountingRepository.listPartyLedgerRows(actor.companyId, partyType, partyId, dateFrom, dateTo)
     ]);
 
     return this.buildLedgerPayload(
@@ -2190,16 +2274,18 @@ class AccountingService {
       normalBalance,
       openingTotals,
       rows,
-      query,
+      { ...query, dateFrom, dateTo },
       "ledger_viewed",
       context
     );
   }
 
   public async getCashBook(actor: AccountingActor, query: BookQuery, context: AccountingRequestContext) {
+    const dateFrom = this.toDate(query.dateFrom, "dateFrom");
+    const dateTo = this.toDate(query.dateTo, "dateTo");
     const cashAccount = await this.getSystemAccount(actor.companyId, "cash");
-    const rows = await accountingRepository.listBookRows(actor.companyId, "cash", query.dateFrom!, query.dateTo!);
-    const openingTotals = await accountingRepository.getLedgerTotalsBeforeDate(actor.companyId, cashAccount.id, query.dateFrom!);
+    const rows = await accountingRepository.listBookRows(actor.companyId, "cash", dateFrom, dateTo);
+    const openingTotals = await accountingRepository.getLedgerTotalsBeforeDate(actor.companyId, cashAccount.id, dateFrom);
 
     return this.buildLedgerPayload(
       actor,
@@ -2207,16 +2293,18 @@ class AccountingService {
       cashAccount.normalBalance,
       openingTotals,
       rows,
-      query,
+      { ...query, dateFrom, dateTo },
       "ledger_viewed",
       context
     );
   }
 
   public async getBankBook(actor: AccountingActor, query: BookQuery, context: AccountingRequestContext) {
+    const dateFrom = this.toDate(query.dateFrom, "dateFrom");
+    const dateTo = this.toDate(query.dateTo, "dateTo");
     const bankAccount = await this.getSystemAccount(actor.companyId, "bank");
-    const rows = await accountingRepository.listBookRows(actor.companyId, "bank", query.dateFrom!, query.dateTo!, query.bankAccountId);
-    const openingTotals = await accountingRepository.getLedgerTotalsBeforeDate(actor.companyId, bankAccount.id, query.dateFrom!);
+    const rows = await accountingRepository.listBookRows(actor.companyId, "bank", dateFrom, dateTo, query.bankAccountId);
+    const openingTotals = await accountingRepository.getLedgerTotalsBeforeDate(actor.companyId, bankAccount.id, dateFrom);
 
     return this.buildLedgerPayload(
       actor,
@@ -2224,7 +2312,7 @@ class AccountingService {
       bankAccount.normalBalance,
       openingTotals,
       rows,
-      query,
+      { ...query, dateFrom, dateTo },
       "ledger_viewed",
       context
     );
@@ -2233,7 +2321,7 @@ class AccountingService {
   public async getTrialBalance(actor: AccountingActor, query: TrialBalanceQuery, context: AccountingRequestContext) {
     const range = await this.buildDateRangeFromTrialOrProfitQuery(actor.companyId, query);
     const openingRows =
-      compareDecimals(range.dateFrom.toISOString().slice(0, 10), range.dateTo.toISOString().slice(0, 10), 0) <= 0
+      range.dateFrom.getTime() <= range.dateTo.getTime()
         ? await accountingRepository.getGroupedAccountLineTotals(actor.companyId, {
             dateTo: this.previousDate(range.dateFrom)
           })
@@ -2333,7 +2421,7 @@ class AccountingService {
   }
 
   public async getBalanceSheet(actor: AccountingActor, query: BalanceSheetQuery, context: AccountingRequestContext) {
-    const asOfDate = query.asOfDate ?? new Date();
+    const asOfDate = query.asOfDate ? this.toDate(query.asOfDate, "asOfDate") : new Date();
     const year = query.financialYearId
       ? await accountingRepository.findFinancialYearById(actor.companyId, query.financialYearId)
       : await this.getFinancialYearForDate(actor.companyId, asOfDate);

@@ -70,6 +70,11 @@ export const ACCOUNTING_TABS = [
       "payment.reminder.manage",
     ],
   },
+  {
+    label: "GST & Tax",
+    href: "/app/accounting/gst",
+    permissions: ["gst.view", "gst.manage", "gst.export", "gst.itc.manage", "gst.adjustment.manage"],
+  },
 ] as const;
 
 export const PURCHASES_TABS = [

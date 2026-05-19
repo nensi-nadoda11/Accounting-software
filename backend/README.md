@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, Module 8, Module 9, Module 10, Module 11, and Module 12: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, purchase management APIs, sales/invoice billing APIs, payments APIs, accounting-core APIs, and expense management APIs.
+Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, Module 8, Module 9, Module 10, Module 11, Module 12, and Module 13: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, purchase management APIs, sales/invoice billing APIs, payments APIs, accounting-core APIs, expense management APIs, and GST/tax management APIs.
 
 ## Stack
 
@@ -31,6 +31,7 @@ src/
     inventory/
     accounting/
     expenses/
+    gst/
     payments/
     sales/
     purchases/
@@ -370,6 +371,27 @@ All sales routes require authentication, company access, and permission-based ac
 - `GET /api/v1/expenses/reports/payment-mode`
 - `GET /api/v1/expenses/reports/gst`
 
+## Implemented Module 13 APIs
+
+- `GET /api/v1/gst/summary`
+- `GET /api/v1/gst/sales`
+- `GET /api/v1/gst/sales/export`
+- `GET /api/v1/gst/purchases`
+- `GET /api/v1/gst/purchases/export`
+- `GET /api/v1/gst/itc`
+- `GET /api/v1/gst/itc/export`
+- `PATCH /api/v1/gst/itc/:id/status`
+- `GET /api/v1/gst/output-tax`
+- `GET /api/v1/gst/hsn-summary`
+- `GET /api/v1/gst/hsn-summary/export`
+- `GET /api/v1/gst/tax-summary`
+- `GET /api/v1/gst/tax-summary/export`
+- `GET /api/v1/gst/adjustments`
+- `POST /api/v1/gst/adjustments`
+- `POST /api/v1/gst/adjustments/:id/cancel`
+- `GET /api/v1/gst/gstr-1/export`
+- `GET /api/v1/gst/gstr-3b/export`
+
 ## Security
 
 - Helmet enabled
@@ -404,5 +426,6 @@ All sales routes require authentication, company access, and permission-based ac
 - Payments and accounting exports are available as CSV now; the API contracts are structured so XLSX/PDF can be added later without changing the routes.
 - Module 11 accounting reports are generated strictly from posted journal entry lines, with posted journals remaining immutable and corrections flowing through reversal entries.
 - Module 12 expense posting creates and posts accounting events inside the same transaction so posted expenses immediately affect journals and P&L safely.
+- GST exports are available as CSV now, and each export is logged in both audit logs and `gst_report_exports`.
 - Customer outstanding, ledger, and payment history now include sales invoices, sales returns, and sales payments.
 - The backend applies Drizzle migrations automatically on startup, including the Module 2 company setup schema.

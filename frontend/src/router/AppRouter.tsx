@@ -9,6 +9,7 @@ import { ResetPasswordPage } from "../features/auth/ResetPasswordPage";
 import { VerifyOtpPage } from "../features/auth/VerifyOtpPage";
 import { AccountingCorePage } from "../features/accounting/AccountingCorePage";
 import { ExpensesPage } from "../features/expenses/ExpensesPage";
+import { GstManagementPage } from "../features/gst/GstManagementPage";
 import { PaymentsPage } from "../features/payments/PaymentsPage";
 import { CustomersPage } from "../features/customers/CustomersPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
@@ -126,6 +127,14 @@ export const AppRouter = () => (
               ]}
             >
               <PaymentsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="accounting/gst"
+          element={
+            <PermissionRoute permissions={["gst.view", "gst.manage", "gst.export", "gst.itc.manage", "gst.adjustment.manage"]}>
+              <GstManagementPage />
             </PermissionRoute>
           }
         />

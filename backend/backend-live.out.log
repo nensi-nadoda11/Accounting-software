@@ -1,0 +1,73 @@
+◇ injected env (28) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+Backend server running on port 4000 
+[0mGET /api/v1/gst/sales?page=1&limit=20&dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 1158.493 ms - 81[0m
+10:42:13 AM [tsx] change in ./src\middlewares\validate-request.middleware.ts Restarting...
+c◇ injected env (28) from .env // tip: ⌘ override existing { override: true }
+Backend server running on port 4000 
+10:42:38 AM [tsx] change in ./src\middlewares\validate-request.middleware.ts Restarting...
+c◇ injected env (28) from .env // tip: ⌘ enable debugging { debug: true }
+Backend server running on port 4000 
+[0mGET /api/v1/accounting/journals?page=1&limit=20&dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 1005.244 ms - 81[0m
+[0mGET /api/v1/accounting/trial-balance?financialYearId=98a2dfcd-ff1b-4d8f-9e91-76001e7db6ee&dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 425.625 ms - 81[0m
+[0mGET /api/v1/accounting/balance-sheet?financialYearId=98a2dfcd-ff1b-4d8f-9e91-76001e7db6ee&asOfDate=2026-05-19 [31m500[0m 418.945 ms - 81[0m
+[0mGET /api/v1/gst/sales?page=1&limit=20&dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 425.037 ms - 81[0m
+[0mGET /api/v1/gst/purchases?page=1&limit=20&dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 423.894 ms - 81[0m
+[0mGET /api/v1/gst/itc?page=1&limit=20&dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 423.146 ms - 81[0m
+[0mGET /api/v1/gst/output-tax?dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 425.084 ms - 81[0m
+[0mGET /api/v1/gst/hsn-summary?dateFrom=2026-05-01&dateTo=2026-05-19&source=all [31m500[0m 421.767 ms - 81[0m
+[0mGET /api/v1/gst/tax-summary?dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 421.526 ms - 81[0m
+[0mGET /api/v1/gst/adjustments?page=1&limit=20&dateFrom=2026-05-01&dateTo=2026-05-19 [31m500[0m 421.275 ms - 81[0m
+10:43:43 AM [tsx] change in ./src\middlewares\validate-request.middleware.ts Restarting...
+c◇ injected env (28) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+Backend server running on port 4000 
+10:44:26 AM [tsx] change in ./src\modules\gst\gst.service.ts Rerunning...
+c◇ injected env (28) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+Backend server running on port 4000 
+10:45:12 AM [tsx] change in ./src\modules\accounting\accounting.service.ts Rerunning...
+c◇ injected env (28) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+Backend server running on port 4000 
+10:45:18 AM [tsx] change in ./src\modules\accounting\accounting.service.ts Restarting...
+c◇ injected env (28) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+Backend server running on port 4000 
+10:45:24 AM [tsx] change in ./src\modules\accounting\accounting.service.ts Restarting...
+c◇ injected env (28) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+Backend server running on port 4000 
+10:45:31 AM [tsx] change in ./src\modules\accounting\accounting.service.ts Restarting...
+c◇ injected env (28) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Backend server running on port 4000 
+10:45:39 AM [tsx] change in ./src\modules\accounting\accounting.service.ts Restarting...
+c◇ injected env (28) from .env // tip: ⌘ enable debugging { debug: true }
+Backend server running on port 4000 
+10:45:51 AM [tsx] change in ./src\modules\accounting\accounting.service.ts Restarting...
+c◇ injected env (28) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+Backend server running on port 4000 
+10:45:56 AM [tsx] change in ./src\modules\accounting\accounting.service.ts Restarting...
+c◇ injected env (28) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Backend server running on port 4000 
+10:46:28 AM [tsx] change in ./src\modules\gst\gst.service.ts Restarting...
+c◇ injected env (28) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+Backend server running on port 4000 
+10:49:25 AM [tsx] change in ./src\modules\gst\gst.service.ts Rerunning...
+c◇ injected env (28) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+Backend server running on port 4000 
+[0mGET /api/v1/accounting/accounts [32m200[0m 1304.111 ms - 138[0m
+[0mGET /api/v1/accounting/opening-balances [32m200[0m 910.537 ms - 146[0m
+[0mGET /api/v1/accounting/journals?page=1&limit=20&dateFrom=2025-04-01&dateTo=2026-03-31 [32m200[0m 712.140 ms - 145[0m
+[0mGET /api/v1/accounting/cash-book?dateFrom=2025-04-01&dateTo=2026-03-31 [33m409[0m 569.761 ms - 81[0m
+[0mGET /api/v1/accounting/bank-book?dateFrom=2025-04-01&dateTo=2026-03-31 [33m409[0m 568.284 ms - 81[0m
+[0mGET /api/v1/accounting/trial-balance?dateFrom=2025-04-01&dateTo=2026-03-31 [32m200[0m 1132.982 ms - 236[0m
+[0mGET /api/v1/accounting/profit-loss?dateFrom=2025-04-01&dateTo=2026-03-31 [32m200[0m 714.431 ms - 236[0m
+[0mGET /api/v1/accounting/balance-sheet?asOfDate=2026-03-31 [32m200[0m 859.206 ms - 321[0m
+[0mGET /api/v1/accounting/events?page=1&limit=20 [32m200[0m 720.762 ms - 147[0m
+[0mGET /api/v1/accounting/period-locks [32m200[0m 567.345 ms - 82[0m
+[0mGET /api/v1/gst/summary?dateFrom=2025-04-01&dateTo=2026-03-31 [32m200[0m 2468.874 ms - 3343[0m
+[0mGET /api/v1/gst/sales?dateFrom=2025-04-01&dateTo=2026-03-31&page=1&limit=20 [32m200[0m 982.240 ms - 146[0m
+[0mGET /api/v1/gst/purchases?dateFrom=2025-04-01&dateTo=2026-03-31&page=1&limit=20 [32m200[0m 1124.444 ms - 149[0m
+[0mGET /api/v1/gst/itc?dateFrom=2025-04-01&dateTo=2026-03-31&page=1&limit=20 [32m200[0m 1118.328 ms - 144[0m
+[0mGET /api/v1/gst/output-tax?dateFrom=2025-04-01&dateTo=2026-03-31 [32m200[0m 978.533 ms - 212[0m
+[0mGET /api/v1/gst/hsn-summary?dateFrom=2025-04-01&dateTo=2026-03-31&source=all [32m200[0m 1113.376 ms - 89[0m
+[0mGET /api/v1/gst/tax-summary?dateFrom=2025-04-01&dateTo=2026-03-31 [32m200[0m 859.717 ms - 85[0m
+[0mGET /api/v1/gst/adjustments?page=1&limit=20 [32m200[0m 1003.379 ms - 145[0m
+11:12:30 AM [tsx] change in ./src\modules\accounting\accounting.service.ts Restarting...
+c◇ injected env (28) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Backend server running on port 4000 

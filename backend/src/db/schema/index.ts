@@ -4,6 +4,7 @@ export * from "./companies";
 export * from "./company-settings";
 export * from "./customers";
 export * from "./expenses";
+export * from "./gst";
 export * from "./inventory";
 export * from "./otp-verifications";
 export * from "./payments";

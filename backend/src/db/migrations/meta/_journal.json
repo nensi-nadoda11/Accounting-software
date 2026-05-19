@@ -78,6 +78,13 @@
       "when": 1779206400000,
       "tag": "0010_payments_management_module",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1779484800000,
+      "tag": "0011_gst_tax_management_module",
+      "breakpoints": true
     }
   ]
 }

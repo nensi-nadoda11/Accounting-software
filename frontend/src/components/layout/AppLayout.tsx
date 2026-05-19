@@ -1,8 +1,10 @@
 import { LogOut } from "lucide-react";
+import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "../../providers/AuthProvider";
 import { useToast } from "../../providers/ToastProvider";
+import { applyUiPreferencesToDocument, settingsApi } from "../../services/settingsApi";
 import { Button } from "../ui/Button";
 import { SubTabs } from "./SubTabs";
 import { TopNav } from "./TopNav";
@@ -18,6 +20,32 @@ export const AppLayout = () => {
     location.pathname.startsWith("/app/purchases") ||
     location.pathname.startsWith("/app/inventory") ||
     location.pathname.startsWith("/app/hr-payroll");
+
+  useEffect(() => {
+    if (!user) {
+      applyUiPreferencesToDocument(null);
+      return;
+    }
+
+    let active = true;
+
+    void settingsApi
+      .getUiPreferences()
+      .then((response) => {
+        if (active) {
+          applyUiPreferencesToDocument(response.data);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          applyUiPreferencesToDocument(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-[#F7FAFA]">

@@ -10,6 +10,11 @@
 }
 
 :root {
+  --app-accent: #0f9f8a;
+  --app-accent-strong: #0d8a78;
+  --app-accent-soft: rgba(15, 159, 138, 0.16);
+  --app-control-height: 2.5rem;
+  --app-table-cell-y: 0.75rem;
   color: var(--color-app-text);
   background: var(--color-app-bg);
   font-family:
@@ -37,6 +42,14 @@ body {
   background: #f7fafa;
 }
 
+:root[data-compact-mode="false"] {
+  --app-control-height: 2.875rem;
+}
+
+:root[data-table-density="normal"] {
+  --app-table-cell-y: 1rem;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -46,4 +59,42 @@ button,
 input,
 select {
   font: inherit;
+}
+
+.app-control-height {
+  height: var(--app-control-height);
+}
+
+.app-accent-surface {
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+}
+
+.app-accent-surface:hover {
+  border-color: var(--app-accent-strong);
+  background: var(--app-accent-strong);
+}
+
+.app-accent-bg {
+  background: var(--app-accent);
+}
+
+.app-accent-text {
+  color: var(--app-accent);
+}
+
+.app-focus-ring:focus-visible {
+  box-shadow: 0 0 0 4px var(--app-accent-soft);
+}
+
+.app-input-focus:focus,
+.app-input-focus:focus-visible {
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 4px var(--app-accent-soft);
+}
+
+.app-table th,
+.app-table td {
+  padding-top: var(--app-table-cell-y) !important;
+  padding-bottom: var(--app-table-cell-y) !important;
 }

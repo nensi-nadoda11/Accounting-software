@@ -97,6 +97,10 @@ export type PermissionKey =
   | "payroll.export"
   | "payroll.slip.print"
   | "payroll.manage"
+  | "notifications.view"
+  | "notifications.manage"
+  | "notifications.send"
+  | "notifications.settings.manage"
   | "report.view"
   | "report.export"
   | "reports.view"
@@ -113,9 +117,19 @@ export type PermissionKey =
   | "reports.accounting.view"
   | "user.view"
   | "user.manage"
+  | "settings.view"
   | "settings.manage"
+  | "permissions.manage"
+  | "invoice.settings.manage"
+  | "tax.settings.manage"
+  | "payment.settings.manage"
+  | "profile.manage"
   | "audit.view"
-  | "backup.manage";
+  | "audit.export"
+  | "backup.create"
+  | "backup.download"
+  | "backup.restore"
+  | "backup.delete";
 
 export interface Company {
   id: string;

@@ -88,6 +88,10 @@ export const ALL_PERMISSIONS = [
   "payroll.export",
   "payroll.slip.print",
   "payroll.manage",
+  "notifications.view",
+  "notifications.manage",
+  "notifications.send",
+  "notifications.settings.manage",
   "report.view",
   "report.export",
   "reports.view",
@@ -104,9 +108,19 @@ export const ALL_PERMISSIONS = [
   "reports.accounting.view",
   "user.view",
   "user.manage",
+  "settings.view",
   "settings.manage",
+  "permissions.manage",
+  "invoice.settings.manage",
+  "tax.settings.manage",
+  "payment.settings.manage",
+  "profile.manage",
   "audit.view",
-  "backup.manage"
+  "audit.export",
+  "backup.create",
+  "backup.download",
+  "backup.restore",
+  "backup.delete"
 ] as const;
 
 export type PermissionKey = (typeof ALL_PERMISSIONS)[number];
@@ -166,6 +180,8 @@ const accountantPermissions: PermissionKey[] = [
   "payroll.slip.print",
   "report.view",
   "report.export",
+  "notifications.view",
+  "notifications.send",
   "reports.view",
   "reports.export",
   "reports.sales.view",
@@ -185,7 +201,12 @@ const accountantPermissions: PermissionKey[] = [
   "purchase.view",
   "purchase.export",
   "purchase.payment.view",
-  "purchase.payment.manage"
+  "purchase.payment.manage",
+  "settings.view",
+  "invoice.settings.manage",
+  "tax.settings.manage",
+  "payment.settings.manage",
+  "audit.view"
 ];
 
 const staffPermissions: PermissionKey[] = [
@@ -211,7 +232,9 @@ const staffPermissions: PermissionKey[] = [
   "sales.payment.view",
   "sales.pos.access",
   "expense.view",
-  "expense.create"
+  "expense.create",
+  "notifications.view",
+  "profile.manage"
 ];
 
 const auditorPermissions: PermissionKey[] = [
@@ -236,6 +259,7 @@ const auditorPermissions: PermissionKey[] = [
   "reports.gst.view",
   "reports.accounting.view",
   "audit.view",
+  "audit.export",
   "accounting.view",
   "accounting.reports.view",
   "ledger.view",
@@ -250,6 +274,9 @@ const auditorPermissions: PermissionKey[] = [
   "sales.view",
   "sales.payment.view",
   "expense.view"
+  ,
+  "notifications.view",
+  "settings.view"
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {

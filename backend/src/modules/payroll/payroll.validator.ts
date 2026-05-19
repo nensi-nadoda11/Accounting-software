@@ -136,7 +136,7 @@ export const itemIdParamSchema = z.object({
   id: z.uuid()
 });
 
-export const createEmployeeSchema = z
+const employeeBaseSchema = z
   .object({
     fullName: z.string().trim().min(2).max(150),
     mobile: z.string().trim().regex(INDIAN_MOBILE_REGEX, "Mobile must be a valid 10 digit Indian mobile number"),
@@ -165,18 +165,9 @@ export const createEmployeeSchema = z
     upiId: z.preprocess(trimToNull, z.string().trim().regex(UPI_REGEX, "UPI ID is invalid").nullable().optional()),
     status: z.enum(EMPLOYEE_STATUSES).optional().default("active")
   })
-  .strict()
-  .superRefine((value, ctx) => {
-    if (value.joiningDate.getTime() > Date.now()) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["joiningDate"],
-        message: "Joining date cannot be in the future"
-      });
-    }
-  });
+  .strict();
 
-export const updateEmployeeSchema = createEmployeeSchema.partial().superRefine((value, ctx) => {
+const validateJoiningDate = (value: { joiningDate?: Date | undefined }, ctx: z.RefinementCtx) => {
   if (value.joiningDate && value.joiningDate.getTime() > Date.now()) {
     ctx.addIssue({
       code: "custom",
@@ -184,7 +175,11 @@ export const updateEmployeeSchema = createEmployeeSchema.partial().superRefine((
       message: "Joining date cannot be in the future"
     });
   }
-});
+};
+
+export const createEmployeeSchema = employeeBaseSchema.superRefine(validateJoiningDate);
+
+export const updateEmployeeSchema = employeeBaseSchema.partial().superRefine(validateJoiningDate);
 
 export const listEmployeesQuerySchema = listBaseQuery.extend({
   search: z.preprocess(trimToNull, z.string().trim().max(150).nullable().optional()),
@@ -224,7 +219,7 @@ export const listAttendanceQuerySchema = listBaseQuery.extend({
   department: z.preprocess(trimToNull, z.string().trim().max(100).nullable().optional())
 });
 
-export const createAttendanceSchema = z
+const attendanceBaseSchema = z
   .object({
     employeeId: z.uuid(),
     payrollMonth: payrollMonthSchema,
@@ -237,19 +232,40 @@ export const createAttendanceSchema = z
     overtimeHours: decimalNumber({ min: 0 }).optional().default(0),
     remarks: optionalNullableString(1000)
   })
-  .strict()
-  .superRefine((value, ctx) => {
-    const total = value.presentDays + value.absentDays + value.paidLeaveDays + value.unpaidLeaveDays + value.halfDays;
-    if (total > value.workingDays + 0.0001) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["workingDays"],
-        message: "Present, absent, leave, and half days cannot exceed working days"
-      });
-    }
-  });
+  .strict();
 
-export const updateAttendanceSchema = createAttendanceSchema.partial().strict().superRefine((value, ctx) => {
+const validateAttendanceDays = (
+  value: {
+    workingDays?: number | undefined;
+    presentDays?: number | undefined;
+    absentDays?: number | undefined;
+    paidLeaveDays?: number | undefined;
+    unpaidLeaveDays?: number | undefined;
+    halfDays?: number | undefined;
+  },
+  ctx: z.RefinementCtx
+) => {
+  if (value.workingDays === undefined || value.presentDays === undefined) {
+    return;
+  }
+
+  const total =
+    value.presentDays + (value.absentDays ?? 0) + (value.paidLeaveDays ?? 0) + (value.unpaidLeaveDays ?? 0) + (value.halfDays ?? 0);
+
+  if (total > value.workingDays + 0.0001) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["workingDays"],
+      message: "Present, absent, leave, and half days cannot exceed working days"
+    });
+  }
+};
+
+export const createAttendanceSchema = attendanceBaseSchema.superRefine(validateAttendanceDays);
+
+export const updateAttendanceSchema = attendanceBaseSchema.partial().superRefine((value, ctx) => {
+  validateAttendanceDays(value, ctx);
+
   const values = [
     value.presentDays,
     value.absentDays,

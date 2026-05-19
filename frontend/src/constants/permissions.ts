@@ -90,6 +90,10 @@ export const ALL_PERMISSIONS: PermissionKey[] = [
   "payroll.export",
   "payroll.slip.print",
   "payroll.manage",
+  "notifications.view",
+  "notifications.manage",
+  "notifications.send",
+  "notifications.settings.manage",
   "report.view",
   "report.export",
   "reports.view",
@@ -106,9 +110,19 @@ export const ALL_PERMISSIONS: PermissionKey[] = [
   "reports.accounting.view",
   "user.view",
   "user.manage",
+  "settings.view",
   "settings.manage",
+  "permissions.manage",
+  "invoice.settings.manage",
+  "tax.settings.manage",
+  "payment.settings.manage",
+  "profile.manage",
   "audit.view",
-  "backup.manage",
+  "audit.export",
+  "backup.create",
+  "backup.download",
+  "backup.restore",
+  "backup.delete",
 ];
 
 export const PERMISSION_GROUPS: Array<{ label: string; permissions: PermissionKey[] }> = [
@@ -234,6 +248,10 @@ export const PERMISSION_GROUPS: Array<{ label: string; permissions: PermissionKe
     ],
   },
   {
+    label: "Notifications",
+    permissions: ["notifications.view", "notifications.manage", "notifications.send", "notifications.settings.manage"],
+  },
+  {
     label: "Reports",
     permissions: [
       "report.view",
@@ -253,9 +271,20 @@ export const PERMISSION_GROUPS: Array<{ label: string; permissions: PermissionKe
     ],
   },
   { label: "Users", permissions: ["user.view", "user.manage"] },
-  { label: "Settings", permissions: ["settings.manage"] },
-  { label: "Audit", permissions: ["audit.view"] },
-  { label: "Backup", permissions: ["backup.manage"] },
+  {
+    label: "Settings",
+    permissions: [
+      "settings.view",
+      "settings.manage",
+      "permissions.manage",
+      "invoice.settings.manage",
+      "tax.settings.manage",
+      "payment.settings.manage",
+      "profile.manage",
+    ],
+  },
+  { label: "Audit", permissions: ["audit.view", "audit.export"] },
+  { label: "Backup", permissions: ["backup.create", "backup.download", "backup.restore", "backup.delete"] },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
@@ -314,6 +343,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "payroll.export",
     "payroll.slip.print",
     "payroll.manage",
+    "notifications.view",
+    "notifications.send",
     "report.view",
     "report.export",
     "reports.view",
@@ -336,6 +367,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "purchase.export",
     "purchase.payment.view",
     "purchase.payment.manage",
+    "settings.view",
+    "invoice.settings.manage",
+    "tax.settings.manage",
+    "payment.settings.manage",
+    "audit.view",
   ],
   staff: [
     "customer.view",
@@ -362,6 +398,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "sales.pos.access",
     "expense.view",
     "expense.create",
+    "notifications.view",
+    "profile.manage",
   ],
   auditor: [
     "report.view",
@@ -377,6 +415,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "reports.gst.view",
     "reports.accounting.view",
     "audit.view",
+    "audit.export",
     "accounting.view",
     "accounting.reports.view",
     "ledger.view",
@@ -393,6 +432,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "expense.view",
     "payroll.view",
     "payroll.export",
+    "notifications.view",
+    "settings.view",
   ],
 };
 

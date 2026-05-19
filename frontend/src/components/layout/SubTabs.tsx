@@ -43,7 +43,7 @@ export const SubTabs = () => {
               )}
             >
               {tab.label}
-              {active ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-emerald-600" /> : null}
+              {active ? <span className="app-accent-bg absolute inset-x-0 bottom-0 h-0.5 rounded-full" /> : null}
             </Link>
           );
         })}

@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
+import { NotificationBell } from "../../features/notifications/NotificationBell";
 import { TOP_NAV_ITEMS } from "../../constants/navigation";
 import { cn } from "../../lib/utils";
 
@@ -28,11 +29,12 @@ export const TopNav = () => {
             >
               {item.label}
               {activeMenu === item.menu ? (
-                <span className="absolute inset-x-0 -bottom-3 h-0.5 rounded-full bg-emerald-600" />
+                <span className="app-accent-bg absolute inset-x-0 -bottom-3 h-0.5 rounded-full" />
               ) : null}
             </Link>
           ))}
         </nav>
+        <NotificationBell />
       </div>
     </div>
   );

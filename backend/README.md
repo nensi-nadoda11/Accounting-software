@@ -39,6 +39,7 @@ src/
     products/
     permissions/
     suppliers/
+    security-admin/
     users/
   routes/
   services/
@@ -217,6 +218,30 @@ All product routes require authentication, company access, and permission-based 
 - `DELETE /api/v1/products/units/:id`
 
 ## Implemented Module 7 APIs
+
+## Implemented Module 16 APIs
+
+Notification & Reminder module routes are mounted under `/api/v1/notifications`.
+
+- `GET /api/v1/notifications`
+- `GET /api/v1/notifications/unread-count`
+- `GET /api/v1/notifications/recipients`
+- `PATCH /api/v1/notifications/:id/read`
+- `PATCH /api/v1/notifications/read-all`
+- `DELETE /api/v1/notifications/:id`
+- `GET /api/v1/notifications/preferences`
+- `PATCH /api/v1/notifications/preferences`
+- `GET /api/v1/notifications/templates`
+- `POST /api/v1/notifications/templates`
+- `PATCH /api/v1/notifications/templates/:id`
+- `GET /api/v1/notifications/logs`
+- `POST /api/v1/notifications/send`
+- `POST /api/v1/notifications/run-due-reminders`
+- `POST /api/v1/notifications/run-low-stock-check`
+- `POST /api/v1/notifications/run-expiry-check`
+- `POST /api/v1/notifications/run-invoice-reminders`
+- `POST /api/v1/notifications/run-gst-reminders`
+- `POST /api/v1/notifications/run-payroll-reminders`
 
 All inventory routes require authentication, company access, and permission-based access control.
 
@@ -426,6 +451,43 @@ All sales routes require authentication, company access, and permission-based ac
 - `GET /api/v1/payroll/reports/payment`
 - `GET /api/v1/payroll/export`
 
+## Implemented Module 17 APIs
+
+- `GET /api/v1/security-admin/audit-logs`
+- `GET /api/v1/security-admin/audit-logs/export`
+- `GET /api/v1/security-admin/login-logs`
+- `GET /api/v1/security-admin/backups`
+- `POST /api/v1/security-admin/backups`
+- `GET /api/v1/security-admin/backups/:id/download`
+- `POST /api/v1/security-admin/backups/:id/restore`
+- `DELETE /api/v1/security-admin/backups/:id`
+- `GET /api/v1/security-admin/restore-logs`
+
+## Implemented Module 18 APIs
+
+- `GET /api/v1/settings/overview`
+- `GET /api/v1/settings/permissions`
+- `PATCH /api/v1/settings/permissions/user/:userId`
+- `PATCH /api/v1/settings/permissions/role/:role`
+- `GET /api/v1/settings/invoice-templates`
+- `POST /api/v1/settings/invoice-templates`
+- `PATCH /api/v1/settings/invoice-templates/:id`
+- `POST /api/v1/settings/invoice-templates/:id/default`
+- `DELETE /api/v1/settings/invoice-templates/:id`
+- `GET /api/v1/settings/tax`
+- `PATCH /api/v1/settings/tax`
+- `GET /api/v1/settings/payment-modes`
+- `POST /api/v1/settings/payment-modes`
+- `PATCH /api/v1/settings/payment-modes/:id`
+- `POST /api/v1/settings/payment-modes/:id/default`
+- `DELETE /api/v1/settings/payment-modes/:id`
+- `GET /api/v1/settings/ui-preferences`
+- `PATCH /api/v1/settings/ui-preferences`
+- `GET /api/v1/settings/profile-settings`
+- `PATCH /api/v1/settings/profile-settings`
+- `POST /api/v1/settings/profile-settings/change-password`
+- `POST /api/v1/settings/profile-settings/logout-all`
+
 ## Security
 
 - Helmet enabled
@@ -463,3 +525,5 @@ All sales routes require authentication, company access, and permission-based ac
 - GST exports are available as CSV now, and each export is logged in both audit logs and `gst_report_exports`.
 - Customer outstanding, ledger, and payment history now include sales invoices, sales returns, and sales payments.
 - The backend applies Drizzle migrations automatically on startup, including the Module 2 company setup schema.
+- Module 17 backup exports are JSON-based, company-isolated, and exclude password/token/session/OTP secrets from backup data.
+- Module 18 stores company-scoped final settings in `app_settings`, `payment_modes`, `invoice_templates`, and `user_ui_preferences`.

@@ -6,6 +6,7 @@ import { env } from "./config/env";
 import { db, pool } from "./db";
 import { logger } from "./config/logger";
 import { cleanupService } from "./services/cleanup.service";
+import { notificationsScheduler } from "./modules/notifications/notifications.scheduler";
 import { app } from "./app";
 
 const startServer = async () => {
@@ -14,6 +15,7 @@ const startServer = async () => {
     migrationsFolder: path.resolve(process.cwd(), "src/db/migrations"),
   });
   cleanupService.start();
+  notificationsScheduler.start();
 
   app.listen(env.PORT, () => {
     logger.info(`Backend server running on port ${env.PORT}`);

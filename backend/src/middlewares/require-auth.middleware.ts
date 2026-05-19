@@ -35,7 +35,7 @@ export const requireAuth = async (request: Request, response: Response, next: Ne
     request.auth = payload;
     request.currentUser = usersRepository.toSafeUser(user);
     request.currentCompany = company ? companiesRepository.toSafeCompany(company) : null;
-    request.permissions = await permissionService.getEffectivePermissions(user.id, user.role);
+    request.permissions = await permissionService.getEffectivePermissions(user.id, user.role, user.companyId);
 
     next();
   } catch (_error) {

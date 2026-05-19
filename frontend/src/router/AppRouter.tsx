@@ -14,6 +14,7 @@ import { PaymentsPage } from "../features/payments/PaymentsPage";
 import { PayrollPage } from "../features/payroll/PayrollPage";
 import { CustomersPage } from "../features/customers/CustomersPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { NotificationsPage } from "../features/notifications/NotificationsPage";
 import { BankAccountsPage } from "../features/company/BankAccountsPage";
 import { BranchesPage } from "../features/company/BranchesPage";
 import { BrandingPage } from "../features/company/BrandingPage";
@@ -25,8 +26,10 @@ import { PreferencesPage } from "../features/company/PreferencesPage";
 import { PurchasePage } from "../features/purchases/PurchasePage";
 import { ReportsPage } from "../features/reports/ReportsPage";
 import { SalesPage } from "../features/sales/SalesPage";
+import { SecurityAdminPage } from "../features/security-admin/SecurityAdminPage";
 import { TaxSettingsPage } from "../features/company/TaxSettingsPage";
 import { ProductsPage } from "../features/products/ProductsPage";
+import { SettingsFinalPage } from "../features/settings-final/SettingsFinalPage";
 import { InvitesPage } from "../features/settings/InvitesPage";
 import { ProfilePage } from "../features/settings/ProfilePage";
 import { RolesPermissionsPage } from "../features/settings/RolesPermissionsPage";
@@ -39,6 +42,20 @@ import { PermissionRoute, ProtectedRoute, PublicOnlyRoute } from "./guards";
 
 const SettingsIndexRedirect = () => {
   const auth = useAuth();
+
+  if (
+    auth.hasPermission([
+      "settings.view",
+      "settings.manage",
+      "permissions.manage",
+      "invoice.settings.manage",
+      "tax.settings.manage",
+      "payment.settings.manage",
+      "profile.manage",
+    ])
+  ) {
+    return <Navigate to="/app/settings/final" replace />;
+  }
 
   if (auth.hasPermission("settings.manage")) {
     return <Navigate to="/app/settings/company/profile" replace />;
@@ -72,6 +89,24 @@ export const AppRouter = () => (
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route
+          path="system/notifications"
+          element={
+            <PermissionRoute permissions={["notifications.view"]}>
+              <NotificationsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="system/security-admin"
+          element={
+            <PermissionRoute
+              permissions={["audit.view", "audit.export", "backup.create", "backup.download", "backup.restore", "backup.delete"]}
+            >
+              <SecurityAdminPage />
+            </PermissionRoute>
+          }
+        />
         <Route
           path="accounting/core"
           element={
@@ -264,6 +299,24 @@ export const AppRouter = () => (
           }
         />
         <Route path="settings" element={<SettingsIndexRedirect />} />
+        <Route
+          path="settings/final"
+          element={
+            <PermissionRoute
+              permissions={[
+                "settings.view",
+                "settings.manage",
+                "permissions.manage",
+                "invoice.settings.manage",
+                "tax.settings.manage",
+                "payment.settings.manage",
+                "profile.manage",
+              ]}
+            >
+              <SettingsFinalPage />
+            </PermissionRoute>
+          }
+        />
         <Route
           path="settings/company/profile"
           element={

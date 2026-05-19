@@ -149,6 +149,26 @@ export const errorHandler = (
       return;
     }
 
+    if (constraint.includes("payment_modes_company_mode_key_unique_idx")) {
+      response.status(409).json(errorResponse("A payment mode with this key already exists"));
+      return;
+    }
+
+    if (constraint.includes("payment_modes_company_default_enabled_unique_idx")) {
+      response.status(409).json(errorResponse("Only one enabled default payment mode is allowed per company"));
+      return;
+    }
+
+    if (constraint.includes("invoice_templates_company_template_key_unique_idx")) {
+      response.status(409).json(errorResponse("An invoice template with this key already exists"));
+      return;
+    }
+
+    if (constraint.includes("invoice_templates_company_type_default_unique_idx")) {
+      response.status(409).json(errorResponse("Only one active default invoice template is allowed per invoice type"));
+      return;
+    }
+
     if (constraint.includes("chart_of_accounts_company_account_code_unique_idx")) {
       response.status(409).json(errorResponse("An account with this code already exists"));
       return;

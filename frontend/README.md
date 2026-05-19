@@ -1,5 +1,27 @@
 # React + TypeScript + Vite
 
+## Module 16
+
+- Route: `/app/system/notifications`
+- Includes navbar notification bell, notification center, preferences, templates, logs, manual send, and scheduler job actions
+
+## Module 17
+
+- Route: `/app/system/security-admin`
+- Includes audit logs, login logs, backups, restore logs, export, download, restore, and permission-aware actions
+
+## Commands
+
+```bash
+npm install
+npm run dev
+npm run build
+```
+
+## Module 18 Route
+
+- `/app/settings/final`
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

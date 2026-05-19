@@ -128,7 +128,10 @@ class UsersService {
       emailVerifiedAt: new Date()
     });
 
-    await permissionService.replacePermissions(user.id, permissionService.assertValidPermissions(invite.permissions));
+    const invitePermissions = permissionService.assertValidPermissions(invite.permissions);
+    if (invitePermissions.length > 0) {
+      await permissionService.setUserPermissionOverride(invite.companyId, user.id, invitePermissions, user.id);
+    }
     await usersRepository.updateInvite(invite.id, {
       status: "accepted",
       acceptedAt: new Date()
@@ -246,19 +249,19 @@ class UsersService {
 
     const result = await usersRepository.listByCompany(params);
 
-    const permissionMap = await permissionService.getPermissionsForUsers(result.rows.map((row) => row.id));
+    const permissionMap = await permissionService.getEffectivePermissionsForUsers(
+      actor.companyId,
+      result.rows.map((row) => ({
+        id: row.id,
+        role: row.role
+      }))
+    );
 
     return {
       items: result.rows.map((row) => {
-        const customPermissions = permissionMap.get(row.id) ?? [];
-        const effectivePermissions =
-          row.role === "admin"
-            ? permissionService.getDefaultPermissionsByRole("admin")
-            : Array.from(new Set([...permissionService.getDefaultPermissionsByRole(row.role), ...customPermissions]));
-
         return {
           ...usersRepository.toSafeUser(row),
-          permissions: effectivePermissions
+          permissions: permissionMap.get(row.id) ?? []
         };
       }),
       pagination: {
@@ -338,7 +341,7 @@ class UsersService {
     }
 
     const validPermissions = permissionService.assertValidPermissions(permissions);
-    await permissionService.replacePermissions(userId, validPermissions);
+    await permissionService.setUserPermissionOverride(actor.companyId, userId, validPermissions, actor.id);
     await auditLogService.log({
       companyId: actor.companyId,
       userId: actor.id,
@@ -358,7 +361,7 @@ class UsersService {
     }
 
     const company = user.companyId ? await companiesRepository.findById(user.companyId) : null;
-    const permissions = await permissionService.getEffectivePermissions(user.id, user.role);
+    const permissions = await permissionService.getEffectivePermissions(user.id, user.role, user.companyId);
 
     return {
       user: usersRepository.toSafeUser(user),

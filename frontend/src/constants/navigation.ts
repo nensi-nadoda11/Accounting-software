@@ -10,6 +10,19 @@ export const TOP_NAV_ITEMS = [
 ] as const;
 
 export const SETTINGS_TABS = [
+  {
+    label: "Final Settings",
+    href: "/app/settings/final",
+    permissions: [
+      "settings.view",
+      "settings.manage",
+      "permissions.manage",
+      "invoice.settings.manage",
+      "tax.settings.manage",
+      "payment.settings.manage",
+      "profile.manage",
+    ],
+  },
   { label: "Company Profile", href: "/app/settings/company/profile", permissions: ["settings.manage"] },
   { label: "Tax & GST", href: "/app/settings/company/tax", permissions: ["settings.manage"] },
   { label: "Financial Year", href: "/app/settings/company/financial-years", permissions: ["settings.manage"] },

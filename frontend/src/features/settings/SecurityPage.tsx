@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
+import { ShieldCheck } from "lucide-react";
 
 import { getErrorMessage } from "../../lib/errors";
 import { authApi } from "../../services/authApi";
@@ -81,6 +83,24 @@ export const SecurityPage = () => {
           </Button>
         </CardContent>
       </Card>
+
+      {auth.hasPermission(["audit.view", "audit.export", "backup.create", "backup.download", "backup.restore", "backup.delete"]) ? (
+        <Card>
+          <CardHeader title="Security Admin" />
+          <CardContent className="flex items-center justify-between gap-4">
+            <div className="inline-flex items-center gap-3 text-sm font-medium text-slate-700">
+              <ShieldCheck className="size-4 text-emerald-600" />
+              Audit logs, login history, backups, and restore controls
+            </div>
+            <Link
+              to="/app/system/security-admin"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-600 bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            >
+              Open
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <ConfirmDialog
         open={confirmOpen}

@@ -7,6 +7,7 @@ import { companies, otpVerifications, users } from "../../db/schema";
 import { auditLogService } from "../audit-logs/audit-log.service";
 import { companiesRepository } from "../companies/companies.repository";
 import { permissionService } from "../permissions/permission.service";
+import { securityAdminAuditService } from "../security-admin/audit.service";
 import { usersRepository } from "../users/users.repository";
 import { authRepository } from "./auth.repository";
 import { emailService } from "../../services/email.service";
@@ -247,6 +248,13 @@ class AuthService {
 
     if (!user || !user.passwordHash) {
       loginAttemptService.recordFailure(attemptKey);
+      await securityAdminAuditService.logLoginEvent({
+        email: input.identifier.toLowerCase(),
+        loginType: "failed_login",
+        success: false,
+        failureReason: "not_found",
+        context
+      });
       await auditLogService.log({
         action: "login_failed",
         entityType: "user",
@@ -260,6 +268,15 @@ class AuthService {
     const passwordMatches = await comparePassword(input.password, user.passwordHash);
     if (!passwordMatches) {
       loginAttemptService.recordFailure(attemptKey);
+      await securityAdminAuditService.logLoginEvent({
+        companyId: user.companyId,
+        userId: user.id,
+        email: user.email,
+        loginType: "failed_login",
+        success: false,
+        failureReason: "invalid_password",
+        context
+      });
       await auditLogService.log({
         companyId: user.companyId,
         userId: user.id,
@@ -317,8 +334,16 @@ class AuthService {
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
+    await securityAdminAuditService.logLoginEvent({
+      companyId: user.companyId,
+      userId: user.id,
+      email: user.email,
+      loginType: "login",
+      success: true,
+      context
+    });
 
-    const permissions = await permissionService.getEffectivePermissions(user.id, user.role);
+    const permissions = await permissionService.getEffectivePermissions(user.id, user.role, user.companyId);
 
     return {
       accessToken: tokens.accessToken,
@@ -338,7 +363,7 @@ class AuthService {
     }
 
     const company = user.companyId ? await companiesRepository.findById(user.companyId) : null;
-    const permissions = await permissionService.getEffectivePermissions(user.id, user.role);
+    const permissions = await permissionService.getEffectivePermissions(user.id, user.role, user.companyId);
 
     return {
       user: usersRepository.toSafeUser(user),
@@ -348,6 +373,7 @@ class AuthService {
   }
 
   public async logout(sessionId: string, userId: string, context: RequestContext): Promise<void> {
+    const user = await usersRepository.findById(userId);
     await authRepository.revokeSession(sessionId);
     await auditLogService.log({
       userId,
@@ -357,9 +383,20 @@ class AuthService {
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
+    if (user) {
+      await securityAdminAuditService.logLoginEvent({
+        companyId: user.companyId,
+        userId: user.id,
+        email: user.email,
+        loginType: "logout",
+        success: true,
+        context
+      });
+    }
   }
 
   public async logoutAll(userId: string, context: RequestContext): Promise<void> {
+    const user = await usersRepository.findById(userId);
     await authRepository.revokeAllUserSessions(userId);
     await auditLogService.log({
       userId,
@@ -369,6 +406,16 @@ class AuthService {
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
+    if (user) {
+      await securityAdminAuditService.logLoginEvent({
+        companyId: user.companyId,
+        userId: user.id,
+        email: user.email,
+        loginType: "logout",
+        success: true,
+        context
+      });
+    }
   }
 
   public async refresh(refreshToken: string) {
@@ -393,7 +440,7 @@ class AuthService {
     const expiresAt = new Date(Date.now() + this.refreshTtlMs);
     await authRepository.rotateSession(session.id, hashToken(tokens.refreshToken), expiresAt);
 
-    const permissions = await permissionService.getEffectivePermissions(user.id, user.role);
+    const permissions = await permissionService.getEffectivePermissions(user.id, user.role, user.companyId);
 
     return {
       accessToken: tokens.accessToken,
@@ -433,6 +480,14 @@ class AuthService {
       metadata: { identifier },
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
+    });
+    await securityAdminAuditService.logLoginEvent({
+      companyId: user.companyId,
+      userId: user.id,
+      email: user.email,
+      loginType: "password_reset",
+      success: true,
+      context
     });
   }
 

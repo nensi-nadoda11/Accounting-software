@@ -23,6 +23,7 @@ import { InvoiceSettingsPage } from "../features/company/InvoiceSettingsPage";
 import { InventoryStockPage } from "../features/inventory/InventoryStockPage";
 import { PreferencesPage } from "../features/company/PreferencesPage";
 import { PurchasePage } from "../features/purchases/PurchasePage";
+import { ReportsPage } from "../features/reports/ReportsPage";
 import { SalesPage } from "../features/sales/SalesPage";
 import { TaxSettingsPage } from "../features/company/TaxSettingsPage";
 import { ProductsPage } from "../features/products/ProductsPage";
@@ -136,6 +137,14 @@ export const AppRouter = () => (
           element={
             <PermissionRoute permissions={["gst.view", "gst.manage", "gst.export", "gst.itc.manage", "gst.adjustment.manage"]}>
               <GstManagementPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="reports"
+          element={
+            <PermissionRoute permissions={["reports.view", "report.view"]}>
+              <ReportsPage />
             </PermissionRoute>
           }
         />

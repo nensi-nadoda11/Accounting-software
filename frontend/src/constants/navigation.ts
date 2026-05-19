@@ -5,7 +5,7 @@ export const TOP_NAV_ITEMS = [
   { label: "Purchases", href: "/app/purchases/suppliers", menu: "purchases" },
   { label: "Inventory", href: "/app/inventory/stock", menu: "inventory" },
   { label: "HR & Payroll", href: "/app/hr-payroll/payroll", menu: "hr-payroll" },
-  { label: "Reports", href: "/app?menu=reports", menu: "reports" },
+  { label: "Reports", href: "/app/reports", menu: "reports" },
   { label: "Settings", href: "/app/settings", menu: "settings" },
 ] as const;
 

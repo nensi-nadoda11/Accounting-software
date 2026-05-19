@@ -11,6 +11,7 @@ import { AccountingCorePage } from "../features/accounting/AccountingCorePage";
 import { ExpensesPage } from "../features/expenses/ExpensesPage";
 import { GstManagementPage } from "../features/gst/GstManagementPage";
 import { PaymentsPage } from "../features/payments/PaymentsPage";
+import { PayrollPage } from "../features/payroll/PayrollPage";
 import { CustomersPage } from "../features/customers/CustomersPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { BankAccountsPage } from "../features/company/BankAccountsPage";
@@ -231,6 +232,25 @@ export const AppRouter = () => (
           element={
             <PermissionRoute permissions={["product.view"]}>
               <ProductsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="hr-payroll/payroll"
+          element={
+            <PermissionRoute
+              permissions={[
+                "payroll.view",
+                "payroll.employee.manage",
+                "payroll.structure.manage",
+                "payroll.generate",
+                "payroll.pay",
+                "payroll.export",
+                "payroll.slip.print",
+                "payroll.manage",
+              ]}
+            >
+              <PayrollPage />
             </PermissionRoute>
           }
         />

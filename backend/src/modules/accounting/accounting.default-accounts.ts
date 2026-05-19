@@ -75,6 +75,15 @@ export const DEFAULT_SYSTEM_ACCOUNTS: DefaultAccountSeed[] = [
     description: "Trade payables control account"
   },
   {
+    systemKey: "salary_payable",
+    accountCode: "LIA-SALPAY",
+    accountName: "Salary Payable",
+    accountType: "liability",
+    accountSubtype: "salary_payable",
+    normalBalance: "credit",
+    description: "Outstanding salary payable to employees"
+  },
+  {
     systemKey: "output_gst",
     accountCode: "LIA-GSTOUT",
     accountName: "Output GST",

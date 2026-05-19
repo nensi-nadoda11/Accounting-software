@@ -16,7 +16,8 @@ export const AppLayout = () => {
     location.pathname.startsWith("/app/accounting") ||
     location.pathname.startsWith("/app/sales") ||
     location.pathname.startsWith("/app/purchases") ||
-    location.pathname.startsWith("/app/inventory");
+    location.pathname.startsWith("/app/inventory") ||
+    location.pathname.startsWith("/app/hr-payroll");
 
   return (
     <div className="min-h-screen bg-[#F7FAFA]">

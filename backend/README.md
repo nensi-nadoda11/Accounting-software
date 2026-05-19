@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, Module 8, Module 9, Module 10, Module 11, Module 12, and Module 13: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, purchase management APIs, sales/invoice billing APIs, payments APIs, accounting-core APIs, expense management APIs, and GST/tax management APIs.
+Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, Module 8, Module 9, Module 10, Module 11, Module 12, Module 13, and Module 14: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, purchase management APIs, sales/invoice billing APIs, payments APIs, accounting-core APIs, expense management APIs, GST/tax management APIs, and payroll APIs.
 
 ## Stack
 
@@ -33,6 +33,7 @@ src/
     expenses/
     gst/
     payments/
+    payroll/
     sales/
     purchases/
     products/
@@ -391,6 +392,39 @@ All sales routes require authentication, company access, and permission-based ac
 - `POST /api/v1/gst/adjustments/:id/cancel`
 - `GET /api/v1/gst/gstr-1/export`
 - `GET /api/v1/gst/gstr-3b/export`
+
+## Implemented Module 14 APIs
+
+- `GET /api/v1/payroll/employees`
+- `POST /api/v1/payroll/employees`
+- `GET /api/v1/payroll/employees/:id`
+- `PATCH /api/v1/payroll/employees/:id`
+- `DELETE /api/v1/payroll/employees/:id`
+- `GET /api/v1/payroll/employees/:id/salary-structure`
+- `POST /api/v1/payroll/employees/:id/salary-structure`
+- `PATCH /api/v1/payroll/employees/:id/salary-structure/:structureId`
+- `GET /api/v1/payroll/attendance`
+- `POST /api/v1/payroll/attendance`
+- `PATCH /api/v1/payroll/attendance/:id`
+- `GET /api/v1/payroll/runs`
+- `POST /api/v1/payroll/runs`
+- `GET /api/v1/payroll/runs/:id`
+- `POST /api/v1/payroll/runs/:id/generate`
+- `POST /api/v1/payroll/runs/:id/pay`
+- `POST /api/v1/payroll/runs/:id/cancel`
+- `GET /api/v1/payroll/items`
+- `PATCH /api/v1/payroll/items/:id/bonus-deductions`
+- `POST /api/v1/payroll/items/:id/pay`
+- `GET /api/v1/payroll/items/:id/slip`
+- `GET /api/v1/payroll/items/:id/slip/pdf`
+- `POST /api/v1/payroll/items/:id/slip/email`
+- `GET /api/v1/payroll/reports/monthly`
+- `GET /api/v1/payroll/reports/employee`
+- `GET /api/v1/payroll/reports/department`
+- `GET /api/v1/payroll/reports/bonus-deductions`
+- `GET /api/v1/payroll/reports/unpaid`
+- `GET /api/v1/payroll/reports/payment`
+- `GET /api/v1/payroll/export`
 
 ## Security
 

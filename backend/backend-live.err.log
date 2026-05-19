@@ -119,3 +119,37 @@ Unhandled error TypeError: Cannot set property query of #<IncomingMessage> which
     at handle (E:\Accounting_software\backend\node_modules\router\index.js:435:11)
     at Layer.handleRequest (E:\Accounting_software\backend\node_modules\router\lib\layer.js:152:17)
     at E:\Accounting_software\backend\node_modules\router\index.js:295:15
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1

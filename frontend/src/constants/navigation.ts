@@ -4,6 +4,7 @@ export const TOP_NAV_ITEMS = [
   { label: "Sales", href: "/app/sales/customers", menu: "sales" },
   { label: "Purchases", href: "/app/purchases/suppliers", menu: "purchases" },
   { label: "Inventory", href: "/app/inventory/stock", menu: "inventory" },
+  { label: "HR & Payroll", href: "/app/hr-payroll/payroll", menu: "hr-payroll" },
   { label: "Reports", href: "/app?menu=reports", menu: "reports" },
   { label: "Settings", href: "/app/settings", menu: "settings" },
 ] as const;
@@ -103,5 +104,22 @@ export const INVENTORY_TABS = [
     label: "Products",
     href: "/app/inventory/products",
     permissions: ["product.view", "category.manage", "unit.manage", "product.price.view"],
+  },
+] as const;
+
+export const HR_PAYROLL_TABS = [
+  {
+    label: "Payroll",
+    href: "/app/hr-payroll/payroll",
+    permissions: [
+      "payroll.view",
+      "payroll.employee.manage",
+      "payroll.structure.manage",
+      "payroll.generate",
+      "payroll.pay",
+      "payroll.export",
+      "payroll.slip.print",
+      "payroll.manage",
+    ],
   },
 ] as const;

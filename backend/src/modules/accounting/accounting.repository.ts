@@ -22,6 +22,7 @@ import {
   companyBankAccounts,
   companyFinancialYears,
   customers,
+  employees,
   expenseCategories,
   expenses,
   financialPeriodLocks,
@@ -34,10 +35,13 @@ import {
   purchaseInvoices,
   purchasePayments,
   purchaseReturns,
+  payrollItems,
+  payrollRuns,
   salesInvoiceItems,
   salesInvoices,
   salesPayments,
   salesReturns,
+  salaryPayments,
   stockMovements,
   suppliers
 } from "../../db/schema";
@@ -1086,6 +1090,43 @@ export class AccountingRepository {
       ...paymentRow,
       allocations,
       bankAccount
+    };
+  }
+
+  public async getPayrollRunAccountingContext(companyId: string, payrollRunId: string, executor?: DbExecutor) {
+    const [run] = await this
+      .getExecutor(executor)
+      .select()
+      .from(payrollRuns)
+      .where(and(eq(payrollRuns.companyId, companyId), eq(payrollRuns.id, payrollRunId)))
+      .limit(1);
+
+    if (!run) {
+      return null;
+    }
+
+    const items = await this
+      .getExecutor(executor)
+      .select({
+        item: payrollItems,
+        employee: employees
+      })
+      .from(payrollItems)
+      .innerJoin(employees, eq(payrollItems.employeeId, employees.id))
+      .where(and(eq(payrollItems.companyId, companyId), eq(payrollItems.payrollRunId, payrollRunId)))
+      .orderBy(asc(payrollItems.employeeNameSnapshot));
+
+    const paymentsForRun = await this
+      .getExecutor(executor)
+      .select()
+      .from(salaryPayments)
+      .where(and(eq(salaryPayments.companyId, companyId), eq(salaryPayments.payrollRunId, payrollRunId)))
+      .orderBy(asc(salaryPayments.paymentDate), asc(salaryPayments.createdAt));
+
+    return {
+      run,
+      items,
+      payments: paymentsForRun
     };
   }
 

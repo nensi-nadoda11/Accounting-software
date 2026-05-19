@@ -1303,10 +1303,103 @@ class AccountingService {
       };
     }
 
+    if (event.eventType === "payroll_generated") {
+      const context = await accountingRepository.getPayrollRunAccountingContext(actor.companyId, event.referenceId, executor);
+      if (!context) {
+        throw new AppError("Payroll run not found for accounting event", 404);
+      }
+
+      if (compareDecimals(context.run.netPayableTotal, "0.00", 2) <= 0) {
+        return markIgnored("Payroll run total is zero");
+      }
+
+      const salaryExpense = await this.getSystemAccount(actor.companyId, "salary_expense", executor);
+      const salaryPayable = await this.getSystemAccount(actor.companyId, "salary_payable", executor);
+
+      return {
+        kind: "journal" as const,
+        entryDate: context.run.generatedAt ?? event.createdAt,
+        voucherType: "payroll",
+        financialYearId: null,
+        referenceType: "payroll_run",
+        referenceId: context.run.id,
+        referenceNumber: context.run.runNumber,
+        description: `Payroll generated ${context.run.runNumber}`,
+        lines: [
+          {
+            accountId: salaryExpense.id,
+            debit: normalizeMoney(context.run.netPayableTotal),
+            credit: "0.00",
+            description: `Payroll expense ${context.run.payrollMonth}`
+          },
+          {
+            accountId: salaryPayable.id,
+            debit: "0.00",
+            credit: normalizeMoney(context.run.netPayableTotal),
+            description: `Salary payable ${context.run.payrollMonth}`
+          }
+        ]
+      };
+    }
+
+    if (event.eventType === "payroll_paid") {
+      const context = await accountingRepository.getPayrollRunAccountingContext(actor.companyId, event.referenceId, executor);
+      if (!context) {
+        throw new AppError("Payroll run not found for accounting event", 404);
+      }
+
+      const payload = event.payload as {
+        paymentBatchAmount?: string | number;
+        paymentMode?: "cash" | "bank" | "upi" | "cheque" | "other";
+        bankAccountId?: string | null;
+        referenceNumber?: string | null;
+      };
+      const paymentAmount = normalizeMoney(payload.paymentBatchAmount ?? "0.00");
+      if (compareDecimals(paymentAmount, "0.00", 2) <= 0) {
+        return markIgnored("Payroll payment batch total is zero");
+      }
+
+      const salaryPayable = await this.getSystemAccount(actor.companyId, "salary_payable", executor);
+      const bankOrCash = await this.getSystemAccount(
+        actor.companyId,
+        payload.paymentMode === "cash" ? "cash" : "bank",
+        executor
+      );
+
+      return {
+        kind: "journal" as const,
+        entryDate: event.createdAt,
+        voucherType: "payment",
+        financialYearId: null,
+        referenceType: "payroll_run",
+        referenceId: context.run.id,
+        referenceNumber: context.run.runNumber,
+        description: `Payroll payment ${context.run.runNumber}`,
+        lines: [
+          {
+            accountId: salaryPayable.id,
+            debit: paymentAmount,
+            credit: "0.00",
+            description: `Salary payable settlement ${context.run.payrollMonth}`
+          },
+          {
+            accountId: bankOrCash.id,
+            debit: "0.00",
+            credit: paymentAmount,
+            referenceType: bankOrCash.systemKey === "bank" && payload.bankAccountId ? "company_bank_account" : null,
+            referenceId: bankOrCash.systemKey === "bank" ? payload.bankAccountId ?? null : null,
+            description: `Payroll disbursement ${payload.referenceNumber ?? context.run.runNumber}`
+          }
+        ]
+      };
+    }
+
     if (
       event.eventType === "sales_invoice_cancelled" ||
       event.eventType === "purchase_cancelled" ||
       event.eventType === "expense_cancelled" ||
+      event.eventType === "payroll_adjusted" ||
+      event.eventType === "payroll_cancelled" ||
       event.eventType === "customer_payment_reversed" ||
       event.eventType === "supplier_payment_reversed"
     ) {

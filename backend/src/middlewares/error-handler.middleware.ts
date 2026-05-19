@@ -179,6 +179,46 @@ export const errorHandler = (
       return;
     }
 
+    if (constraint.includes("employees_company_employee_code_unique_idx")) {
+      response.status(409).json(errorResponse("An employee with this code already exists"));
+      return;
+    }
+
+    if (constraint.includes("employees_company_mobile_unique_idx")) {
+      response.status(409).json(errorResponse("An employee with this mobile number already exists"));
+      return;
+    }
+
+    if (constraint.includes("employees_company_email_unique_idx")) {
+      response.status(409).json(errorResponse("An employee with this email already exists"));
+      return;
+    }
+
+    if (constraint.includes("employee_salary_structures_company_employee_active_unique_idx")) {
+      response.status(409).json(errorResponse("Only one active salary structure is allowed per employee"));
+      return;
+    }
+
+    if (constraint.includes("employee_attendance_company_employee_month_unique_idx")) {
+      response.status(409).json(errorResponse("Attendance already exists for this employee and month"));
+      return;
+    }
+
+    if (constraint.includes("payroll_runs_company_run_number_unique_idx")) {
+      response.status(409).json(errorResponse("A payroll run with this number already exists"));
+      return;
+    }
+
+    if (constraint.includes("payroll_runs_company_month_active_unique_idx")) {
+      response.status(409).json(errorResponse("A non-cancelled payroll run already exists for this month"));
+      return;
+    }
+
+    if (constraint.includes("payroll_items_company_run_employee_unique_idx")) {
+      response.status(409).json(errorResponse("Payroll is already generated for this employee in the selected run"));
+      return;
+    }
+
     response.status(409).json(errorResponse("Duplicate record already exists"));
     return;
   }

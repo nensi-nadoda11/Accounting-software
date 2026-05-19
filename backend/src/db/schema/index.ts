@@ -7,6 +7,7 @@ export * from "./expenses";
 export * from "./gst";
 export * from "./inventory";
 export * from "./otp-verifications";
+export * from "./payroll";
 export * from "./payments";
 export * from "./purchases";
 export * from "./products";

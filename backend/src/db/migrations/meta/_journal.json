@@ -85,6 +85,13 @@
       "when": 1779484800000,
       "tag": "0011_gst_tax_management_module",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1779883200000,
+      "tag": "0012_payroll_module",
+      "breakpoints": true
     }
   ]
 }

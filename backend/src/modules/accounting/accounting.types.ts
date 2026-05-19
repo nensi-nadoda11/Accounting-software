@@ -30,6 +30,7 @@ export const SYSTEM_ACCOUNT_KEYS = [
   "input_gst",
   "advance_to_supplier",
   "accounts_payable",
+  "salary_payable",
   "output_gst",
   "loans",
   "advance_from_customer",

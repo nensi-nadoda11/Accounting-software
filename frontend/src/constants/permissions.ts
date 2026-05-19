@@ -1,6 +1,7 @@
 import type { PermissionKey, Role } from "../types/auth";
 
 export const ALL_PERMISSIONS: PermissionKey[] = [
+  "dashboard.view",
   "customer.view",
   "customer.create",
   "customer.update",
@@ -126,6 +127,10 @@ export const ALL_PERMISSIONS: PermissionKey[] = [
 ];
 
 export const PERMISSION_GROUPS: Array<{ label: string; permissions: PermissionKey[] }> = [
+  {
+    label: "Dashboard",
+    permissions: ["dashboard.view"],
+  },
   {
     label: "Customer",
     permissions: ["customer.view", "customer.create", "customer.update", "customer.delete", "customer.ledger.view", "customer.export"],
@@ -290,6 +295,7 @@ export const PERMISSION_GROUPS: Array<{ label: string; permissions: PermissionKe
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
   admin: [...ALL_PERMISSIONS],
   accountant: [
+    "dashboard.view",
     "customer.view",
     "customer.ledger.view",
     "customer.export",
@@ -374,6 +380,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "audit.view",
   ],
   staff: [
+    "dashboard.view",
     "customer.view",
     "customer.create",
     "customer.update",
@@ -402,6 +409,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "profile.manage",
   ],
   auditor: [
+    "dashboard.view",
     "report.view",
     "reports.view",
     "reports.sales.view",

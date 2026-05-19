@@ -1,4 +1,5 @@
 export const ALL_PERMISSIONS = [
+  "dashboard.view",
   "customer.view",
   "customer.create",
   "customer.update",
@@ -126,6 +127,7 @@ export const ALL_PERMISSIONS = [
 export type PermissionKey = (typeof ALL_PERMISSIONS)[number];
 
 const accountantPermissions: PermissionKey[] = [
+  "dashboard.view",
   "customer.view",
   "customer.ledger.view",
   "customer.export",
@@ -210,6 +212,7 @@ const accountantPermissions: PermissionKey[] = [
 ];
 
 const staffPermissions: PermissionKey[] = [
+  "dashboard.view",
   "customer.view",
   "customer.create",
   "customer.update",
@@ -238,6 +241,7 @@ const staffPermissions: PermissionKey[] = [
 ];
 
 const auditorPermissions: PermissionKey[] = [
+  "dashboard.view",
   "customer.view",
   "customer.ledger.view",
   "supplier.view",

@@ -1,6 +1,6 @@
 # Advanced Accounting Software Backend
 
-Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, Module 8, Module 9, Module 10, Module 11, Module 12, Module 13, and Module 14: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, purchase management APIs, sales/invoice billing APIs, payments APIs, accounting-core APIs, expense management APIs, GST/tax management APIs, and payroll APIs.
+Production-oriented backend for Module 1, Module 2, Module 4, Module 5, Module 6, Module 7, Module 8, Module 9, Module 10, Module 11, Module 12, Module 13, Module 14, and Module 19: authentication, roles, invites, permissions, sessions, profile management, audit logs, company setup, Drizzle migrations, customer management APIs, supplier/vendor management APIs, product/service management APIs, inventory/stock management APIs, purchase management APIs, sales/invoice billing APIs, payments APIs, accounting-core APIs, expense management APIs, GST/tax management APIs, payroll APIs, and dashboard APIs.
 
 ## Stack
 
@@ -28,6 +28,7 @@ src/
     company/
     companies/
     customers/
+    dashboard/
     inventory/
     accounting/
     expenses/
@@ -487,6 +488,21 @@ All sales routes require authentication, company access, and permission-based ac
 - `PATCH /api/v1/settings/profile-settings`
 - `POST /api/v1/settings/profile-settings/change-password`
 - `POST /api/v1/settings/profile-settings/logout-all`
+
+## Implemented Module 19 APIs
+
+All dashboard routes require authentication, company access, and `dashboard.view`.
+
+- `GET /api/v1/dashboard/summary`
+- `GET /api/v1/dashboard/charts/sales`
+- `GET /api/v1/dashboard/charts/purchases`
+- `GET /api/v1/dashboard/charts/expenses`
+- `GET /api/v1/dashboard/charts/payments`
+- `GET /api/v1/dashboard/top-products`
+- `GET /api/v1/dashboard/recent-activities`
+- `GET /api/v1/dashboard/alerts`
+- `GET /api/v1/dashboard/pending-tasks`
+- `GET /api/v1/dashboard/role-dashboard`
 
 ## Security
 

@@ -1,5 +1,5 @@
 export const TOP_NAV_ITEMS = [
-  { label: "Dashboard", href: "/app?menu=dashboard", menu: "dashboard" },
+  { label: "Dashboard", href: "/app/dashboard", menu: "dashboard" },
   { label: "Accounting", href: "/app/accounting/core", menu: "accounting" },
   { label: "Sales", href: "/app/sales/customers", menu: "sales" },
   { label: "Purchases", href: "/app/purchases/suppliers", menu: "purchases" },

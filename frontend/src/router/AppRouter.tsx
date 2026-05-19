@@ -88,7 +88,15 @@ export const AppRouter = () => (
           </ProtectedRoute>
         }
       >
-        <Route index element={<DashboardPage />} />
+        <Route index element={<Navigate to="/app/dashboard" replace />} />
+        <Route
+          path="dashboard"
+          element={
+            <PermissionRoute permissions={["dashboard.view"]}>
+              <DashboardPage />
+            </PermissionRoute>
+          }
+        />
         <Route
           path="system/notifications"
           element={

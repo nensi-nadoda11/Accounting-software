@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import authRoutes from "./auth.routes";
 import companyRoutes from "../modules/company/company.routes";
+import dashboardRoutes from "../modules/dashboard/dashboard.routes";
 import customersRoutes from "../modules/customers/customers.routes";
 import expensesRoutes from "../modules/expenses/expenses.routes";
 import gstRoutes from "../modules/gst/gst.routes";
@@ -26,6 +27,7 @@ const router = Router();
 router.use("/auth", authRoutes);
 router.use("/accounting", accountingRoutes);
 router.use("/company", companyRoutes);
+router.use("/dashboard", dashboardRoutes);
 router.use("/customers", customersRoutes);
 router.use("/expenses", expensesRoutes);
 router.use("/gst", gstRoutes);

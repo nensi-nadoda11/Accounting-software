@@ -8,6 +8,7 @@ export type UserStatus =
 export type CompanyStatus = "setup_pending" | "active" | "suspended" | "inactive";
 
 export type PermissionKey =
+  | "dashboard.view"
   | "customer.view"
   | "customer.create"
   | "customer.update"

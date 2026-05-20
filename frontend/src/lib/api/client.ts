@@ -27,6 +27,11 @@ const dispatchSessionExpired = () => {
   window.dispatchEvent(new CustomEvent("session-expired"));
 };
 
+const shouldInvalidateSession = (error: AxiosError) => {
+  const status = error.response?.status;
+  return status === 401 || status === 403;
+};
+
 client.interceptors.request.use((config) => {
   const token = tokenStore.get();
   if (token) {
@@ -61,8 +66,10 @@ client.interceptors.response.use(
             return token;
           })
           .catch((refreshError) => {
-            tokenStore.clear();
-            dispatchSessionExpired();
+            if (refreshError instanceof AxiosError && shouldInvalidateSession(refreshError)) {
+              tokenStore.clear();
+              dispatchSessionExpired();
+            }
             throw refreshError;
           })
           .finally(() => {

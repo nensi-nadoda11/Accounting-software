@@ -13,6 +13,8 @@ export const errorHandler = (
   response: Response,
   _next: NextFunction
 ): void => {
+  const nestedCause = (error as { cause?: NodeJS.ErrnoException & { message?: string; code?: string } } | null)?.cause;
+
   if (error instanceof ZodError) {
     response.status(400).json(
       errorResponse(
@@ -263,8 +265,32 @@ export const errorHandler = (
     return;
   }
 
+  const rawMessage = [
+    (error as Error | undefined)?.message,
+    nestedCause?.message
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (
+    databaseError?.code === "XX000" &&
+    rawMessage.toLowerCase().includes("max clients reached in session mode")
+  ) {
+    response.status(503).json(errorResponse("Database is temporarily busy. Please try again in a moment."));
+    return;
+  }
+
   const systemError = error as NodeJS.ErrnoException & { name?: string; message?: string };
-  if (systemError?.code === "ENOTFOUND" || systemError?.code === "ECONNREFUSED" || systemError?.code === "ETIMEDOUT") {
+  const serviceUnavailableCodes = new Set([
+    "EAI_AGAIN",
+    "ENOTFOUND",
+    "ECONNREFUSED",
+    "ETIMEDOUT",
+    "EHOSTUNREACH",
+    "ECONNRESET"
+  ]);
+
+  if (serviceUnavailableCodes.has(systemError?.code ?? "") || serviceUnavailableCodes.has(nestedCause?.code ?? "")) {
     response.status(503).json(errorResponse("A required service is currently unavailable. Please try again later."));
     return;
   }

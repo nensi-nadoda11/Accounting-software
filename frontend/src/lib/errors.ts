@@ -49,6 +49,10 @@ export const getErrorMessage = (error: unknown, fallback = "Something went wrong
       return "You do not have permission to perform this action.";
     }
 
+    if (error.response.status === 503) {
+      return "Server is temporarily unavailable. Please try again in a moment.";
+    }
+
     if (error.response.status >= 500) {
       return "Server error occurred. Please try again.";
     }

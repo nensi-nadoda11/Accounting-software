@@ -5,6 +5,7 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
+import { AxiosError } from "axios";
 
 import { authApi } from "../services/authApi";
 import { tokenStore } from "../lib/token-store";
@@ -48,7 +49,15 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         company: response.data.company,
         permissions: response.data.permissions,
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const status = error.response?.status;
+        if (status === 401 || status === 403) {
+          clearSession();
+        }
+        return;
+      }
+
       clearSession();
     }
   }, [clearSession, setSession]);

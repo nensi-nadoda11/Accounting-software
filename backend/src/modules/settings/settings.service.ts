@@ -158,10 +158,8 @@ class SettingsService {
       return this.normalizeTaxSettings(existing.settingValue);
     }
 
-    const [companyTaxSettings, invoiceSettings] = await Promise.all([
-      companyRepository.findTaxSettingsByCompanyId(companyId),
-      companyRepository.findInvoiceSettingsByCompanyId(companyId)
-    ]);
+    const companyTaxSettings = await companyRepository.findTaxSettingsByCompanyId(companyId);
+    const invoiceSettings = await companyRepository.findInvoiceSettingsByCompanyId(companyId);
 
     if (!companyTaxSettings && !invoiceSettings) {
       return { ...DEFAULT_TAX_SETTINGS };
@@ -293,14 +291,12 @@ class SettingsService {
   }
 
   public async getOverview(actor: SettingsActor) {
-    const [users, paymentModeRows, templateRows, taxSettings, uiPreferences, profile] = await Promise.all([
-      settingsRepository.listUsersForPermissions(actor.companyId),
-      settingsRepository.listPaymentModes(actor.companyId),
-      settingsRepository.listInvoiceTemplates(actor.companyId),
-      this.getTaxSettingsRecord(actor.companyId),
-      settingsRepository.findUiPreferences(actor.companyId, actor.id),
-      this.getProfileSettings(actor)
-    ]);
+    const users = await settingsRepository.listUsersForPermissions(actor.companyId);
+    const paymentModeRows = await settingsRepository.listPaymentModes(actor.companyId);
+    const templateRows = await settingsRepository.listInvoiceTemplates(actor.companyId);
+    const taxSettings = await this.getTaxSettingsRecord(actor.companyId);
+    const uiPreferences = await settingsRepository.findUiPreferences(actor.companyId, actor.id);
+    const profile = await this.getProfileSettings(actor);
 
     const sections: OverviewSection[] = [
       {
@@ -374,10 +370,8 @@ class SettingsService {
   }
 
   public async getPermissionsMatrix(actor: SettingsActor) {
-    const [roleMap, users] = await Promise.all([
-      permissionService.getRolePermissionMap(actor.companyId),
-      settingsRepository.listUsersForPermissions(actor.companyId)
-    ]);
+    const roleMap = await permissionService.getRolePermissionMap(actor.companyId);
+    const users = await settingsRepository.listUsersForPermissions(actor.companyId);
 
     const permissionMap = await permissionService.getEffectivePermissionsForUsers(
       actor.companyId,

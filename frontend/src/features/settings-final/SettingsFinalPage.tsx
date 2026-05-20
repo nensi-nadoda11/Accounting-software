@@ -313,7 +313,7 @@ export const SettingsFinalPage = () => {
       return <LoadingState label="Loading settings overview..." />;
     }
 
-    if (overviewError) {
+    if (overviewError && !overview) {
       return <ErrorState title={overviewError} action={<Button variant="secondary" onClick={() => void loadOverview()}>Retry</Button>} />;
     }
 
@@ -371,7 +371,7 @@ export const SettingsFinalPage = () => {
     if (invoiceLoading && !invoiceTemplates) {
       return <LoadingState label="Loading invoice templates..." />;
     }
-    if (invoiceError) {
+    if (invoiceError && !invoiceTemplates) {
       return <ErrorState title={invoiceError} action={<Button variant="secondary" onClick={() => void loadInvoiceTemplates()}>Retry</Button>} />;
     }
     if (!invoiceTemplates) {
@@ -459,7 +459,7 @@ export const SettingsFinalPage = () => {
         auth.hasPermission(["settings.view", "permissions.manage"]) ? (
           permissionLoading && !permissionMatrix ? (
             <LoadingState label="Loading permission matrix..." />
-          ) : permissionError ? (
+          ) : permissionError && !permissionMatrix ? (
             <ErrorState title={permissionError} action={<Button variant="secondary" onClick={() => void loadPermissions()}>Retry</Button>} />
           ) : permissionMatrix ? (
             <PermissionMatrix
@@ -508,7 +508,7 @@ export const SettingsFinalPage = () => {
         auth.hasPermission("tax.settings.manage") ? (
           taxLoading && !taxSettings ? (
             <LoadingState label="Loading tax settings..." />
-          ) : taxError ? (
+          ) : taxError && !taxSettings ? (
             <ErrorState title={taxError} action={<Button variant="secondary" onClick={() => void loadTaxSettings()}>Retry</Button>} />
           ) : taxSettings ? (
             <TaxSettingsForm
@@ -540,7 +540,7 @@ export const SettingsFinalPage = () => {
         auth.hasPermission("payment.settings.manage") ? (
           paymentLoading && !paymentModes ? (
             <LoadingState label="Loading payment modes..." />
-          ) : paymentError ? (
+          ) : paymentError && !paymentModes ? (
             <ErrorState title={paymentError} action={<Button variant="secondary" onClick={() => void loadPaymentModes()}>Retry</Button>} />
           ) : (
             <div className="space-y-4">
@@ -582,7 +582,7 @@ export const SettingsFinalPage = () => {
         auth.hasPermission(["profile.manage", "settings.manage"]) ? (
           themeLoading && !uiPreferences ? (
             <LoadingState label="Loading theme preferences..." />
-          ) : themeError ? (
+          ) : themeError && !uiPreferences ? (
             <ErrorState title={themeError} action={<Button variant="secondary" onClick={() => void loadTheme()}>Retry</Button>} />
           ) : uiPreferences ? (
             <ThemeSettingsForm
@@ -615,7 +615,7 @@ export const SettingsFinalPage = () => {
         auth.hasPermission("profile.manage") ? (
           profileLoading && !profileSettings ? (
             <LoadingState label="Loading profile settings..." />
-          ) : profileError ? (
+          ) : profileError && !profileSettings ? (
             <ErrorState title={profileError} action={<Button variant="secondary" onClick={() => void loadProfile()}>Retry</Button>} />
           ) : profileSettings ? (
             <ProfileSettingsForm

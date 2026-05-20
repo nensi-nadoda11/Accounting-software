@@ -244,10 +244,8 @@ export class PermissionService {
       return new Set(overridePermissions);
     }
 
-    const [rolePermissions, customPermissions] = await Promise.all([
-      this.getDefaultPermissionsByRole(role, companyId),
-      this.getCustomPermissions(userId)
-    ]);
+    const rolePermissions = await this.getDefaultPermissionsByRole(role, companyId);
+    const customPermissions = await this.getCustomPermissions(userId);
 
     return new Set([...rolePermissions, ...customPermissions]);
   }
@@ -261,11 +259,9 @@ export class PermissionService {
     }
 
     const userIds = users.map((user) => user.id);
-    const [rolePermissions, legacyPermissions, overridePermissions] = await Promise.all([
-      this.getRolePermissionMap(companyId),
-      this.getPermissionsForUsers(userIds),
-      this.getUserPermissionOverrides(companyId, userIds)
-    ]);
+    const rolePermissions = await this.getRolePermissionMap(companyId);
+    const legacyPermissions = await this.getPermissionsForUsers(userIds);
+    const overridePermissions = await this.getUserPermissionOverrides(companyId, userIds);
 
     return users.reduce<Map<string, PermissionKey[]>>((map, user) => {
       const override = overridePermissions.get(user.id);

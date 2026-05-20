@@ -4,9 +4,11 @@ import { Pool } from "pg";
 import { env } from "../config/env";
 import * as schema from "./schema";
 
+const poolMax = Math.max(1, Math.min(env.DB_POOL_MAX, 5));
+
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  max: env.DB_POOL_MAX,
+  max: poolMax,
   idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT_MS
 });
 

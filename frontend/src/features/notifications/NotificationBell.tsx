@@ -21,28 +21,59 @@ export const NotificationBell = () => {
   const toast = useToast();
   const auth = useAuth();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const openRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const countRequestInFlightRef = useRef(false);
+  const listRequestInFlightRef = useRef(false);
 
   const canView = auth.isAuthenticated && auth.hasPermission("notifications.view");
 
-  const loadBell = async () => {
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  const loadUnreadCount = async () => {
     if (!canView) {
       return;
     }
 
-    try {
-      const [countResponse, listResponse] = await Promise.all([
-        notificationsApi.unreadCount(),
-        notificationsApi.list({ page: 1, limit: 5, unread: true }),
-      ]);
+    if (countRequestInFlightRef.current) {
+      return;
+    }
 
+    countRequestInFlightRef.current = true;
+
+    try {
+      const countResponse = await notificationsApi.unreadCount();
       setCount(countResponse.data.count);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to load notifications"));
+    } finally {
+      countRequestInFlightRef.current = false;
+    }
+  };
+
+  const loadNotificationPreview = async () => {
+    if (!canView) {
+      return;
+    }
+
+    if (listRequestInFlightRef.current) {
+      return;
+    }
+
+    listRequestInFlightRef.current = true;
+
+    try {
+      const listResponse = await notificationsApi.list({ page: 1, limit: 5, unread: true });
       setItems(listResponse.data.items);
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to load notifications"));
+    } finally {
+      listRequestInFlightRef.current = false;
     }
   };
 
@@ -51,13 +82,13 @@ export const NotificationBell = () => {
       return;
     }
 
-    void loadBell();
+    void loadUnreadCount();
     const interval = window.setInterval(() => {
-      void loadBell();
+      void loadUnreadCount();
     }, 60_000);
 
     const refresh = () => {
-      void loadBell();
+      void Promise.all([loadUnreadCount(), openRef.current ? loadNotificationPreview() : Promise.resolve()]);
     };
 
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
@@ -95,7 +126,7 @@ export const NotificationBell = () => {
           setOpen(nextOpen);
           if (nextOpen) {
             setLoading(true);
-            await loadBell();
+            await Promise.all([loadUnreadCount(), loadNotificationPreview()]);
             setLoading(false);
           }
         }}
@@ -119,7 +150,7 @@ export const NotificationBell = () => {
                 try {
                   await notificationsApi.markAllRead();
                   window.dispatchEvent(new Event(NOTIFICATIONS_UPDATED_EVENT));
-                  await loadBell();
+                  await Promise.all([loadUnreadCount(), loadNotificationPreview()]);
                 } catch (error) {
                   toast.error(getErrorMessage(error, "Failed to mark notifications as read"));
                 }

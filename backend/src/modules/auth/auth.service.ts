@@ -314,6 +314,7 @@ class AuthService {
       id: decodedSeed.sessionId,
       userId: user.id,
       refreshTokenHash: hashToken(sessionSeedToken),
+      rememberMe: input.rememberMe ?? false,
       userAgent: context.userAgent,
       ipAddress: context.ipAddress,
       expiresAt: sessionExpiresAt
@@ -446,6 +447,7 @@ class AuthService {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       refreshExpiresAt: expiresAt,
+      rememberMe: session.rememberMe,
       user: usersRepository.toSafeUser(user),
       company: companiesRepository.toSafeCompany(company),
       permissions: Array.from(permissions)

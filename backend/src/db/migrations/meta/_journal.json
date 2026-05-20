@@ -127,6 +127,13 @@
       "when": 1780315200000,
       "tag": "0017_runtime_security_module",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782000000000,
+      "tag": "0018_auth_session_remember_me",
+      "breakpoints": true
     }
   ]
 }

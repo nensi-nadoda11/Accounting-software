@@ -1,26 +1,12 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
 import { tokenStore } from "../token-store";
+import { getApiBaseUrl } from "./resolve-api-base";
 
-const resolveApiOrigin = () => {
-  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
-
-  if (configured) {
-    return configured.replace(/\/+$/, "");
-  }
-
-  if (typeof window !== "undefined") {
-    if (window.location.port === "5173") {
-      return "http://localhost:4000";
-    }
-
-    return window.location.origin.replace(/\/+$/, "");
-  }
-
-  return "http://localhost:4000";
-};
-
-const API_BASE_URL = `${resolveApiOrigin()}/api/v1`;
+const API_BASE_URL = getApiBaseUrl({
+  configuredBaseUrl: import.meta.env.VITE_API_BASE_URL,
+  isDev: import.meta.env.DEV
+});
 
 const client = axios.create({
   baseURL: API_BASE_URL,

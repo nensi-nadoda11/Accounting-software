@@ -18,6 +18,11 @@ npm run dev
 npm run build
 ```
 
+## Environment
+
+`VITE_API_BASE_URL` points the frontend at the backend origin, for example `http://localhost:4000` in local development or `https://api.example.com` in production.
+Production builds must set this explicitly. The client only falls back to `http://localhost:4000` while running Vite in development.
+
 ## Module 18 Route
 
 - `/app/settings/final`

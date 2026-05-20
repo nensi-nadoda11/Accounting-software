@@ -14,3 +14,5 @@ frontend/node_modules
 
 backend/dist
 frontend/dist
+backend/.test-dist
+frontend/.test-dist

@@ -83,7 +83,7 @@ export class AuthController {
     }
 
     const data = await authService.refresh(refreshToken);
-    authService.applyRefreshCookie(response, data.refreshToken, data.refreshExpiresAt, true);
+    authService.applyRefreshCookie(response, data.refreshToken, data.refreshExpiresAt, data.rememberMe);
     response.json(
       successResponse("Token refreshed successfully", {
         accessToken: data.accessToken,

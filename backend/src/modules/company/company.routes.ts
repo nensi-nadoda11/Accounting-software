@@ -52,6 +52,7 @@ router.patch("/invoice-settings", validateRequest({ body: invoiceSettingsUpdateS
 router.get("/invoice-settings/preview-number", asyncHandler(companyController.previewInvoiceNumber));
 
 router.get("/branding", asyncHandler(companyController.getBranding));
+router.get("/branding/:type/file", validateRequest({ params: brandingDeleteParamSchema }), asyncHandler(companyController.downloadBranding));
 router.post("/branding/upload", uploadBrandingAsset, validateRequest({ body: brandingUploadBodySchema }), asyncHandler(companyController.uploadBranding));
 router.delete("/branding/:type", validateRequest({ params: brandingDeleteParamSchema }), asyncHandler(companyController.deleteBranding));
 

@@ -235,7 +235,7 @@ export class PayrollController {
   };
 
   public getSlipPdf = async (request: Request, response: Response): Promise<void> => {
-    const data = await payrollService.getPayrollSlipPdf(
+    const file = await payrollService.getPayrollSlipPdf(
       {
         id: request.currentUser!.id,
         companyId: request.currentUser!.companyId!,
@@ -244,7 +244,9 @@ export class PayrollController {
       String(request.params.id),
       { ipAddress: getRequestIp(request), userAgent: getUserAgent(request) }
     );
-    response.json(successResponse("Salary slip PDF payload fetched successfully", data));
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `attachment; filename="${file.fileName}"`);
+    response.send(file.content);
   };
 
   public emailSlip = async (request: Request, response: Response): Promise<void> => {

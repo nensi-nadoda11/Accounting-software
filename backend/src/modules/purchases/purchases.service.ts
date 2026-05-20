@@ -5,7 +5,6 @@ import { inventoryRepository } from "../inventory/inventory.repository";
 import { inventoryService } from "../inventory/inventory.service";
 import {
   addDecimals,
-  buildCsvBuffer,
   compareDecimals,
   decimalToScaledBigInt,
   divideMoneyByQuantity,
@@ -17,6 +16,9 @@ import {
 import { suppliersRepository } from "../suppliers/suppliers.repository";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
+import { buildTextPdfFile } from "../../utils/export-documents";
 import { purchasesRepository } from "./purchases.repository";
 import type {
   CreatePurchaseReturnInput,
@@ -65,6 +67,41 @@ const pickDefined = <T extends Record<string, unknown>>(value: T): Partial<T> =>
   Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Partial<T>;
 
 const toDateOnly = (value: Date) => value.toISOString().slice(0, 10);
+const formatDateValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().slice(0, 10);
+};
+
+const formatDateTimeValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().replace("T", " ").slice(0, 16);
+};
+
+const padCell = (value: string | number, width: number, align: "left" | "right" = "left") => {
+  const normalized = String(value);
+  if (normalized.length >= width) {
+    return normalized.slice(0, width);
+  }
+
+  return align === "right" ? normalized.padStart(width, " ") : normalized.padEnd(width, " ");
+};
+
 const roundHalfUp = (dividend: bigint, divisor: bigint) => {
   if (divisor === 0n) {
     throw new Error("Division by zero");
@@ -80,12 +117,6 @@ const roundHalfUp = (dividend: bigint, divisor: bigint) => {
 };
 
 class PurchasesService {
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
-  }
-
   private normalizePrefix(prefix: string | null | undefined, fallback: string) {
     const base = (prefix?.trim() || fallback).replace(/-+$/, "");
     return `${base}-`;
@@ -1746,7 +1777,6 @@ class PurchasesService {
     query: ExportPurchasesQuery,
     context: PurchaseRequestContext
   ): Promise<PurchaseExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await purchasesRepository.listPurchasesForExport({
       companyId: actor.companyId,
       search: query.search ?? null,
@@ -1757,21 +1787,32 @@ class PurchasesService {
       dateFrom: query.dateFrom ?? null,
       dateTo: query.dateTo ?? null
     });
-
-    const content = buildCsvBuffer(
-      ["Purchase No", "Supplier", "Supplier Invoice", "Invoice Date", "Status", "Payment Status", "Grand Total", "Paid", "Due"],
-      rows.map((row) => [
-        row.invoice.purchaseNumber,
-        row.supplierName,
-        row.invoice.supplierInvoiceNumber ?? "",
-        row.invoice.invoiceDate.toISOString(),
-        row.invoice.purchaseStatus,
-        row.invoice.paymentStatus,
-        normalizeMoney(row.invoice.grandTotal),
-        normalizeMoney(row.invoice.paidAmount),
-        normalizeMoney(row.invoice.dueAmount)
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Purchase Invoices",
+      columns: [
+        { key: "purchaseNumber", label: "Purchase No" },
+        { key: "supplierName", label: "Supplier" },
+        { key: "supplierInvoiceNumber", label: "Supplier Invoice" },
+        { key: "invoiceDate", label: "Invoice Date" },
+        { key: "purchaseStatus", label: "Status" },
+        { key: "paymentStatus", label: "Payment Status" },
+        { key: "grandTotal", label: "Grand Total", type: "number" },
+        { key: "paidAmount", label: "Paid", type: "number" },
+        { key: "dueAmount", label: "Due", type: "number" }
+      ],
+      rows: rows.map((row) => ({
+        purchaseNumber: row.invoice.purchaseNumber,
+        supplierName: row.supplierName,
+        supplierInvoiceNumber: row.invoice.supplierInvoiceNumber ?? "",
+        invoiceDate: formatDateValue(row.invoice.invoiceDate),
+        purchaseStatus: row.invoice.purchaseStatus,
+        paymentStatus: row.invoice.paymentStatus,
+        grandTotal: Number(normalizeMoney(row.invoice.grandTotal)),
+        paidAmount: Number(normalizeMoney(row.invoice.paidAmount)),
+        dueAmount: Number(normalizeMoney(row.invoice.dueAmount))
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `purchases-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1786,11 +1827,7 @@ class PurchasesService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `purchases-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async generatePurchasePdf(
@@ -1801,20 +1838,51 @@ class PurchasesService {
     const detail = await this.getPurchase(actor, purchaseId);
     const invoice = detail.invoice;
     const items = (invoice.items ?? []) as Array<ReturnType<PurchasesService["mapInvoiceItemRow"]>>;
-
-    const content = buildCsvBuffer(
-      ["Purchase No", "Supplier", "Invoice Date", "Product", "Qty", "Free Qty", "Rate", "Line Total"],
-      items.map((item) => [
-        invoice.purchaseNumber,
-        invoice.supplier.name,
-        invoice.invoiceDate.toISOString(),
-        item.productNameSnapshot,
-        item.quantity,
-        item.freeQuantity,
-        item.purchaseRate,
-        item.lineTotal
-      ])
-    );
+    const company = await companyRepository.findCompanyById(actor.companyId);
+    const lines = [
+      company?.legalName || company?.name || "Company",
+      [company?.addressLine1, company?.addressLine2, company?.city, company?.state, company?.pincode].filter(Boolean).join(", ") || "Address not available",
+      `GSTIN: ${company?.gstNumber || "-"}`,
+      "",
+      `PURCHASE INVOICE ${invoice.purchaseNumber}`,
+      `Invoice Date   : ${formatDateValue(invoice.invoiceDate)}`,
+      `Due Date       : ${formatDateValue(invoice.dueDate)}`,
+      `Supplier       : ${invoice.supplier.name}`,
+      `Supplier Code  : ${invoice.supplier.supplierCode ?? "-"}`,
+      `Supplier GSTIN : ${invoice.supplier.gstNumber ?? "-"}`,
+      `Warehouse      : ${invoice.warehouse?.name ?? "-"}`,
+      `Status         : ${invoice.purchaseStatus}`,
+      `Payment        : ${invoice.paymentStatus}`,
+      "",
+      [padCell("Product", 26), padCell("Qty", 8, "right"), padCell("Free", 8, "right"), padCell("Rate", 10, "right"), padCell("Taxable", 12, "right"), padCell("Total", 12, "right")].join(" "),
+      "-".repeat(82),
+      ...(items.length
+        ? items.map((item) =>
+            [
+              padCell(item.productNameSnapshot, 26),
+              padCell(item.quantity, 8, "right"),
+              padCell(item.freeQuantity, 8, "right"),
+              padCell(item.purchaseRate, 10, "right"),
+              padCell(item.taxableAmount, 12, "right"),
+              padCell(item.lineTotal, 12, "right")
+            ].join(" ")
+          )
+        : ["No line items available"]),
+      "",
+      `Subtotal       : ${invoice.subtotal}`,
+      `GST Total      : ${invoice.gstTotal}`,
+      `Freight        : ${invoice.freightCharges}`,
+      `Other Charges  : ${invoice.additionalCharges}`,
+      `Round Off      : ${invoice.roundOffAmount}`,
+      `Grand Total    : ${invoice.grandTotal}`,
+      `Paid Amount    : ${invoice.paidAmount}`,
+      `Due Amount     : ${invoice.dueAmount}`,
+      `Notes          : ${invoice.notes || "-"}`,
+      `Terms          : ${invoice.termsConditions || "-"}`,
+      "",
+      `Generated At   : ${formatDateTimeValue(new Date())}`
+    ];
+    const file = buildTextPdfFile(invoice.purchaseNumber, lines);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1823,17 +1891,13 @@ class PurchasesService {
       entityType: "purchase_invoice",
       entityId: purchaseId,
       metadata: {
-        fallback: "csv"
+        mode: "pdf"
       },
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `${invoice.purchaseNumber}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async exportReturns(
@@ -1841,7 +1905,6 @@ class PurchasesService {
     query: ExportPurchaseReturnsQuery,
     context: PurchaseRequestContext
   ): Promise<PurchaseExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await purchasesRepository.listPurchaseReturnsForExport({
       companyId: actor.companyId,
       search: query.search ?? null,
@@ -1851,17 +1914,24 @@ class PurchasesService {
       dateFrom: query.dateFrom ?? null,
       dateTo: query.dateTo ?? null
     });
-
-    const content = buildCsvBuffer(
-      ["Return No", "Purchase No", "Supplier", "Return Date", "Grand Total"],
-      rows.map((row) => [
-        row.purchaseReturn.returnNumber,
-        row.purchaseNumber ?? "",
-        row.supplierName,
-        row.purchaseReturn.returnDate.toISOString(),
-        normalizeMoney(row.purchaseReturn.grandTotal)
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Purchase Returns",
+      columns: [
+        { key: "returnNumber", label: "Return No" },
+        { key: "purchaseNumber", label: "Purchase No" },
+        { key: "supplierName", label: "Supplier" },
+        { key: "returnDate", label: "Return Date" },
+        { key: "grandTotal", label: "Grand Total", type: "number" }
+      ],
+      rows: rows.map((row) => ({
+        returnNumber: row.purchaseReturn.returnNumber,
+        purchaseNumber: row.purchaseNumber ?? "",
+        supplierName: row.supplierName,
+        returnDate: formatDateValue(row.purchaseReturn.returnDate),
+        grandTotal: Number(normalizeMoney(row.purchaseReturn.grandTotal))
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `purchase-returns-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1876,11 +1946,7 @@ class PurchasesService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `purchase-returns-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async generateReturnPdf(
@@ -1894,22 +1960,47 @@ class PurchasesService {
       productName: string;
       quantity: string;
       returnRate: string;
+      taxableAmount: string;
+      gstAmount: string;
       lineTotal: string;
     }>;
 
-    const content = buildCsvBuffer(
-      ["Return No", "Purchase No", "Supplier", "Return Date", "Product", "Qty", "Rate", "Line Total"],
-      items.map((item) => [
-        purchaseReturn.returnNumber,
-        purchaseReturn.purchaseNumber ?? "",
-        purchaseReturn.supplierName,
-        purchaseReturn.returnDate.toISOString(),
-        item.productName,
-        item.quantity,
-        item.returnRate,
-        item.lineTotal
-      ])
-    );
+    const company = await companyRepository.findCompanyById(actor.companyId);
+    const lines = [
+      company?.legalName || company?.name || "Company",
+      [company?.addressLine1, company?.addressLine2, company?.city, company?.state, company?.pincode].filter(Boolean).join(", ") || "Address not available",
+      "",
+      `PURCHASE RETURN ${purchaseReturn.returnNumber}`,
+      `Return Date    : ${formatDateValue(purchaseReturn.returnDate)}`,
+      `Purchase No    : ${purchaseReturn.purchaseNumber ?? "-"}`,
+      `Supplier       : ${purchaseReturn.supplierName}`,
+      `Supplier Code  : ${purchaseReturn.supplierCode ?? "-"}`,
+      `Warehouse      : ${purchaseReturn.warehouse?.name ?? "-"}`,
+      "",
+      [padCell("Product", 30), padCell("Qty", 8, "right"), padCell("Rate", 10, "right"), padCell("Taxable", 12, "right"), padCell("GST", 10, "right"), padCell("Total", 12, "right")].join(" "),
+      "-".repeat(88),
+      ...(items.length
+        ? items.map((item) =>
+            [
+              padCell(item.productName, 30),
+              padCell(item.quantity, 8, "right"),
+              padCell(item.returnRate, 10, "right"),
+              padCell(item.taxableAmount, 12, "right"),
+              padCell(item.gstAmount, 10, "right"),
+              padCell(item.lineTotal, 12, "right")
+            ].join(" ")
+          )
+        : ["No return items available"]),
+      "",
+      `Subtotal       : ${purchaseReturn.subtotal}`,
+      `GST Total      : ${purchaseReturn.gstTotal}`,
+      `Round Off      : ${purchaseReturn.roundOffAmount}`,
+      `Grand Total    : ${purchaseReturn.grandTotal}`,
+      `Notes          : ${purchaseReturn.notes || "-"}`,
+      "",
+      `Generated At   : ${formatDateTimeValue(new Date())}`
+    ];
+    const file = buildTextPdfFile(purchaseReturn.returnNumber, lines);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1918,17 +2009,13 @@ class PurchasesService {
       entityType: "purchase_return",
       entityId: purchaseReturnId,
       metadata: {
-        fallback: "csv"
+        mode: "pdf"
       },
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `${purchaseReturn.returnNumber}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 }
 

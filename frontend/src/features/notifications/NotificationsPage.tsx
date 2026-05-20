@@ -9,8 +9,8 @@ import { Card, CardContent } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { notificationsApi } from "../../services/notificationsApi";
 import type {
   Notification,
@@ -503,3 +503,4 @@ export const NotificationsPage = () => {
     </div>
   );
 };
+

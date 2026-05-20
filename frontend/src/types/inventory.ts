@@ -374,4 +374,4 @@ export interface InventoryValuationResponse {
   };
 }
 
-export interface InventoryExportResult extends DownloadFileResult {}
+export type InventoryExportResult = DownloadFileResult;

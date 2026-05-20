@@ -26,8 +26,8 @@ import { Modal } from "../../components/ui/Modal";
 import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { customersApi } from "../../services/customersApi";
 import { financialYearApi } from "../../services/financialYearApi";
 import { gstApi } from "../../services/gstApi";
@@ -35,6 +35,7 @@ import { suppliersApi } from "../../services/suppliersApi";
 import type { CompanyFinancialYear } from "../../types/company";
 import type {
   GstAdjustment,
+  GstExportFormat,
   GstExportType,
   GstFilters,
   GstListResponse,
@@ -246,6 +247,7 @@ export const GstManagementPage = () => {
   const [exportDateTo, setExportDateTo] = useState(getTodayInput());
   const [exportSource, setExportSource] = useState<"sales" | "purchase" | "expense" | "all">("all");
   const [exportLoadingType, setExportLoadingType] = useState<GstExportType | null>(null);
+  const [exportFormat, setExportFormat] = useState<GstExportFormat>("xlsx");
 
   const cancelForm = useForm<GstAdjustmentCancelFormInputValues, undefined, GstAdjustmentCancelFormValues>({
     resolver: zodResolver(gstAdjustmentCancelSchema),
@@ -591,18 +593,18 @@ export const GstManagementPage = () => {
       const filters: GstExportFiltersValues = parsed.data;
       const file =
         type === "sales"
-          ? await gstApi.exportSales({ ...filters })
+          ? await gstApi.exportSales({ ...filters, format: exportFormat })
           : type === "purchases"
-          ? await gstApi.exportPurchases({ ...filters })
+          ? await gstApi.exportPurchases({ ...filters, format: exportFormat })
           : type === "itc"
-          ? await gstApi.exportItc({ ...filters })
+          ? await gstApi.exportItc({ ...filters, format: exportFormat })
           : type === "hsn-summary"
-          ? await gstApi.exportHsnSummary({ ...filters, source: filters.source })
+          ? await gstApi.exportHsnSummary({ ...filters, source: filters.source, format: exportFormat })
           : type === "tax-summary"
-          ? await gstApi.exportTaxSummary({ ...filters })
+          ? await gstApi.exportTaxSummary({ ...filters, format: exportFormat })
           : type === "gstr-1"
-          ? await gstApi.exportGstr1({ ...filters })
-          : await gstApi.exportGstr3b({ ...filters });
+          ? await gstApi.exportGstr1({ ...filters, format: exportFormat })
+          : await gstApi.exportGstr3b({ ...filters, format: exportFormat });
       toDownload(file);
       toast.success("Export downloaded");
     } catch (error) {
@@ -635,6 +637,13 @@ export const GstManagementPage = () => {
         }}
         actions={
           <div className="flex items-center gap-2">
+            {canExport ? (
+              <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as GstExportFormat)} className="w-28">
+                <option value="csv">CSV</option>
+                <option value="xlsx">XLSX</option>
+                <option value="pdf">PDF</option>
+              </Select>
+            ) : null}
             <Button type="button" variant="secondary" onClick={refreshActiveTab}>
               <RefreshCcw className="mr-2 size-4" />
               Refresh
@@ -671,7 +680,7 @@ export const GstManagementPage = () => {
                     <Button type="button" variant="secondary" loading={exportLoadingType === "gstr-1"} onClick={async () => {
                       try {
                         setExportLoadingType("gstr-1");
-                        const file = await gstApi.exportGstr1(getSummaryExportRange());
+                        const file = await gstApi.exportGstr1({ ...getSummaryExportRange(), format: exportFormat });
                         toDownload(file);
                         toast.success("GSTR-1 exported");
                       } catch (error) {
@@ -686,7 +695,7 @@ export const GstManagementPage = () => {
                     <Button type="button" variant="secondary" loading={exportLoadingType === "gstr-3b"} onClick={async () => {
                       try {
                         setExportLoadingType("gstr-3b");
-                        const file = await gstApi.exportGstr3b(getSummaryExportRange());
+                        const file = await gstApi.exportGstr3b({ ...getSummaryExportRange(), format: exportFormat });
                         toDownload(file);
                         toast.success("GSTR-3B exported");
                       } catch (error) {
@@ -791,7 +800,7 @@ export const GstManagementPage = () => {
                 <Button type="button" variant="secondary" loading={exportLoadingType === "sales"} onClick={async () => {
                   try {
                     setExportLoadingType("sales");
-                    const file = await gstApi.exportSales(buildSalesFilters());
+                    const file = await gstApi.exportSales({ ...buildSalesFilters(), format: exportFormat });
                     toDownload(file);
                     toast.success("Sales GST exported");
                   } catch (error) {
@@ -843,7 +852,7 @@ export const GstManagementPage = () => {
                 <Button type="button" variant="secondary" loading={exportLoadingType === "purchases"} onClick={async () => {
                   try {
                     setExportLoadingType("purchases");
-                    const file = await gstApi.exportPurchases(buildPurchaseFilters());
+                    const file = await gstApi.exportPurchases({ ...buildPurchaseFilters(), format: exportFormat });
                     toDownload(file);
                     toast.success("Purchase GST exported");
                   } catch (error) {
@@ -895,7 +904,7 @@ export const GstManagementPage = () => {
                 <Button type="button" variant="secondary" loading={exportLoadingType === "itc"} onClick={async () => {
                   try {
                     setExportLoadingType("itc");
-                    const file = await gstApi.exportItc(buildItcFilters());
+                    const file = await gstApi.exportItc({ ...buildItcFilters(), format: exportFormat });
                     toDownload(file);
                     toast.success("ITC exported");
                   } catch (error) {
@@ -957,7 +966,7 @@ export const GstManagementPage = () => {
                   <Button type="button" variant="secondary" loading={exportLoadingType === "hsn-summary"} onClick={async () => {
                     try {
                       setExportLoadingType("hsn-summary");
-                      const file = await gstApi.exportHsnSummary(buildHsnFilters());
+                      const file = await gstApi.exportHsnSummary({ ...buildHsnFilters(), format: exportFormat });
                       toDownload(file);
                       toast.success("HSN/SAC exported");
                     } catch (error) {
@@ -988,7 +997,7 @@ export const GstManagementPage = () => {
                   <Button type="button" variant="secondary" loading={exportLoadingType === "tax-summary"} onClick={async () => {
                     try {
                       setExportLoadingType("tax-summary");
-                      const file = await gstApi.exportTaxSummary(buildTaxFilters());
+                      const file = await gstApi.exportTaxSummary({ ...buildTaxFilters(), format: exportFormat });
                       toDownload(file);
                       toast.success("Tax summary exported");
                     } catch (error) {
@@ -1190,3 +1199,4 @@ export const GstManagementPage = () => {
     </>
   );
 };
+

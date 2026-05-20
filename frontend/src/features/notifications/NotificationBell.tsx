@@ -6,8 +6,8 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { Button } from "../../components/ui/Button";
 import { cn } from "../../lib/utils";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { notificationsApi } from "../../services/notificationsApi";
 import type { Notification } from "../../types/notification";
 import {
@@ -189,3 +189,4 @@ export const NotificationBell = () => {
     </div>
   );
 };
+

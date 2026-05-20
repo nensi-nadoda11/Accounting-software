@@ -6,8 +6,8 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { getErrorMessage } from "../../lib/errors";
 import { useDebouncedValue } from "../customers/useDebouncedValue";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { securityAdminApi } from "../../services/securityAdminApi";
 import type {
   AuditFilters,
@@ -204,7 +204,9 @@ export const SecurityAdminPage = () => {
               canExport={canAuditExport}
               exporting={auditExporting}
               onExport={() => {
-                const exportFilters = (({ page, limit, ...rest }: AuditFilters) => rest)(auditFilters);
+                const exportFilters = Object.fromEntries(
+                  Object.entries(auditFilters).filter(([key]) => key !== "page" && key !== "limit"),
+                ) as Omit<AuditFilters, "page" | "limit">;
                 setAuditExporting(true);
                 void securityAdminApi
                   .exportAuditLogs(exportFilters)
@@ -356,3 +358,4 @@ export const SecurityAdminPage = () => {
     </div>
   );
 };
+

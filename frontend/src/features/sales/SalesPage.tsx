@@ -8,10 +8,11 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { Select } from "../../components/ui/Select";
 import { SideSheet } from "../../components/ui/SideSheet";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { useDebouncedValue } from "../customers/useDebouncedValue";
 import { applyFriendlyFieldErrors, saveDownloadedFile } from "../customers/customerUtils";
 import { bankApi } from "../../services/bankApi";
@@ -26,6 +27,7 @@ import type {
   InvoiceStatus,
   InvoiceType,
   PaymentStatus,
+  SalesExportFormat,
   SalesInvoice,
   SalesInvoiceListItem,
   SalesListResponse,
@@ -45,7 +47,7 @@ import { SendInvoiceModal } from "./components/SendInvoiceModal";
 import { createPaymentPayload, createReturnPayload, createSalesUpdatePayload } from "./salesUtils";
 import type { LookupOption } from "./components/AsyncLookupSelect";
 
-type SalesPageTab = "invoices" | "pos" | "returns" | "payments";
+export type SalesPageTab = "invoices" | "pos" | "returns" | "payments";
 
 type ConfirmState =
   | { type: "delete"; invoice: SalesInvoiceListItem | SalesInvoice }
@@ -120,6 +122,7 @@ const buildPrintHtml = (invoice: SalesInvoice) => `<!doctype html>
     </div>
   </body>
 </html>`;
+void buildPrintHtml;
 
 export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   const auth = useAuth();
@@ -142,6 +145,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   const [submittingReturn, setSubmittingReturn] = useState(false);
   const [submittingSend, setSubmittingSend] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<SalesExportFormat>("xlsx");
   const [pageError, setPageError] = useState<string | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -432,21 +436,11 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
 
   const printInvoice = async (invoiceId: string) => {
     try {
-      const response = await salesApi.getPdfPayload(invoiceId);
-      const invoice = response.data.invoice;
-      const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1100,height=780");
-      if (!printWindow) {
-        toast.error("Unable to open print window");
-        return;
-      }
-
-      printWindow.document.write(buildPrintHtml(invoice));
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      setTimeout(() => printWindow.close(), 500);
+      const file = await salesApi.getPdfFile(invoiceId);
+      saveDownloadedFile(file.blob, file.fileName);
+      toast.success("Invoice PDF downloaded");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load print preview"));
+      toast.error(getErrorMessage(error, "Failed to download invoice PDF"));
     }
   };
 
@@ -498,34 +492,42 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
             actions={
               <div className="flex flex-wrap gap-2">
                 {canExport ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    loading={exporting}
-                    onClick={async () => {
-                      try {
-                        setExporting(true);
-                        const file = await salesApi.exportReturns({
-                          page,
-                          limit: 20,
-                          search: searchParams.get("search") || undefined,
-                          customerId: customerId || undefined,
-                          warehouseId: warehouseId || undefined,
-                          dateFrom: dateFrom || undefined,
-                          dateTo: dateTo || undefined,
-                        });
-                        saveDownloadedFile(file.blob, file.fileName);
-                        toast.success("Sales returns exported");
-                      } catch (error) {
-                        toast.error(getErrorMessage(error, "Failed to export sales returns"));
-                      } finally {
-                        setExporting(false);
-                      }
-                    }}
-                  >
-                    <Download className="mr-2 size-4" />
-                    Export
-                  </Button>
+                  <>
+                    <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SalesExportFormat)} className="w-28">
+                      <option value="csv">CSV</option>
+                      <option value="xlsx">XLSX</option>
+                      <option value="pdf">PDF</option>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={exporting}
+                      onClick={async () => {
+                        try {
+                          setExporting(true);
+                          const file = await salesApi.exportReturns({
+                            page,
+                            limit: 20,
+                            search: searchParams.get("search") || undefined,
+                            customerId: customerId || undefined,
+                            warehouseId: warehouseId || undefined,
+                            dateFrom: dateFrom || undefined,
+                            dateTo: dateTo || undefined,
+                            format: exportFormat,
+                          });
+                          saveDownloadedFile(file.blob, file.fileName);
+                          toast.success("Sales returns exported");
+                        } catch (error) {
+                          toast.error(getErrorMessage(error, "Failed to export sales returns"));
+                        } finally {
+                          setExporting(false);
+                        }
+                      }}
+                    >
+                      <Download className="mr-2 size-4" />
+                      Export
+                    </Button>
+                  </>
                 ) : null}
                 {canReturn ? (
                   <Button type="button" onClick={() => void openReturnCreate()}>
@@ -593,37 +595,45 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
             actions={
               <div className="flex flex-wrap gap-2">
                 {canExport ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    loading={exporting}
-                    onClick={async () => {
-                      try {
-                        setExporting(true);
-                        const file = await salesApi.exportList({
-                          page,
-                          limit: 20,
-                          search: searchParams.get("search") || undefined,
-                          invoiceStatus: invoiceStatusFilter || undefined,
-                          paymentStatus: paymentStatusFilter || undefined,
-                          customerId: customerId || undefined,
-                          warehouseId: warehouseId || undefined,
-                          invoiceType: invoiceTypeFilter || undefined,
-                          dateFrom: dateFrom || undefined,
-                          dateTo: dateTo || undefined,
-                        });
-                        saveDownloadedFile(file.blob, file.fileName);
-                        toast.success("Sales export downloaded");
-                      } catch (error) {
-                        toast.error(getErrorMessage(error, "Failed to export sales"));
-                      } finally {
-                        setExporting(false);
-                      }
-                    }}
-                  >
-                    <Download className="mr-2 size-4" />
-                    Export
-                  </Button>
+                  <>
+                    <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SalesExportFormat)} className="w-28">
+                      <option value="csv">CSV</option>
+                      <option value="xlsx">XLSX</option>
+                      <option value="pdf">PDF</option>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={exporting}
+                      onClick={async () => {
+                        try {
+                          setExporting(true);
+                          const file = await salesApi.exportList({
+                            page,
+                            limit: 20,
+                            search: searchParams.get("search") || undefined,
+                            invoiceStatus: invoiceStatusFilter || undefined,
+                            paymentStatus: paymentStatusFilter || undefined,
+                            customerId: customerId || undefined,
+                            warehouseId: warehouseId || undefined,
+                            invoiceType: invoiceTypeFilter || undefined,
+                            dateFrom: dateFrom || undefined,
+                            dateTo: dateTo || undefined,
+                            format: exportFormat,
+                          });
+                          saveDownloadedFile(file.blob, file.fileName);
+                          toast.success("Sales export downloaded");
+                        } catch (error) {
+                          toast.error(getErrorMessage(error, "Failed to export sales"));
+                        } finally {
+                          setExporting(false);
+                        }
+                      }}
+                    >
+                      <Download className="mr-2 size-4" />
+                      Export
+                    </Button>
+                  </>
                 ) : null}
                 {canCreate && tab === "invoices" ? (
                   <Button
@@ -894,6 +904,9 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
               toast.success(response.message || "Email processed");
             } else {
               const response = await salesApi.sendWhatsapp(sendInvoice.id, { mobile: values.recipient, message: values.message });
+              if (response.data.whatsappUrl) {
+                window.open(response.data.whatsappUrl, "_blank", "noopener,noreferrer");
+              }
               toast.success(response.message || "WhatsApp request processed");
             }
 
@@ -967,3 +980,4 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
     </>
   );
 };
+

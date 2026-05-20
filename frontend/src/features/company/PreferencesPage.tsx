@@ -6,7 +6,7 @@ import type { z } from "zod";
 
 import { getErrorMessage } from "../../lib/errors";
 import { preferencesApi } from "../../services/preferencesApi";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
@@ -185,3 +185,4 @@ export const PreferencesPage = () => {
     </div>
   );
 };
+

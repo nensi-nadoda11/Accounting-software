@@ -264,6 +264,13 @@ export class CompanyController {
     response.json(successResponse("Branding asset deleted successfully", data));
   };
 
+  public downloadBranding = async (request: Request, response: Response): Promise<void> => {
+    const file = await companyService.downloadBrandingAsset(request.currentUser!.companyId!, request.params.type as never);
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `inline; filename="${file.fileName}"`);
+    response.send(file.content);
+  };
+
   public listBranches = async (request: Request, response: Response): Promise<void> => {
     const data = await companyService.listBranches(request.currentUser!.companyId!, request.query as never);
     response.json(successResponse("Branches fetched successfully", data));

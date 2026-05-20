@@ -154,22 +154,29 @@ export const calculateExpensePreview = ({
   const amountScaled = roundToScale(normalizedAmount, 2);
   const rateScaled = roundToScale(normalizedRate, GST_DIVISOR_SCALE);
 
-  let taxableAmount = "0.00";
-  let gstAmount = "0.00";
-  let totalAmount = "0.00";
+  const { taxableAmount, gstAmount, totalAmount } =
+    priceTaxType === "inclusive"
+      ? (() => {
+          const divisor = pow10(GST_DIVISOR_SCALE) + rateScaled;
+          const baseScaled = divideScaled(amountScaled * pow10(GST_DIVISOR_SCALE), divisor);
 
-  if (priceTaxType === "inclusive") {
-    const divisor = pow10(GST_DIVISOR_SCALE) + rateScaled;
-    const baseScaled = divideScaled(amountScaled * pow10(GST_DIVISOR_SCALE), divisor);
-    taxableAmount = fromScaled(baseScaled, 2);
-    gstAmount = fromScaled(amountScaled - baseScaled, 2);
-    totalAmount = normalizedAmount;
-  } else {
-    taxableAmount = normalizedAmount;
-    const computedGst = divideScaled(amountScaled * rateScaled, 10n ** BigInt(GST_DIVISOR_SCALE + 2));
-    gstAmount = fromScaled(computedGst, 2);
-    totalAmount = addDecimals(taxableAmount, gstAmount, 2);
-  }
+          return {
+            taxableAmount: fromScaled(baseScaled, 2),
+            gstAmount: fromScaled(amountScaled - baseScaled, 2),
+            totalAmount: normalizedAmount,
+          };
+        })()
+      : (() => {
+          const computedGst = divideScaled(amountScaled * rateScaled, 10n ** BigInt(GST_DIVISOR_SCALE + 2));
+          const nextTaxableAmount = normalizedAmount;
+          const nextGstAmount = fromScaled(computedGst, 2);
+
+          return {
+            taxableAmount: nextTaxableAmount,
+            gstAmount: nextGstAmount,
+            totalAmount: addDecimals(nextTaxableAmount, nextGstAmount, 2),
+          };
+        })();
 
   const split =
     compareDecimals(gstAmount, "0", 2) <= 0

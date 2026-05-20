@@ -5,7 +5,7 @@ import { Card, CardContent } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { getErrorMessage } from "../../lib/errors";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { customersApi } from "../../services/customersApi";
 import { expensesApi } from "../../services/expensesApi";
 import { financialYearApi } from "../../services/financialYearApi";
@@ -909,3 +909,4 @@ const renderTab = ({
 
   return <EmptyState title="No report data available" />;
 };
+

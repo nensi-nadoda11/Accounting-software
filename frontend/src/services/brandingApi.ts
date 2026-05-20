@@ -1,6 +1,13 @@
+import type { AxiosResponse } from "axios";
+
 import { client } from "../lib/api/client";
 import type { CompanyBranding, CompanyBrandingAssetType } from "../types/company";
 import type { ApiResponse } from "../types/api";
+
+const extractBlob = async (request: Promise<AxiosResponse<Blob>>) => {
+  const response = await request;
+  return response.data;
+};
 
 export const brandingApi = {
   get: async () => (await client.get<ApiResponse<CompanyBranding>>("/company/branding")).data,
@@ -22,6 +29,12 @@ export const brandingApi = {
       })
     ).data;
   },
+  downloadAsset: async (assetUrl: string) =>
+    extractBlob(
+      client.get(assetUrl, {
+        responseType: "blob",
+      }),
+    ),
   remove: async (type: CompanyBrandingAssetType) =>
     (await client.delete<ApiResponse<CompanyBranding>>(`/company/branding/${type}`)).data,
 };

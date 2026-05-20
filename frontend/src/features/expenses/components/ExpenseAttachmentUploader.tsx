@@ -1,8 +1,9 @@
 import { Paperclip, Trash2, UploadCloud } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { cn } from "../../../lib/utils";
+import { expensesApi } from "../../../services/expensesApi";
 import type { ExpenseAttachment } from "../../../types/expense";
 import { formatBytes, isPreviewableImage, isPreviewablePdf } from "../expenseUtils";
 
@@ -27,6 +28,7 @@ export const ExpenseAttachmentUploader = ({
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const accept = "image/jpeg,image/png,image/webp,application/pdf";
 
   const previewItems = useMemo(
@@ -38,12 +40,65 @@ export const ExpenseAttachmentUploader = ({
     [attachments],
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    const urls: string[] = [];
+
+    const loadPreviews = async () => {
+      const nextEntries = await Promise.all(
+        previewItems.map(async ({ attachment, kind }) => {
+          if (kind === "file") {
+            return null;
+          }
+
+          try {
+            const file = await expensesApi.downloadAttachment(attachment.fileUrl, attachment.originalName);
+            const objectUrl = URL.createObjectURL(file.blob);
+            urls.push(objectUrl);
+            return [attachment.id, objectUrl] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setPreviewUrls(
+          Object.fromEntries(nextEntries.filter((entry): entry is readonly [string, string] => Boolean(entry))),
+        );
+      }
+    };
+
+    void loadPreviews();
+
+    return () => {
+      cancelled = true;
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [previewItems]);
+
   const handleFiles = (list: FileList | null) => {
     if (!list?.length) {
       return;
     }
 
     onUpload(Array.from(list));
+  };
+
+  const openAttachment = async (attachment: ExpenseAttachment, previewUrl?: string) => {
+    try {
+      if (previewUrl) {
+        window.open(previewUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      const file = await expensesApi.downloadAttachment(attachment.fileUrl, attachment.originalName);
+      const objectUrl = URL.createObjectURL(file.blob);
+      window.open(objectUrl, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch {
+      // Keep the uploader responsive even if a preview file can no longer be read.
+    }
   };
 
   return (
@@ -110,10 +165,10 @@ export const ExpenseAttachmentUploader = ({
               <button
                 type="button"
                 className="flex h-36 w-full items-center justify-center bg-slate-50"
-                onClick={() => window.open(attachment.fileUrl, "_blank", "noopener,noreferrer")}
+                onClick={() => void openAttachment(attachment, previewUrls[attachment.id])}
               >
-                {kind === "image" ? (
-                  <img src={attachment.fileUrl} alt={attachment.originalName} className="h-full w-full object-cover" />
+                {kind === "image" && previewUrls[attachment.id] ? (
+                  <img src={previewUrls[attachment.id]} alt={attachment.originalName} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-slate-500">
                     <Paperclip className="size-5" />

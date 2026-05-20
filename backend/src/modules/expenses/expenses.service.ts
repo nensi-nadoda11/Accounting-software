@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import path from "path";
 
 import { db } from "../../db";
@@ -12,7 +13,12 @@ import {
   normalizeMoney as normalizeMoneyValue
 } from "../inventory/inventory.utils";
 import { AppError } from "../../utils/app-error";
-import { deleteUploadFileByUrl, buildPublicUploadUrl } from "../../utils/upload";
+import {
+  buildPrivateUploadReference,
+  deleteUploadFileByUrl,
+  getContentTypeFromFileName,
+  resolveStoredUploadPath
+} from "../../utils/upload";
 import { getPagination } from "../../utils/pagination";
 import {
   calculateExpenseTotals,
@@ -47,6 +53,10 @@ type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const INDIAN_GST_STATE_CODE_LENGTH = 2;
 
 class ExpensesService {
+  private buildExpenseAttachmentDownloadPath(expenseId: string, attachmentId: string) {
+    return `/api/v1/expenses/${expenseId}/attachments/${attachmentId}/download`;
+  }
+
   private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
     if (format !== "csv") {
       throw new AppError("Only CSV export is available right now", 400);
@@ -289,7 +299,7 @@ class ExpensesService {
       id: row.id,
       fileName: row.fileName,
       originalName: row.originalName,
-      fileUrl: row.fileUrl,
+      fileUrl: this.buildExpenseAttachmentDownloadPath(row.expenseId, row.id),
       mimeType: row.mimeType,
       sizeBytes: row.sizeBytes,
       uploadedBy: row.uploadedBy,
@@ -1131,7 +1141,7 @@ class ExpensesService {
             expenseId,
             fileName: file.filename,
             originalName: file.originalname,
-            fileUrl: buildPublicUploadUrl(relativePath),
+            fileUrl: buildPrivateUploadReference(relativePath),
             mimeType: file.mimetype,
             sizeBytes: file.size,
             uploadedBy: actor.id
@@ -1144,7 +1154,7 @@ class ExpensesService {
     }).catch(async (error) => {
       await Promise.all(
         files.map((file) =>
-          deleteUploadFileByUrl(buildPublicUploadUrl(path.posix.join(getExpenseUploadRelativeDirectory(actor.companyId, expenseId), file.filename)))
+          deleteUploadFileByUrl(buildPrivateUploadReference(path.posix.join(getExpenseUploadRelativeDirectory(actor.companyId, expenseId), file.filename)))
         )
       );
       throw error;
@@ -1207,6 +1217,31 @@ class ExpensesService {
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
+  }
+
+  public async downloadAttachment(actor: Pick<ExpenseActor, "companyId">, expenseId: string, attachmentId: string) {
+    const attachment = await expensesRepository.findAttachmentById(actor.companyId, attachmentId);
+    if (!attachment || attachment.expenseId !== expenseId) {
+      throw new AppError("Expense attachment not found", 404);
+    }
+
+    const absolutePath = resolveStoredUploadPath(attachment.fileUrl);
+    if (!absolutePath) {
+      throw new AppError("Expense attachment path is invalid", 400);
+    }
+
+    let content: Buffer;
+    try {
+      content = await fs.readFile(absolutePath);
+    } catch {
+      throw new AppError("Expense attachment could not be read", 404);
+    }
+
+    return {
+      fileName: attachment.originalName,
+      contentType: attachment.mimeType || getContentTypeFromFileName(absolutePath),
+      content
+    };
   }
 
   public async listRecurring(actor: Pick<ExpenseActor, "companyId">, query: ListRecurringExpensesQuery) {

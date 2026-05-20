@@ -30,7 +30,6 @@ import type {
   PayrollRunListQuery,
   SalarySlipEmailPayload,
   SalarySlipEmailResponse,
-  SalarySlipPdfResponse,
   SalarySlipResponse,
   SalaryStructure,
   SalaryStructurePayload,
@@ -50,7 +49,7 @@ const getFileNameFromDisposition = (contentDisposition: string | undefined, fall
     return decodeURIComponent(utfMatch[1]);
   }
 
-  const match = contentDisposition.match(/filename=\"?([^\"]+)\"?/i);
+  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
   return match?.[1] ?? fallback;
 };
 
@@ -181,7 +180,12 @@ export const payrollApi = {
     (await client.get<ApiResponse<SalarySlipResponse>>(`/payroll/items/${itemId}/slip`)).data,
 
   getSlipPdf: async (itemId: string) =>
-    (await client.get<ApiResponse<SalarySlipPdfResponse>>(`/payroll/items/${itemId}/slip/pdf`)).data,
+    extractDownload(
+      client.get(`/payroll/items/${itemId}/slip/pdf`, {
+        responseType: "blob",
+      }),
+      `salary-slip-${itemId}.pdf`,
+    ),
 
   emailSlip: async (itemId: string, payload: SalarySlipEmailPayload) =>
     (await client.post<ApiResponse<SalarySlipEmailResponse>>(`/payroll/items/${itemId}/slip/email`, payload)).data,

@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -10,28 +8,9 @@ import {
 
 import { authApi } from "../services/authApi";
 import { tokenStore } from "../lib/token-store";
-import type { Company, PermissionKey, Role, User } from "../types/auth";
-import { useToast } from "./ToastProvider";
-
-type AuthContextValue = {
-  user: User | null;
-  company: Company | null;
-  permissions: PermissionKey[];
-  accessToken: string | null;
-  isAuthenticated: boolean;
-  isInitializing: boolean;
-  login: (payload: { identifier: string; password: string; rememberMe?: boolean }) => Promise<void>;
-  logout: () => Promise<void>;
-  logoutAll: () => Promise<void>;
-  refreshSession: () => Promise<void>;
-  hasRole: (roles: Role[]) => boolean;
-  hasPermission: (permission: PermissionKey | PermissionKey[]) => boolean;
-  setSession: (payload: { accessToken: string; user: User; company: Company | null; permissions: PermissionKey[] }) => void;
-  updateUser: (user: User) => void;
-  updateCompany: (company: Company | null) => void;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import type { Company, PermissionKey, User } from "../types/auth";
+import { AuthContext, type AuthContextValue } from "./auth-context";
+import { useToast } from "./useToast";
 
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const toast = useToast();
@@ -148,13 +127,4 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-
-  return context;
 };

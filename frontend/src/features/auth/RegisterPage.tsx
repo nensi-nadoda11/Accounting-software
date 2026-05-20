@@ -6,7 +6,7 @@ import type { z } from "zod";
 
 import { getErrorMessage } from "../../lib/errors";
 import { authApi } from "../../services/authApi";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { AuthShell } from "./AuthShell";
 import { registerSchema } from "./authSchemas";
 import { Button } from "../../components/ui/Button";
@@ -102,3 +102,4 @@ export const RegisterPage = () => {
     </AuthShell>
   );
 };
+

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getErrorMessage } from "../../lib/errors";
 import { brandingApi } from "../../services/brandingApi";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { Card, CardContent, CardHeader } from "../../components/ui/Card";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { LoadingState } from "../../components/ui/LoadingState";
@@ -19,6 +19,7 @@ export const BrandingPage = () => {
   const [uploadingType, setUploadingType] = useState<CompanyBrandingAssetType | null>(null);
   const [removingType, setRemovingType] = useState<CompanyBrandingAssetType | null>(null);
   const [fileErrors, setFileErrors] = useState<Partial<Record<CompanyBrandingAssetType, string>>>({});
+  const [previewUrls, setPreviewUrls] = useState<Partial<Record<CompanyBrandingAssetType, string>>>({});
 
   const loadBranding = async () => {
     try {
@@ -36,6 +37,53 @@ export const BrandingPage = () => {
     void loadBranding();
   }, []);
 
+  useEffect(() => {
+    if (!branding) {
+      setPreviewUrls({});
+      return;
+    }
+
+    let cancelled = false;
+    const urls: string[] = [];
+
+    const loadPreviews = async () => {
+      const nextEntries = await Promise.all(
+        BRANDING_ASSET_SECTIONS.map(async (asset) => {
+          const assetUrl = getBrandingAssetUrl(branding, asset.type);
+          if (!assetUrl) {
+            return null;
+          }
+
+          try {
+            const blob = await brandingApi.downloadAsset(assetUrl);
+            const objectUrl = URL.createObjectURL(blob);
+            urls.push(objectUrl);
+            return [asset.type, objectUrl] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setPreviewUrls(
+          Object.fromEntries(
+            nextEntries.filter(
+              (entry): entry is readonly [CompanyBrandingAssetType, string] => Boolean(entry),
+            ),
+          ) as Partial<Record<CompanyBrandingAssetType, string>>,
+        );
+      }
+    };
+
+    void loadPreviews();
+
+    return () => {
+      cancelled = true;
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [branding]);
+
   if (loading || !branding) {
     return <LoadingState label="Loading branding..." />;
   }
@@ -51,7 +99,7 @@ export const BrandingPage = () => {
               <FileUpload
                 key={asset.type}
                 label={asset.label}
-                previewUrl={getBrandingAssetUrl(branding, asset.type)}
+                previewUrl={previewUrls[asset.type] ?? null}
                 error={fileErrors[asset.type]}
                 uploading={uploadingType === asset.type || removingType === asset.type}
                 onFileSelect={async (file) => {
@@ -100,3 +148,4 @@ export const BrandingPage = () => {
     </div>
   );
 };
+

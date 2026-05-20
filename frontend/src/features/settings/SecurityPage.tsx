@@ -7,8 +7,8 @@ import { ShieldCheck } from "lucide-react";
 
 import { getErrorMessage } from "../../lib/errors";
 import { authApi } from "../../services/authApi";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../components/ui/Card";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
@@ -117,3 +117,4 @@ export const SecurityPage = () => {
     </div>
   );
 };
+

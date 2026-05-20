@@ -142,6 +142,13 @@ router.delete(
   asyncHandler(expensesController.deleteAttachment)
 );
 
+router.get(
+  "/:id/attachments/:attachmentId/download",
+  requirePermission(["expense.view"]),
+  validateRequest({ params: expenseAttachmentParamSchema }),
+  asyncHandler(expensesController.downloadAttachment)
+);
+
 router.post(
   "/:id/post",
   requirePermission(["expense.post"]),

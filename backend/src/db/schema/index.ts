@@ -13,6 +13,7 @@ export * from "./payments";
 export * from "./purchases";
 export * from "./products";
 export * from "./reports";
+export * from "./runtime-security";
 export * from "./sales";
 export * from "./sessions";
 export * from "./settings";

@@ -236,6 +236,20 @@ export class ExpensesController {
     response.json(successResponse("Expense receipt deleted successfully", {}));
   };
 
+  public downloadAttachment = async (request: Request, response: Response): Promise<void> => {
+    const file = await expensesService.downloadAttachment(
+      {
+        companyId: request.currentUser!.companyId!
+      },
+      String(request.params.id),
+      String(request.params.attachmentId)
+    );
+
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `inline; filename="${file.fileName}"`);
+    response.send(file.content);
+  };
+
   public listRecurring = async (request: Request, response: Response): Promise<void> => {
     const data = await expensesService.listRecurring(
       {

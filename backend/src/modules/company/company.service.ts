@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import path from "path";
 
 import { db } from "../../db";
@@ -7,9 +8,11 @@ import { logger } from "../../config/logger";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
 import {
-  buildPublicUploadUrl,
+  buildPrivateUploadReference,
   deleteUploadFileByUrl,
-  getBrandingUploadRelativeDirectory
+  getContentTypeFromFileName,
+  getBrandingUploadRelativeDirectory,
+  resolveStoredUploadPath
 } from "../../utils/upload";
 import { companyRepository } from "./company.repository";
 import type {
@@ -149,6 +152,27 @@ const formatInvoiceNumber = (prefix: string, nextNumber: number, padding: number
   `${prefix}${String(nextNumber).padStart(padding, "0")}`;
 
 class CompanyService {
+  private buildBrandingAssetDownloadPath(type: CompanyBrandingAssetType) {
+    return `/api/v1/company/branding/${type}/file`;
+  }
+
+  private mapBrandingForClient(
+    branding: NonNullable<Awaited<ReturnType<typeof companyRepository.findBrandingByCompanyId>>> | ReturnType<CompanyService["buildDefaultBranding"]>
+  ) {
+    return {
+      id: branding.id,
+      companyId: branding.companyId,
+      logoUrl: branding.logoUrl ? this.buildBrandingAssetDownloadPath("logo") : null,
+      invoiceLogoUrl: branding.invoiceLogoUrl ? this.buildBrandingAssetDownloadPath("invoiceLogo") : null,
+      signatureUrl: branding.signatureUrl ? this.buildBrandingAssetDownloadPath("signature") : null,
+      stampUrl: branding.stampUrl ? this.buildBrandingAssetDownloadPath("stamp") : null,
+      faviconUrl: branding.faviconUrl ? this.buildBrandingAssetDownloadPath("favicon") : null,
+      primaryColor: branding.primaryColor,
+      createdAt: branding.createdAt,
+      updatedAt: branding.updatedAt
+    };
+  }
+
   private async getCompanyOrThrow(companyId: string) {
     const company = await companyRepository.findCompanyById(companyId);
     if (!company) {
@@ -973,7 +997,7 @@ class CompanyService {
 
   public async getBranding(companyId: string) {
     const branding = await companyRepository.findBrandingByCompanyId(companyId);
-    return branding ? companyRepository.toBranding(branding) : this.buildDefaultBranding(companyId);
+    return this.mapBrandingForClient(branding ? companyRepository.toBranding(branding) : this.buildDefaultBranding(companyId));
   }
 
   public async uploadBrandingAsset(
@@ -990,7 +1014,7 @@ class CompanyService {
     const relativeFilePath = file
       ? path.posix.join(getBrandingUploadRelativeDirectory(actor.companyId), file.filename)
       : null;
-    const nextFileUrl = relativeFilePath ? buildPublicUploadUrl(relativeFilePath) : null;
+    const nextFileUrl = relativeFilePath ? buildPrivateUploadReference(relativeFilePath) : null;
     const existingBranding = await companyRepository.findBrandingByCompanyId(actor.companyId);
     const previousFileUrl = existingBranding ? existingBranding[fieldName] : null;
 
@@ -1022,7 +1046,7 @@ class CompanyService {
         userAgent: context.userAgent
       });
 
-      return companyRepository.toBranding(updatedBranding);
+      return this.mapBrandingForClient(companyRepository.toBranding(updatedBranding));
     } catch (error) {
       if (nextFileUrl) {
         await deleteUploadFileByUrl(nextFileUrl).catch((cleanupError) => {
@@ -1041,7 +1065,7 @@ class CompanyService {
   ) {
     const existingBranding = await companyRepository.findBrandingByCompanyId(actor.companyId);
     if (!existingBranding) {
-      return this.buildDefaultBranding(actor.companyId);
+      return this.mapBrandingForClient(this.buildDefaultBranding(actor.companyId));
     }
 
     const fieldName = COMPANY_BRANDING_FIELD_MAP[type];
@@ -1074,7 +1098,38 @@ class CompanyService {
       userAgent: context.userAgent
     });
 
-    return companyRepository.toBranding(updatedBranding);
+    return this.mapBrandingForClient(companyRepository.toBranding(updatedBranding));
+  }
+
+  public async downloadBrandingAsset(companyId: string, type: CompanyBrandingAssetType) {
+    const existingBranding = await companyRepository.findBrandingByCompanyId(companyId);
+    if (!existingBranding) {
+      throw new AppError("Branding asset not found", 404);
+    }
+
+    const fieldName = COMPANY_BRANDING_FIELD_MAP[type];
+    const fileReference = existingBranding[fieldName];
+    if (!fileReference) {
+      throw new AppError("Branding asset not found", 404);
+    }
+
+    const absolutePath = resolveStoredUploadPath(fileReference);
+    if (!absolutePath) {
+      throw new AppError("Branding asset path is invalid", 400);
+    }
+
+    let content: Buffer;
+    try {
+      content = await fs.readFile(absolutePath);
+    } catch {
+      throw new AppError("Branding asset could not be read", 404);
+    }
+
+    return {
+      fileName: path.basename(absolutePath),
+      contentType: getContentTypeFromFileName(absolutePath),
+      content
+    };
   }
 
   public async listBranches(

@@ -21,8 +21,8 @@ import { Table, TableWrapper } from "../../components/ui/Table";
 import { TableActionIcons } from "../../components/ui/TableActionIcons";
 import { Textarea } from "../../components/ui/Textarea";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { bankApi } from "../../services/bankApi";
 import { customersApi } from "../../services/customersApi";
 import { financialYearApi } from "../../services/financialYearApi";
@@ -1837,3 +1837,4 @@ export const AccountingCorePage = () => {
     </>
   );
 };
+

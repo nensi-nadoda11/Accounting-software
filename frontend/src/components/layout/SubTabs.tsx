@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import { ACCOUNTING_TABS, HR_PAYROLL_TABS, INVENTORY_TABS, PURCHASES_TABS, SALES_TABS, SETTINGS_TABS } from "../../constants/navigation";
 import { cn } from "../../lib/utils";
-import { useAuth } from "../../providers/AuthProvider";
+import { useAuth } from "../../providers/useAuth";
 
 export const SubTabs = () => {
   const location = useLocation();
@@ -51,3 +51,4 @@ export const SubTabs = () => {
     </div>
   );
 };
+

@@ -4,8 +4,8 @@ import { Check, CheckCircle2 } from "lucide-react";
 import { getErrorMessage } from "../../../lib/errors";
 import { companyApi } from "../../../services/companyApi";
 import { brandingApi } from "../../../services/brandingApi";
-import { useAuth } from "../../../providers/AuthProvider";
-import { useToast } from "../../../providers/ToastProvider";
+import { useAuth } from "../../../providers/useAuth";
+import { useToast } from "../../../providers/useToast";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import type { CompanyBranding, CompanySetupStatus, CompanyTaxSettings } from "../../../types/company";
 import { getSetupChecklist } from "../companyUtils";
@@ -117,3 +117,4 @@ export const CompanySetupStatusCard = () => {
     </Card>
   );
 };
+

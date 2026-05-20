@@ -1,36 +1,28 @@
 import type { NextFunction, Request, Response } from "express";
 
+import { runtimeSecurityService } from "../services/runtime-security.service";
 import { errorResponse } from "../utils/api-response";
 
-type Bucket = {
-  count: number;
-  windowStart: number;
-};
-
 export const createRateLimiter = (options: { limit: number; windowMs: number; keyPrefix: string }) => {
-  const buckets = new Map<string, Bucket>();
+  return async (request: Request, response: Response, next: NextFunction): Promise<void> => {
+    try {
+      const identifier = [request.auth?.sub, request.ip ?? "unknown"].filter(Boolean).join(":");
+      const result = await runtimeSecurityService.consumeRateLimit({
+        identifier,
+        keyPrefix: options.keyPrefix,
+        limit: options.limit,
+        windowMs: options.windowMs
+      });
 
-  return (request: Request, response: Response, next: NextFunction): void => {
-    const ip = request.ip ?? "unknown";
-    const key = `${options.keyPrefix}:${ip}`;
-    const current = buckets.get(key);
-    const now = Date.now();
+      if (!result.allowed) {
+        response.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)).toString());
+        response.status(429).json(errorResponse("Too many requests. Please try again later."));
+        return;
+      }
 
-    if (!current || now - current.windowStart >= options.windowMs) {
-      buckets.set(key, { count: 1, windowStart: now });
       next();
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    if (current.count >= options.limit) {
-      response
-        .status(429)
-        .json(errorResponse("Too many requests. Please try again later."));
-      return;
-    }
-
-    current.count += 1;
-    buckets.set(key, current);
-    next();
   };
 };

@@ -11,7 +11,7 @@ import { LoadingState } from "../../../components/ui/LoadingState";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { getErrorMessage } from "../../../lib/errors";
-import { useToast } from "../../../providers/ToastProvider";
+import { useToast } from "../../../providers/useToast";
 import { customersApi } from "../../../services/customersApi";
 import { paymentsApi } from "../../../services/paymentsApi";
 import { suppliersApi } from "../../../services/suppliersApi";
@@ -391,3 +391,4 @@ export const PaymentEntryForm = ({
     </div>
   );
 };
+

@@ -4,12 +4,13 @@ import { accountingRepository } from "../accounting/accounting.repository";
 import { companyRepository } from "../company/company.repository";
 import {
   addDecimals,
-  buildCsvBuffer,
   compareDecimals,
   normalizeMoney as normalizeMoneyValue
 } from "../inventory/inventory.utils";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
 import {
   calculateHsnSummary,
   calculateInputTax,
@@ -73,6 +74,19 @@ const EMPTY_ADJUSTMENT_BREAKDOWN = (): AdjustmentBreakdown => ({
   other: "0.00"
 });
 
+const formatDateValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().slice(0, 10);
+};
+
 class GstService {
   private toDate(value: Date | string | null | undefined, fieldName: string): Date {
     if (value instanceof Date) {
@@ -113,12 +127,6 @@ class GstService {
           }
         : {})
     };
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
   }
 
   private buildNextSequenceNumber(previousValue: string | null, prefix: string) {
@@ -1064,26 +1072,40 @@ class GstService {
   }
 
   public async exportSales(actor: GstActor, query: GstSalesExportQuery, context: GstRequestContext): Promise<GstExportPayload> {
-    this.ensureCsvFormat(query.format);
     const result = await this.listSales(actor, query, context);
     const rows = result.items as Array<Record<string, string | Date | null>>;
-    const content = buildCsvBuffer(
-      ["Invoice Date", "Invoice No", "Customer", "GSTIN", "Place Of Supply", "Taxable", "CGST", "SGST", "IGST", "Cess", "Total GST", "Invoice Total"],
-      rows.map((row) => [
-        (row.invoiceDate as Date).toISOString().slice(0, 10),
-        String(row.invoiceNumber),
-        String(row.customerName),
-        String(row.gstin ?? ""),
-        String(row.placeOfSupply),
-        String(row.taxableAmount),
-        String(row.cgstAmount),
-        String(row.sgstAmount),
-        String(row.igstAmount),
-        String(row.cessAmount),
-        String(row.totalGst),
-        String(row.invoiceTotal)
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "GST Sales",
+      columns: [
+        { key: "invoiceDate", label: "Invoice Date" },
+        { key: "invoiceNumber", label: "Invoice No" },
+        { key: "customerName", label: "Customer" },
+        { key: "gstin", label: "GSTIN" },
+        { key: "placeOfSupply", label: "Place Of Supply" },
+        { key: "taxableAmount", label: "Taxable", type: "number" },
+        { key: "cgstAmount", label: "CGST", type: "number" },
+        { key: "sgstAmount", label: "SGST", type: "number" },
+        { key: "igstAmount", label: "IGST", type: "number" },
+        { key: "cessAmount", label: "Cess", type: "number" },
+        { key: "totalGst", label: "Total GST", type: "number" },
+        { key: "invoiceTotal", label: "Invoice Total", type: "number" }
+      ],
+      rows: rows.map((row) => ({
+        invoiceDate: formatDateValue(row.invoiceDate as Date | string),
+        invoiceNumber: String(row.invoiceNumber),
+        customerName: String(row.customerName),
+        gstin: String(row.gstin ?? ""),
+        placeOfSupply: String(row.placeOfSupply),
+        taxableAmount: Number(row.taxableAmount ?? 0),
+        cgstAmount: Number(row.cgstAmount ?? 0),
+        sgstAmount: Number(row.sgstAmount ?? 0),
+        igstAmount: Number(row.igstAmount ?? 0),
+        cessAmount: Number(row.cessAmount ?? 0),
+        totalGst: Number(row.totalGst ?? 0),
+        invoiceTotal: Number(row.invoiceTotal ?? 0)
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `gst-sales-${new Date().toISOString().slice(0, 10)}`);
 
     await this.persistExportLog(
       actor,
@@ -1094,11 +1116,7 @@ class GstService {
       rows.length
     );
 
-    return {
-      fileName: `gst-sales-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async exportPurchases(
@@ -1106,28 +1124,44 @@ class GstService {
     query: GstPurchasesExportQuery,
     context: GstRequestContext
   ): Promise<GstExportPayload> {
-    this.ensureCsvFormat(query.format);
     const result = await this.listPurchases(actor, query, context);
     const rows = result.items as Array<Record<string, string | Date | null>>;
-    const content = buildCsvBuffer(
-      ["Purchase Date", "Purchase No", "Supplier", "GSTIN", "Supplier Invoice No", "Taxable", "CGST", "SGST", "IGST", "Cess", "Total GST", "ITC Eligibility", "Claim Status", "Invoice Total"],
-      rows.map((row) => [
-        (row.purchaseDate as Date).toISOString().slice(0, 10),
-        String(row.purchaseNumber),
-        String(row.supplierName),
-        String(row.gstin ?? ""),
-        String(row.supplierInvoiceNumber ?? ""),
-        String(row.taxableAmount),
-        String(row.cgstAmount),
-        String(row.sgstAmount),
-        String(row.igstAmount),
-        String(row.cessAmount),
-        String(row.totalGst),
-        String(row.itcEligibility),
-        String(row.claimStatus),
-        String(row.invoiceTotal)
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "GST Purchases",
+      columns: [
+        { key: "purchaseDate", label: "Purchase Date" },
+        { key: "purchaseNumber", label: "Purchase No" },
+        { key: "supplierName", label: "Supplier" },
+        { key: "gstin", label: "GSTIN" },
+        { key: "supplierInvoiceNumber", label: "Supplier Invoice No" },
+        { key: "taxableAmount", label: "Taxable", type: "number" },
+        { key: "cgstAmount", label: "CGST", type: "number" },
+        { key: "sgstAmount", label: "SGST", type: "number" },
+        { key: "igstAmount", label: "IGST", type: "number" },
+        { key: "cessAmount", label: "Cess", type: "number" },
+        { key: "totalGst", label: "Total GST", type: "number" },
+        { key: "itcEligibility", label: "ITC Eligibility" },
+        { key: "claimStatus", label: "Claim Status" },
+        { key: "invoiceTotal", label: "Invoice Total", type: "number" }
+      ],
+      rows: rows.map((row) => ({
+        purchaseDate: formatDateValue(row.purchaseDate as Date | string),
+        purchaseNumber: String(row.purchaseNumber),
+        supplierName: String(row.supplierName),
+        gstin: String(row.gstin ?? ""),
+        supplierInvoiceNumber: String(row.supplierInvoiceNumber ?? ""),
+        taxableAmount: Number(row.taxableAmount ?? 0),
+        cgstAmount: Number(row.cgstAmount ?? 0),
+        sgstAmount: Number(row.sgstAmount ?? 0),
+        igstAmount: Number(row.igstAmount ?? 0),
+        cessAmount: Number(row.cessAmount ?? 0),
+        totalGst: Number(row.totalGst ?? 0),
+        itcEligibility: String(row.itcEligibility),
+        claimStatus: String(row.claimStatus),
+        invoiceTotal: Number(row.invoiceTotal ?? 0)
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `gst-purchases-${new Date().toISOString().slice(0, 10)}`);
 
     await this.persistExportLog(
       actor,
@@ -1138,36 +1172,48 @@ class GstService {
       rows.length
     );
 
-    return {
-      fileName: `gst-purchases-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async exportItc(actor: GstActor, query: GstItcExportQuery, context: GstRequestContext): Promise<GstExportPayload> {
-    this.ensureCsvFormat(query.format);
     const result = await this.listItc(actor, query, context);
     const rows = result.items as Array<Record<string, string | Date | null>>;
-    const content = buildCsvBuffer(
-      ["Source Type", "Source No", "Supplier", "Supplier GSTIN", "Invoice Date", "Taxable", "CGST", "SGST", "IGST", "Cess", "Total GST", "Eligibility", "Claim Status", "Claimed Amount"],
-      rows.map((row) => [
-        String(row.sourceType),
-        String(row.sourceNumber ?? ""),
-        String(row.supplierName ?? ""),
-        String(row.supplierGstin ?? ""),
-        (row.invoiceDate as Date).toISOString().slice(0, 10),
-        String(row.taxableAmount),
-        String(row.cgstAmount),
-        String(row.sgstAmount),
-        String(row.igstAmount),
-        String(row.cessAmount),
-        String(row.totalGstAmount),
-        String(row.eligibilityStatus),
-        String(row.claimStatus),
-        String(row.claimedAmount)
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "GST ITC",
+      columns: [
+        { key: "sourceType", label: "Source Type" },
+        { key: "sourceNumber", label: "Source No" },
+        { key: "supplierName", label: "Supplier" },
+        { key: "supplierGstin", label: "Supplier GSTIN" },
+        { key: "invoiceDate", label: "Invoice Date" },
+        { key: "taxableAmount", label: "Taxable", type: "number" },
+        { key: "cgstAmount", label: "CGST", type: "number" },
+        { key: "sgstAmount", label: "SGST", type: "number" },
+        { key: "igstAmount", label: "IGST", type: "number" },
+        { key: "cessAmount", label: "Cess", type: "number" },
+        { key: "totalGstAmount", label: "Total GST", type: "number" },
+        { key: "eligibilityStatus", label: "Eligibility" },
+        { key: "claimStatus", label: "Claim Status" },
+        { key: "claimedAmount", label: "Claimed Amount", type: "number" }
+      ],
+      rows: rows.map((row) => ({
+        sourceType: String(row.sourceType),
+        sourceNumber: String(row.sourceNumber ?? ""),
+        supplierName: String(row.supplierName ?? ""),
+        supplierGstin: String(row.supplierGstin ?? ""),
+        invoiceDate: formatDateValue(row.invoiceDate as Date | string),
+        taxableAmount: Number(row.taxableAmount ?? 0),
+        cgstAmount: Number(row.cgstAmount ?? 0),
+        sgstAmount: Number(row.sgstAmount ?? 0),
+        igstAmount: Number(row.igstAmount ?? 0),
+        cessAmount: Number(row.cessAmount ?? 0),
+        totalGstAmount: Number(row.totalGstAmount ?? 0),
+        eligibilityStatus: String(row.eligibilityStatus),
+        claimStatus: String(row.claimStatus),
+        claimedAmount: Number(row.claimedAmount ?? 0)
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `gst-itc-${new Date().toISOString().slice(0, 10)}`);
 
     await this.persistExportLog(
       actor,
@@ -1178,11 +1224,7 @@ class GstService {
       rows.length
     );
 
-    return {
-      fileName: `gst-itc-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async exportHsnSummary(
@@ -1190,24 +1232,37 @@ class GstService {
     query: GstHsnSummaryExportQuery,
     context: GstRequestContext
   ): Promise<GstExportPayload> {
-    this.ensureCsvFormat(query.format);
     const result = await this.getHsnSummary(actor, query, context);
-    const content = buildCsvBuffer(
-      ["HSN/SAC", "Description", "Unit", "Quantity", "Taxable Value", "GST Rate", "CGST", "SGST", "IGST", "Cess", "Total Tax"],
-      result.items.map((row) => [
-        row.hsnSacCode ?? "",
-        row.description ?? "",
-        row.unit ?? "",
-        row.quantity,
-        row.taxableValue,
-        row.gstRate,
-        row.cgstAmount,
-        row.sgstAmount,
-        row.igstAmount,
-        row.cessAmount,
-        row.totalTax
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "GST HSN Summary",
+      columns: [
+        { key: "hsnSacCode", label: "HSN/SAC" },
+        { key: "description", label: "Description" },
+        { key: "unit", label: "Unit" },
+        { key: "quantity", label: "Quantity", type: "number" },
+        { key: "taxableValue", label: "Taxable Value", type: "number" },
+        { key: "gstRate", label: "GST Rate", type: "number" },
+        { key: "cgstAmount", label: "CGST", type: "number" },
+        { key: "sgstAmount", label: "SGST", type: "number" },
+        { key: "igstAmount", label: "IGST", type: "number" },
+        { key: "cessAmount", label: "Cess", type: "number" },
+        { key: "totalTax", label: "Total Tax", type: "number" }
+      ],
+      rows: result.items.map((row) => ({
+        hsnSacCode: row.hsnSacCode ?? "",
+        description: row.description ?? "",
+        unit: row.unit ?? "",
+        quantity: Number(row.quantity),
+        taxableValue: Number(row.taxableValue),
+        gstRate: Number(row.gstRate),
+        cgstAmount: Number(row.cgstAmount),
+        sgstAmount: Number(row.sgstAmount),
+        igstAmount: Number(row.igstAmount),
+        cessAmount: Number(row.cessAmount),
+        totalTax: Number(row.totalTax)
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `gst-hsn-summary-${new Date().toISOString().slice(0, 10)}`);
 
     await this.persistExportLog(
       actor,
@@ -1218,11 +1273,7 @@ class GstService {
       result.items.length
     );
 
-    return {
-      fileName: `gst-hsn-summary-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async exportTaxSummary(
@@ -1230,19 +1281,27 @@ class GstService {
     query: GstTaxSummaryExportQuery,
     context: GstRequestContext
   ): Promise<GstExportPayload> {
-    this.ensureCsvFormat(query.format);
     const result = await this.getTaxSummary(actor, query, context);
-    const content = buildCsvBuffer(
-      ["GST Rate", "Taxable Sales", "Output GST", "Taxable Purchases", "Input GST", "Net GST"],
-      result.items.map((row) => [
-        row.gstRate,
-        row.taxableSales,
-        row.outputGst,
-        row.taxablePurchases,
-        row.inputGst,
-        row.netGst
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "GST Tax Summary",
+      columns: [
+        { key: "gstRate", label: "GST Rate", type: "number" },
+        { key: "taxableSales", label: "Taxable Sales", type: "number" },
+        { key: "outputGst", label: "Output GST", type: "number" },
+        { key: "taxablePurchases", label: "Taxable Purchases", type: "number" },
+        { key: "inputGst", label: "Input GST", type: "number" },
+        { key: "netGst", label: "Net GST", type: "number" }
+      ],
+      rows: result.items.map((row) => ({
+        gstRate: Number(row.gstRate),
+        taxableSales: Number(row.taxableSales),
+        outputGst: Number(row.outputGst),
+        taxablePurchases: Number(row.taxablePurchases),
+        inputGst: Number(row.inputGst),
+        netGst: Number(row.netGst)
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `gst-tax-summary-${new Date().toISOString().slice(0, 10)}`);
 
     await this.persistExportLog(
       actor,
@@ -1253,32 +1312,41 @@ class GstService {
       result.items.length
     );
 
-    return {
-      fileName: `gst-tax-summary-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async exportGstr1(actor: GstActor, query: GstGstr1ExportQuery, context: GstRequestContext): Promise<GstExportPayload> {
-    this.ensureCsvFormat(query.format);
     const result = await this.listSales(actor, query, context);
-    const content = buildCsvBuffer(
-      ["Invoice Date", "Invoice No", "Party Type", "GSTIN", "Place Of Supply", "Taxable", "CGST", "SGST", "IGST", "Cess", "Invoice Total"],
-      result.items.map((row) => [
-        row.invoiceDate.toISOString().slice(0, 10),
-        row.invoiceNumber,
-        row.gstin ? "B2B" : "B2C",
-        row.gstin ?? "",
-        row.placeOfSupply,
-        row.taxableAmount,
-        row.cgstAmount,
-        row.sgstAmount,
-        row.igstAmount,
-        row.cessAmount,
-        row.invoiceTotal
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "GSTR-1",
+      columns: [
+        { key: "invoiceDate", label: "Invoice Date" },
+        { key: "invoiceNumber", label: "Invoice No" },
+        { key: "partyType", label: "Party Type" },
+        { key: "gstin", label: "GSTIN" },
+        { key: "placeOfSupply", label: "Place Of Supply" },
+        { key: "taxableAmount", label: "Taxable", type: "number" },
+        { key: "cgstAmount", label: "CGST", type: "number" },
+        { key: "sgstAmount", label: "SGST", type: "number" },
+        { key: "igstAmount", label: "IGST", type: "number" },
+        { key: "cessAmount", label: "Cess", type: "number" },
+        { key: "invoiceTotal", label: "Invoice Total", type: "number" }
+      ],
+      rows: result.items.map((row) => ({
+        invoiceDate: formatDateValue(row.invoiceDate),
+        invoiceNumber: row.invoiceNumber,
+        partyType: row.gstin ? "B2B" : "B2C",
+        gstin: row.gstin ?? "",
+        placeOfSupply: row.placeOfSupply,
+        taxableAmount: Number(row.taxableAmount),
+        cgstAmount: Number(row.cgstAmount),
+        sgstAmount: Number(row.sgstAmount),
+        igstAmount: Number(row.igstAmount),
+        cessAmount: Number(row.cessAmount),
+        invoiceTotal: Number(row.invoiceTotal)
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `gstr1-${new Date().toISOString().slice(0, 10)}`);
 
     await this.persistExportLog(
       actor,
@@ -1289,11 +1357,7 @@ class GstService {
       result.items.length
     );
 
-    return {
-      fileName: `gstr1-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async exportGstr3b(
@@ -1301,7 +1365,6 @@ class GstService {
     query: GstGstr3bExportQuery,
     context: GstRequestContext
   ): Promise<GstExportPayload> {
-    this.ensureCsvFormat(query.format);
     const summary = await this.getSummary(
       actor,
       {
@@ -1311,23 +1374,28 @@ class GstService {
       },
       context
     );
-    const content = buildCsvBuffer(
-      ["Section", "Amount"],
-      [
-        ["Taxable Sales", summary.taxableSales],
-        ["Output GST", summary.outputGst],
-        ["Taxable Purchases", summary.taxablePurchases],
-        ["Input GST", summary.inputGst],
-        ["Expense Input GST", summary.expenseInputGst],
-        ["Sales Return GST", summary.returns.salesReturnGst],
-        ["Purchase Return GST", summary.returns.purchaseReturnGst],
-        ["ITC Claims", summary.adjustments.itcClaims],
-        ["ITC Reversals", summary.adjustments.itcReversals],
-        ["Output Adjustments", summary.adjustments.outputTaxAdjustments],
-        ["Net GST Payable", summary.netGstPayable],
-        ["Net GST Credit", summary.netGstCredit]
+    const dataset: ReportExportDataset = {
+      title: "GSTR-3B",
+      columns: [
+        { key: "section", label: "Section" },
+        { key: "amount", label: "Amount", type: "number" }
+      ],
+      rows: [
+        { section: "Taxable Sales", amount: Number(summary.taxableSales) },
+        { section: "Output GST", amount: Number(summary.outputGst) },
+        { section: "Taxable Purchases", amount: Number(summary.taxablePurchases) },
+        { section: "Input GST", amount: Number(summary.inputGst) },
+        { section: "Expense Input GST", amount: Number(summary.expenseInputGst) },
+        { section: "Sales Return GST", amount: Number(summary.returns.salesReturnGst) },
+        { section: "Purchase Return GST", amount: Number(summary.returns.purchaseReturnGst) },
+        { section: "ITC Claims", amount: Number(summary.adjustments.itcClaims) },
+        { section: "ITC Reversals", amount: Number(summary.adjustments.itcReversals) },
+        { section: "Output Adjustments", amount: Number(summary.adjustments.outputTaxAdjustments) },
+        { section: "Net GST Payable", amount: Number(summary.netGstPayable) },
+        { section: "Net GST Credit", amount: Number(summary.netGstCredit) }
       ]
-    );
+    };
+    const file = buildReportFile(dataset, query.format, `gstr3b-${new Date().toISOString().slice(0, 10)}`);
 
     await this.persistExportLog(
       actor,
@@ -1338,11 +1406,7 @@ class GstService {
       12
     );
 
-    return {
-      fileName: `gstr3b-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 }
 

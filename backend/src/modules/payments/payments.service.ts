@@ -5,7 +5,6 @@ import { customersRepository } from "../customers/customers.repository";
 import { emailService } from "../../services/email.service";
 import {
   addDecimals,
-  buildCsvBuffer,
   compareDecimals,
   normalizeMoney as normalizeMoneyValue,
   subtractDecimals
@@ -31,6 +30,9 @@ import {
   validateAllocation
 } from "./payments.calculation";
 import { paymentsRepository } from "./payments.repository";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
+import { buildTextPdfFile, buildWhatsappShareUrl } from "../../utils/export-documents";
 import type {
   CancelPaymentInput,
   CompletePaymentInput,
@@ -73,6 +75,34 @@ type ReceiptParty = {
   mobile: string | null;
 };
 
+type ReceiptPdfData = {
+  receiptType: PaymentReceiptType;
+  payment: {
+    paymentNumber: string;
+    paymentDate: Date | string;
+    paymentMode: string;
+    referenceNumber: string | null;
+    amount: string;
+    allocatedAmount: string;
+    unallocatedAmount: string;
+    notes: string | null;
+  };
+  party: {
+    name: string;
+    code: string;
+  };
+  bankAccount: {
+    bankName: string;
+    accountNumber: string;
+  } | null;
+  allocations: Array<{
+    allocationType: string;
+    referenceNumber: string | null;
+    allocationDate: Date | string | null;
+    allocatedAmount: string;
+  }>;
+};
+
 type InvoiceReferenceRow =
   | (typeof import("../../db/schema").salesInvoices.$inferSelect & {
       referenceType: "sales_invoice";
@@ -86,6 +116,40 @@ type InvoiceReferenceRow =
     });
 
 const electronicReceiptModes = new Set(["bank", "upi", "card", "neft", "rtgs", "imps"]);
+const formatDateValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().slice(0, 10);
+};
+
+const formatDateTimeValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().replace("T", " ").slice(0, 16);
+};
+
+const padCell = (value: string | number, width: number, align: "left" | "right" = "left") => {
+  const normalized = String(value);
+  if (normalized.length >= width) {
+    return normalized.slice(0, width);
+  }
+
+  return align === "right" ? normalized.padStart(width, " ") : normalized.padEnd(width, " ");
+};
 
 const pickDefined = <T extends Record<string, unknown>>(value: T): Partial<T> =>
   Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Partial<T>;
@@ -99,12 +163,6 @@ class PaymentsService {
     const match = previousValue?.match(/(\d+)$/);
     const nextNumber = match ? Number(match[1]) + 1 : 1;
     return `${this.normalizePrefix(prefix)}-${String(Number.isFinite(nextNumber) ? nextNumber : 1).padStart(padding, "0")}`;
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
   }
 
   private getReceiptType(paymentType: PaymentType): PaymentReceiptType {
@@ -1507,7 +1565,6 @@ class PaymentsService {
     query: ExportPaymentsQuery,
     context: PaymentRequestContext
   ): Promise<PaymentExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await paymentsRepository.listPaymentsForExport({
       companyId: actor.companyId,
       search: query.search ?? null,
@@ -1520,23 +1577,36 @@ class PaymentsService {
       dateTo: query.dateTo ?? null,
       isAdvance: query.isAdvance
     });
-
-    const content = buildCsvBuffer(
-      ["Payment No", "Receipt No", "Type", "Party", "Date", "Mode", "Amount", "Allocated", "Unallocated", "Status", "Reference"],
-      rows.map((row) => [
-        row.payment.paymentNumber,
-        row.payment.receiptNumber ?? "",
-        row.payment.paymentType,
-        row.payment.partyType === "customer" ? (row.customerName ?? "") : (row.supplierName ?? ""),
-        row.payment.paymentDate.toISOString(),
-        row.payment.paymentMode,
-        normalizeMoney(row.payment.amount),
-        normalizeMoney(row.payment.allocatedAmount),
-        normalizeMoney(row.payment.unallocatedAmount),
-        row.payment.status,
-        row.payment.referenceNumber ?? ""
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Payments",
+      columns: [
+        { key: "paymentNumber", label: "Payment No" },
+        { key: "receiptNumber", label: "Receipt No" },
+        { key: "paymentType", label: "Type" },
+        { key: "partyName", label: "Party" },
+        { key: "paymentDate", label: "Date" },
+        { key: "paymentMode", label: "Mode" },
+        { key: "amount", label: "Amount", type: "number" },
+        { key: "allocatedAmount", label: "Allocated", type: "number" },
+        { key: "unallocatedAmount", label: "Unallocated", type: "number" },
+        { key: "status", label: "Status" },
+        { key: "referenceNumber", label: "Reference" }
+      ],
+      rows: rows.map((row) => ({
+        paymentNumber: row.payment.paymentNumber,
+        receiptNumber: row.payment.receiptNumber ?? "",
+        paymentType: row.payment.paymentType,
+        partyName: row.payment.partyType === "customer" ? (row.customerName ?? "") : (row.supplierName ?? ""),
+        paymentDate: formatDateValue(row.payment.paymentDate),
+        paymentMode: row.payment.paymentMode,
+        amount: Number(normalizeMoney(row.payment.amount)),
+        allocatedAmount: Number(normalizeMoney(row.payment.allocatedAmount)),
+        unallocatedAmount: Number(normalizeMoney(row.payment.unallocatedAmount)),
+        status: row.payment.status,
+        referenceNumber: row.payment.referenceNumber ?? ""
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `payments-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1551,11 +1621,7 @@ class PaymentsService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `payments-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async listAllocations(actor: Pick<PaymentActor, "companyId">, paymentId: string) {
@@ -1740,8 +1806,42 @@ class PaymentsService {
     };
   }
 
-  public async getReceiptPdf(actor: PaymentActor, paymentId: string, context: PaymentRequestContext) {
+  public async getReceiptPdf(actor: PaymentActor, paymentId: string, context: PaymentRequestContext): Promise<PaymentExportPayload> {
     const receipt = await this.loadPaymentReceipt(actor, paymentId);
+    const data = receipt.receiptData as ReceiptPdfData;
+    const lines = [
+      `PAYMENT ${data.receiptType === "customer_receipt" ? "RECEIPT" : "VOUCHER"} ${receipt.receiptNumber}`,
+      `Generated At : ${formatDateTimeValue(receipt.generatedAt)}`,
+      `Payment No   : ${data.payment.paymentNumber}`,
+      `Payment Date : ${formatDateValue(data.payment.paymentDate)}`,
+      `Party        : ${data.party.name}`,
+      `Party Code   : ${data.party.code}`,
+      `Mode         : ${data.payment.paymentMode}`,
+      `Reference    : ${data.payment.referenceNumber ?? "-"}`,
+      `Status       : ${data.receiptType === "customer_receipt" ? "Received" : "Paid"}`,
+      "",
+      [padCell("Allocation", 26), padCell("Reference", 20), padCell("Date", 12), padCell("Amount", 12, "right")].join(" "),
+      "-".repeat(76),
+      ...(data.allocations.length
+        ? data.allocations.map((allocation) =>
+            [
+              padCell(allocation.allocationType, 26),
+              padCell(allocation.referenceNumber ?? "-", 20),
+              padCell(formatDateValue(allocation.allocationDate), 12),
+              padCell(allocation.allocatedAmount, 12, "right")
+            ].join(" ")
+          )
+        : ["No allocations available"]),
+      "",
+      `Total Amount : ${data.payment.amount}`,
+      `Allocated    : ${data.payment.allocatedAmount}`,
+      `Unallocated  : ${data.payment.unallocatedAmount}`,
+      `Bank Account : ${data.bankAccount ? `${data.bankAccount.bankName} ${data.bankAccount.accountNumber}` : "-"}`,
+      `Notes        : ${data.payment.notes ?? "-"}`,
+      "",
+      `Generated At : ${formatDateTimeValue(new Date())}`
+    ];
+    const file = buildTextPdfFile(receipt.receiptNumber, lines);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1750,16 +1850,13 @@ class PaymentsService {
       entityType: "payment_receipt",
       entityId: receipt.id,
       metadata: {
-        fallback: "structured-data"
+        mode: "pdf"
       },
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
 
-    return {
-      pdfAvailable: false,
-      receipt: receipt.receiptData
-    };
+    return file;
   }
 
   public async sendReceipt(actor: PaymentActor, paymentId: string, input: SendReceiptInput, context: PaymentRequestContext) {
@@ -1883,8 +1980,18 @@ class PaymentsService {
     }
 
     if (input.channel === "whatsapp") {
-      status = "failed";
-      errorMessage = "WhatsApp provider is not configured";
+      const whatsappUrl = buildWhatsappShareUrl(
+        receiptParty.mobile ?? "",
+        input.message ?? defaultMessage
+      );
+
+      if (!receiptParty.mobile || !whatsappUrl) {
+        status = "failed";
+        errorMessage = "No WhatsApp mobile is available for the selected party";
+      } else {
+        status = "sent";
+        errorMessage = null;
+      }
     }
 
     const reminder = await paymentsRepository.createReminder({
@@ -1930,7 +2037,12 @@ class PaymentsService {
         channel: reminder.channel,
         errorMessage: reminder.errorMessage,
         sentAt: reminder.sentAt
-      }
+      },
+      ...(input.channel === "whatsapp" && reminder.status === "sent" && receiptParty.mobile
+        ? {
+            whatsappUrl: buildWhatsappShareUrl(receiptParty.mobile, input.message ?? defaultMessage)
+          }
+        : {})
     };
   }
 

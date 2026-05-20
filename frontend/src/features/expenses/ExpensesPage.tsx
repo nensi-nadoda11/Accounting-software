@@ -14,8 +14,8 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { accountingApi } from "../../services/accountingApi";
 import { bankApi } from "../../services/bankApi";
 import { companyApi } from "../../services/companyApi";
@@ -1220,3 +1220,4 @@ export const ExpensesPage = () => {
     </>
   );
 };
+

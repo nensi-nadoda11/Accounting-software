@@ -1,20 +1,14 @@
-import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import { useCallback, useMemo, useState, type PropsWithChildren } from "react";
 import { CheckCircle2, CircleAlert, X } from "lucide-react";
 
 import { cn } from "../lib/utils";
+import { ToastContext, type ToastContextValue } from "./toast-context";
 
 type Toast = {
   id: number;
   title: string;
   tone: "success" | "error";
 };
-
-type ToastContextValue = {
-  success: (title: string) => void;
-  error: (title: string) => void;
-};
-
-const ToastContext = createContext<ToastContextValue | null>(null);
 
 export const ToastProvider = ({ children }: PropsWithChildren) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -73,13 +67,4 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
       </div>
     </ToastContext.Provider>
   );
-};
-
-export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error("useToast must be used within ToastProvider");
-  }
-
-  return context;
 };

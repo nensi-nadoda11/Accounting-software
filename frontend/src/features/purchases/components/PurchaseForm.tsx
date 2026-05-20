@@ -10,8 +10,8 @@ import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { applyFriendlyFieldErrors } from "../../customers/customerUtils";
 import { getErrorMessage } from "../../../lib/errors";
-import { useAuth } from "../../../providers/AuthProvider";
-import { useToast } from "../../../providers/ToastProvider";
+import { useAuth } from "../../../providers/useAuth";
+import { useToast } from "../../../providers/useToast";
 import { productsApi } from "../../../services/productsApi";
 import { suppliersApi } from "../../../services/suppliersApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../../types/company";
@@ -439,3 +439,4 @@ export const PurchaseForm = ({
     </form>
   );
 };
+

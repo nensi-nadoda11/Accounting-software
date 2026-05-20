@@ -11,8 +11,8 @@ import { Checkbox } from "../../components/ui/Checkbox";
 import { FormError } from "../../components/ui/FormError";
 import { Input } from "../../components/ui/Input";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 
 type LoginValues = z.infer<typeof loginSchema>;
 
@@ -75,3 +75,4 @@ export const LoginPage = () => {
     </AuthShell>
   );
 };
+

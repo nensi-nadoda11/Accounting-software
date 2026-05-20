@@ -206,7 +206,7 @@ export class PaymentsController {
   };
 
   public getReceiptPdf = async (request: Request, response: Response): Promise<void> => {
-    const data = await paymentsService.getReceiptPdf(
+    const file = await paymentsService.getReceiptPdf(
       {
         id: request.currentUser!.id,
         companyId: request.currentUser!.companyId!,
@@ -219,7 +219,9 @@ export class PaymentsController {
       }
     );
 
-    response.json(successResponse("Payment receipt PDF payload fetched successfully", data));
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `attachment; filename="${file.fileName}"`);
+    response.send(file.content);
   };
 
   public sendReceipt = async (request: Request, response: Response): Promise<void> => {

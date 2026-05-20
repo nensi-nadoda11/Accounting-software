@@ -9,7 +9,10 @@ import { emailService } from "../../services/email.service";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
 import { employees, employeeAttendance, financialPeriodLocks, payrollItems } from "../../db/schema";
-import { buildCsvBuffer, compareDecimals } from "../inventory/inventory.utils";
+import { compareDecimals } from "../inventory/inventory.utils";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
+import { buildTextPdfFile } from "../../utils/export-documents";
 import {
   calculateGrossSalary,
   calculateNetSalary,
@@ -46,6 +49,41 @@ import type { PayrollActor, PayrollExportPayload, PayrollRequestContext, SalaryT
 
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+const formatDateValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().slice(0, 10);
+};
+
+const formatDateTimeValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().replace("T", " ").slice(0, 16);
+};
+
+const padCell = (value: string | number, width: number, align: "left" | "right" = "left") => {
+  const normalized = String(value);
+  if (normalized.length >= width) {
+    return normalized.slice(0, width);
+  }
+
+  return align === "right" ? normalized.padStart(width, " ") : normalized.padEnd(width, " ");
+};
+
 const pickDefined = <T extends Record<string, unknown>>(value: T): Partial<T> =>
   Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Partial<T>;
 
@@ -58,12 +96,6 @@ class PayrollService {
     const match = previousValue?.match(/(\d+)$/);
     const nextNumber = match ? Number(match[1]) + 1 : 1;
     return `${this.normalizePrefix(prefix)}-${String(Number.isFinite(nextNumber) ? nextNumber : 1).padStart(padding, "0")}`;
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
   }
 
   private getMonthBounds(payrollMonth: string) {
@@ -455,7 +487,9 @@ class PayrollService {
       paidLeaveDays: "0.00",
       unpaidLeaveDays: "0.00",
       halfDays: "0.00",
-      overtimeHours: "0.00"
+      overtimeHours: "0.00",
+      payableDays: workingDays,
+      remarks: null
     };
   }
 
@@ -1843,7 +1877,7 @@ class PayrollService {
     };
   }
 
-  public async getPayrollSlipPdf(actor: PayrollActor, itemId: string, context: PayrollRequestContext) {
+  public async getPayrollSlipPdf(actor: PayrollActor, itemId: string, context: PayrollRequestContext): Promise<PayrollExportPayload> {
     const slip = await this.buildSlipPayload(actor, itemId);
     await payrollRepository.createSalarySlipLog({
       companyId: actor.companyId,
@@ -1851,6 +1885,68 @@ class PayrollService {
       generatedBy: actor.id,
       fileUrl: null
     });
+    const lines = [
+      slip.company?.legalName || slip.company?.name || "Company",
+      [slip.company?.addressLine1, slip.company?.addressLine2, slip.company?.city, slip.company?.state, slip.company?.pincode].filter(Boolean).join(", ") || "Address not available",
+      "",
+      `SALARY SLIP ${slip.runNumber}`,
+      `Payroll Month : ${slip.payrollMonth}`,
+      `Period        : ${formatDateValue(slip.periodStart)} to ${formatDateValue(slip.periodEnd)}`,
+      `Employee      : ${slip.employee.fullName}`,
+      `Employee Code : ${slip.employee.employeeCode}`,
+      `Department    : ${slip.employee.department ?? "-"}`,
+      `Designation   : ${slip.employee.designation ?? "-"}`,
+      `Joining Date  : ${formatDateValue(slip.employee.joiningDate)}`,
+      "",
+      `Working Days  : ${slip.attendance.workingDays}`,
+      `Present Days  : ${slip.attendance.presentDays}`,
+      `Paid Leaves   : ${slip.attendance.paidLeaveDays}`,
+      `Unpaid Leaves : ${slip.attendance.unpaidLeaveDays}`,
+      `Payable Days  : ${slip.attendance.payableDays}`,
+      `Overtime Hrs  : ${slip.attendance.overtimeHours}`,
+      "",
+      `Basic Salary  : ${slip.salary.basicSalary}`,
+      `HRA           : ${slip.salary.hra}`,
+      `Allowances    : ${slip.salary.allowancesTotal}`,
+      `Bonus         : ${slip.salary.bonusTotal}`,
+      `Gross Salary  : ${slip.salary.grossSalary}`,
+      `Deductions    : ${slip.salary.deductionsTotal}`,
+      `Net Salary    : ${slip.salary.netSalary}`,
+      `Paid Amount   : ${slip.salary.paidAmount}`,
+      `Unpaid Amount : ${slip.salary.unpaidAmount}`,
+      `Pay Status    : ${slip.salary.paymentStatus}`,
+      "",
+      "BONUS / DEDUCTIONS",
+      [padCell("Type", 12), padCell("Name", 28), padCell("Amount", 12, "right"), padCell("Taxable", 10)].join(" "),
+      "-".repeat(66),
+      ...(slip.bonusDeductions.length
+        ? slip.bonusDeductions.map((entry) =>
+            [
+              padCell(entry.type, 12),
+              padCell(entry.name, 28),
+              padCell(entry.amount, 12, "right"),
+              padCell(entry.taxable ? "Yes" : "No", 10)
+            ].join(" ")
+          )
+        : ["No bonus or deduction entries"]),
+      "",
+      "PAYMENTS",
+      [padCell("Date", 12), padCell("Mode", 12), padCell("Reference", 20), padCell("Amount", 12, "right")].join(" "),
+      "-".repeat(60),
+      ...(slip.payments.length
+        ? slip.payments.map((payment) =>
+            [
+              padCell(formatDateValue(payment.paymentDate), 12),
+              padCell(payment.paymentMode, 12),
+              padCell(payment.referenceNumber ?? "-", 20),
+              padCell(payment.amount, 12, "right")
+            ].join(" ")
+          )
+        : ["No salary payments recorded"]),
+      "",
+      `Generated At  : ${formatDateTimeValue(new Date())}`
+    ];
+    const file = buildTextPdfFile(`${slip.employee.employeeCode}-${slip.payrollMonth}-salary-slip`, lines);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1859,16 +1955,13 @@ class PayrollService {
       entityType: "salary_slip",
       entityId: itemId,
       metadata: {
-        mode: "pdf-fallback"
+        mode: "pdf"
       },
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
 
-    return {
-      pdfAvailable: false,
-      slip
-    };
+    return file;
   }
 
   public async emailPayrollSlip(actor: PayrollActor, itemId: string, input: SalarySlipEmailInput, context: PayrollRequestContext) {
@@ -2168,7 +2261,6 @@ class PayrollService {
   }
 
   public async exportPayroll(actor: PayrollActor, query: ExportPayrollQuery, context: PayrollRequestContext): Promise<PayrollExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await payrollRepository.listItems({
       companyId: actor.companyId,
       runId: query.runId,
@@ -2177,23 +2269,36 @@ class PayrollService {
       payrollMonth: query.month,
       department: query.department ?? null
     });
-
-    const content = buildCsvBuffer(
-      ["Run Number", "Month", "Employee Code", "Employee Name", "Department", "Gross", "Deductions", "Bonus", "Net", "Paid", "Payment Status"],
-      rows.rows.map((row) => [
-        row.run.runNumber,
-        row.run.payrollMonth,
-        row.item.employeeCodeSnapshot,
-        row.item.employeeNameSnapshot,
-        row.item.departmentSnapshot ?? "",
-        normalizeMoney(row.item.grossSalary),
-        normalizeMoney(row.item.deductionsTotal),
-        normalizeMoney(row.item.bonusTotal),
-        normalizeMoney(row.item.netSalary),
-        normalizeMoney(row.item.paidAmount),
-        row.item.paymentStatus
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Payroll Items",
+      columns: [
+        { key: "runNumber", label: "Run Number" },
+        { key: "payrollMonth", label: "Month" },
+        { key: "employeeCode", label: "Employee Code" },
+        { key: "employeeName", label: "Employee Name" },
+        { key: "department", label: "Department" },
+        { key: "grossSalary", label: "Gross", type: "number" },
+        { key: "deductionsTotal", label: "Deductions", type: "number" },
+        { key: "bonusTotal", label: "Bonus", type: "number" },
+        { key: "netSalary", label: "Net", type: "number" },
+        { key: "paidAmount", label: "Paid", type: "number" },
+        { key: "paymentStatus", label: "Payment Status" }
+      ],
+      rows: rows.rows.map((row) => ({
+        runNumber: row.run.runNumber,
+        payrollMonth: row.run.payrollMonth,
+        employeeCode: row.item.employeeCodeSnapshot,
+        employeeName: row.item.employeeNameSnapshot,
+        department: row.item.departmentSnapshot ?? "",
+        grossSalary: Number(normalizeMoney(row.item.grossSalary)),
+        deductionsTotal: Number(normalizeMoney(row.item.deductionsTotal)),
+        bonusTotal: Number(normalizeMoney(row.item.bonusTotal)),
+        netSalary: Number(normalizeMoney(row.item.netSalary)),
+        paidAmount: Number(normalizeMoney(row.item.paidAmount)),
+        paymentStatus: row.item.paymentStatus
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `payroll-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -2208,11 +2313,7 @@ class PayrollService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `payroll-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 }
 

@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 
 import { getErrorMessage } from "../../lib/errors";
 import { usersApi } from "../../services/usersApi";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { AuthShell } from "./AuthShell";
 import { acceptInviteSchema } from "./authSchemas";
 import { Button } from "../../components/ui/Button";
@@ -18,6 +18,7 @@ type AcceptInviteValues = z.infer<typeof acceptInviteSchema>;
 export const AcceptInvitePage = () => {
   const [params] = useSearchParams();
   const token = params.get("token") || "";
+  const navigate = useNavigate();
   const toast = useToast();
   const [formError, setFormError] = useState<string | undefined>(!token ? "Invite token is missing" : undefined);
   const form = useForm<AcceptInviteValues>({
@@ -37,7 +38,7 @@ export const AcceptInvitePage = () => {
     try {
       await usersApi.acceptInvite({ token, ...values });
       toast.success("Invite accepted successfully");
-      window.location.href = "/login";
+      navigate("/login", { replace: true });
     } catch (error) {
       setFormError(getErrorMessage(error, "Invite acceptance failed"));
     }
@@ -68,3 +69,4 @@ export const AcceptInvitePage = () => {
     </AuthShell>
   );
 };
+

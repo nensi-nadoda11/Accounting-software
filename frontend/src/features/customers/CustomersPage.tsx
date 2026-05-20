@@ -9,16 +9,18 @@ import { Card, CardContent } from "../../components/ui/Card";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { Select } from "../../components/ui/Select";
 import { Table, TableWrapper } from "../../components/ui/Table";
 import { TableActionIconButton } from "../../components/ui/TableActionIconButton";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { customersApi } from "../../services/customersApi";
 import type {
   Customer,
   CustomerListItem,
   CustomerMutableStatus,
+  CustomerExportFormat,
   CustomerSortBy,
   CustomerStatus,
   CustomerType,
@@ -124,6 +126,7 @@ export const CustomersPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<CustomerExportFormat>("xlsx");
   const [submitting, setSubmitting] = useState(false);
   const [preparingFormId, setPreparingFormId] = useState<string | null>(null);
   const [activeInternalTab, setActiveInternalTab] = useState<InternalTab>("customers");
@@ -291,37 +294,45 @@ export const CustomersPage = () => {
         actions={
           <div className="flex flex-wrap gap-2">
             {canExport ? (
-              <Button
-                type="button"
-                variant="secondary"
-                loading={exporting}
-                onClick={async () => {
-                  try {
-                    setExporting(true);
-                    const file = await customersApi.exportList({
-                      page,
-                      limit: 20,
-                      search: searchParams.get("search") || undefined,
-                      status: status || undefined,
-                      customerType: customerType || undefined,
-                      taxType: taxType || undefined,
-                      hasOutstanding: hasOutstanding === "" ? undefined : hasOutstanding === "true",
-                      isBlacklisted: isBlacklisted === "" ? undefined : isBlacklisted === "true",
-                      sortBy,
-                      sortOrder,
-                    });
-                    saveDownloadedFile(file.blob, file.fileName);
-                    toast.success("Customer list exported");
-                  } catch (exportError) {
-                    toast.error(getErrorMessage(exportError, "Failed to export customer list"));
-                  } finally {
-                    setExporting(false);
-                  }
-                }}
-              >
-                <Download className="mr-2 size-4" />
-                Export
-              </Button>
+              <>
+                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as CustomerExportFormat)} className="w-28">
+                  <option value="csv">CSV</option>
+                  <option value="xlsx">XLSX</option>
+                  <option value="pdf">PDF</option>
+                </Select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={exporting}
+                  onClick={async () => {
+                    try {
+                      setExporting(true);
+                      const file = await customersApi.exportList({
+                        page,
+                        limit: 20,
+                        search: searchParams.get("search") || undefined,
+                        status: status || undefined,
+                        customerType: customerType || undefined,
+                        taxType: taxType || undefined,
+                        hasOutstanding: hasOutstanding === "" ? undefined : hasOutstanding === "true",
+                        isBlacklisted: isBlacklisted === "" ? undefined : isBlacklisted === "true",
+                        sortBy,
+                        sortOrder,
+                        format: exportFormat,
+                      });
+                      saveDownloadedFile(file.blob, file.fileName);
+                      toast.success("Customer list exported");
+                    } catch (exportError) {
+                      toast.error(getErrorMessage(exportError, "Failed to export customer list"));
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                >
+                  <Download className="mr-2 size-4" />
+                  Export
+                </Button>
+              </>
             ) : null}
             {canCreate ? (
               <Button type="button" onClick={openCreateForm}>
@@ -617,7 +628,7 @@ export const CustomersPage = () => {
         onOpenPayments={openPayments}
         onExportLedger={async (customer) => {
           try {
-            const file = await customersApi.exportLedger(customer.id, {});
+            const file = await customersApi.exportLedger(customer.id, { format: exportFormat });
             saveDownloadedFile(file.blob, file.fileName);
             toast.success("Ledger exported");
           } catch (exportError) {
@@ -649,7 +660,7 @@ export const CustomersPage = () => {
           }
 
           try {
-            const file = await customersApi.exportLedger(ledgerCustomer.id, {});
+            const file = await customersApi.exportLedger(ledgerCustomer.id, { format: exportFormat });
             saveDownloadedFile(file.blob, file.fileName);
             toast.success("Ledger exported");
           } catch (exportError) {
@@ -729,3 +740,4 @@ export const CustomersPage = () => {
     </div>
   );
 };
+

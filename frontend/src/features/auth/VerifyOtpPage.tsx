@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
@@ -7,7 +7,7 @@ import type { z } from "zod";
 import { getErrorMessage } from "../../lib/errors";
 import { authApi } from "../../services/authApi";
 import { getOtpCooldown, setOtpCooldown } from "../../lib/otp-cooldown";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { AuthShell } from "./AuthShell";
 import { verifyOtpSchema } from "./authSchemas";
 import { Button } from "../../components/ui/Button";
@@ -19,6 +19,7 @@ type VerifyOtpValues = z.infer<typeof verifyOtpSchema>;
 export const VerifyOtpPage = () => {
   const [params] = useSearchParams();
   const emailFromQuery = params.get("email") || "";
+  const navigate = useNavigate();
   const toast = useToast();
   const [formError, setFormError] = useState<string>();
   const [cooldown, setCooldown] = useState(() => getOtpCooldown(emailFromQuery, "register"));
@@ -48,7 +49,7 @@ export const VerifyOtpPage = () => {
     try {
       await authApi.verifyOtp({ ...values, purpose: "register" });
       toast.success("OTP verified successfully");
-      window.location.href = "/login";
+      navigate("/login", { replace: true });
     } catch (error) {
       setFormError(getErrorMessage(error, "OTP verification failed"));
     }
@@ -96,3 +97,4 @@ export const VerifyOtpPage = () => {
     </AuthShell>
   );
 };
+

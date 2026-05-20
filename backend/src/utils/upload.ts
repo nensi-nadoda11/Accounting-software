@@ -13,6 +13,8 @@ const allowedMimeToExtensions: Record<string, string[]> = {
 
 const allowedExtensions = new Set(Object.values(allowedMimeToExtensions).flat());
 const allowedMimeTypes = new Set(Object.keys(allowedMimeToExtensions));
+const privateUploadScheme = "private://";
+const publicBrandingPathPattern = /^company\/[^/]+\/branding\/[^/]+$/i;
 
 const normalizeRelativePath = (value: string) => value.replace(/\\/g, "/").replace(/^\/+/, "");
 
@@ -76,11 +78,18 @@ export const buildPublicUploadUrl = (relativePath: string) => {
   return `${getPublicUploadMountPath().replace(/\/+$/, "")}/${normalizedPath}`;
 };
 
-export const getRelativeUploadPathFromUrl = (fileUrl: string) => {
+export const buildPrivateUploadReference = (relativePath: string) =>
+  `${privateUploadScheme}${normalizeRelativePath(relativePath)}`;
+
+export const getRelativeUploadPathFromReference = (fileReference: string) => {
+  if (fileReference.startsWith(privateUploadScheme)) {
+    return normalizeRelativePath(fileReference.slice(privateUploadScheme.length));
+  }
+
   const mountPath = getPublicUploadMountPath().replace(/\/+$/, "");
 
-  if (isAbsoluteHttpUrl(fileUrl)) {
-    const pathname = new URL(fileUrl).pathname;
+  if (isAbsoluteHttpUrl(fileReference)) {
+    const pathname = new URL(fileReference).pathname;
     if (!pathname.startsWith(`${mountPath}/`)) {
       return null;
     }
@@ -88,20 +97,24 @@ export const getRelativeUploadPathFromUrl = (fileUrl: string) => {
     return normalizeRelativePath(pathname.slice(mountPath.length));
   }
 
-  const normalizedFileUrl = fileUrl.startsWith("/") ? fileUrl : `/${fileUrl}`;
+  const normalizedFileUrl = fileReference.startsWith("/") ? fileReference : `/${fileReference}`;
   if (!normalizedFileUrl.startsWith(`${mountPath}/`)) {
+    if (!fileReference.includes("://")) {
+      return normalizeRelativePath(fileReference);
+    }
+
     return null;
   }
 
   return normalizeRelativePath(normalizedFileUrl.slice(mountPath.length));
 };
 
-export const deleteUploadFileByUrl = async (fileUrl: string | null | undefined) => {
-  if (!fileUrl) {
+export const resolveStoredUploadPath = (fileReference: string | null | undefined) => {
+  if (!fileReference) {
     return;
   }
 
-  const relativePath = getRelativeUploadPathFromUrl(fileUrl);
+  const relativePath = getRelativeUploadPathFromReference(fileReference);
   if (!relativePath) {
     return;
   }
@@ -113,5 +126,43 @@ export const deleteUploadFileByUrl = async (fileUrl: string | null | undefined) 
     return;
   }
 
+  return absolutePath;
+};
+
+export const isPublicUploadPath = (fileReference: string | null | undefined) => {
+  if (!fileReference) {
+    return false;
+  }
+
+  const relativePath = getRelativeUploadPathFromReference(fileReference);
+  return relativePath ? publicBrandingPathPattern.test(relativePath) : false;
+};
+
+export const deleteUploadFileByUrl = async (fileUrl: string | null | undefined) => {
+  const absolutePath = resolveStoredUploadPath(fileUrl);
+  if (!absolutePath) {
+    return;
+  }
+
   await fs.promises.rm(absolutePath, { force: true });
+};
+
+export const getContentTypeFromFileName = (fileName: string) => {
+  const extension = path.extname(fileName).toLowerCase();
+
+  switch (extension) {
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".pdf":
+      return "application/pdf";
+    case ".json":
+      return "application/json; charset=utf-8";
+    default:
+      return "application/octet-stream";
+  }
 };

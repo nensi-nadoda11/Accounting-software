@@ -6,7 +6,6 @@ import { inventoryRepository } from "../inventory/inventory.repository";
 import { inventoryService } from "../inventory/inventory.service";
 import {
   addDecimals,
-  buildCsvBuffer,
   compareDecimals,
   decimalToScaledBigInt,
   divideMoneyByQuantity,
@@ -19,6 +18,9 @@ import {
 import { emailService } from "../../services/email.service";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
+import { buildTextPdfFile, buildWhatsappShareUrl } from "../../utils/export-documents";
 import {
   calculateDueAmount,
   calculateInvoiceTotals,
@@ -102,6 +104,41 @@ const roundHalfUp = (dividend: bigint, divisor: bigint) => {
   return negative ? rounded * -1n : rounded;
 };
 
+const formatDateValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().slice(0, 10);
+};
+
+const formatDateTimeValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().replace("T", " ").slice(0, 16);
+};
+
+const padCell = (value: string | number, width: number, align: "left" | "right" = "left") => {
+  const normalized = String(value);
+  if (normalized.length >= width) {
+    return normalized.slice(0, width);
+  }
+
+  return align === "right" ? normalized.padStart(width, " ") : normalized.padEnd(width, " ");
+};
+
 class SalesService {
   private normalizePrefix(prefix: string | null | undefined, fallback: string) {
     const base = (prefix?.trim() || fallback).replace(/-+$/, "");
@@ -132,12 +169,6 @@ class SalesService {
     }
 
     return scaledBigIntToDecimal(roundHalfUp(totalAmountScaled * partialQuantityScaled, totalQuantityScaled), 2);
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
   }
 
   private buildAddressSnapshot(customer: CustomerRecord, type: "billing" | "shipping"): AddressSnapshot {
@@ -1917,7 +1948,6 @@ class SalesService {
     query: ExportSalesInvoicesQuery,
     context: SalesRequestContext
   ): Promise<SalesExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await salesRepository.listInvoicesForExport({
       companyId: actor.companyId,
       search: query.search ?? null,
@@ -1929,21 +1959,32 @@ class SalesService {
       dateFrom: query.dateFrom ?? null,
       dateTo: query.dateTo ?? null
     });
-
-    const content = buildCsvBuffer(
-      ["Invoice No", "Type", "Customer", "Invoice Date", "Status", "Payment Status", "Grand Total", "Paid", "Due"],
-      rows.map((row) => [
-        row.invoice.invoiceNumber,
-        row.invoice.invoiceType,
-        row.invoice.customerNameSnapshot,
-        row.invoice.invoiceDate.toISOString(),
-        row.invoice.invoiceStatus,
-        row.invoice.paymentStatus,
-        normalizeMoney(row.invoice.grandTotal),
-        normalizeMoney(row.invoice.paidAmount),
-        normalizeMoney(row.invoice.dueAmount)
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Sales Invoices",
+      columns: [
+        { key: "invoiceNumber", label: "Invoice No" },
+        { key: "invoiceType", label: "Type" },
+        { key: "customerName", label: "Customer" },
+        { key: "invoiceDate", label: "Invoice Date" },
+        { key: "invoiceStatus", label: "Status" },
+        { key: "paymentStatus", label: "Payment Status" },
+        { key: "grandTotal", label: "Grand Total", type: "number" },
+        { key: "paidAmount", label: "Paid", type: "number" },
+        { key: "dueAmount", label: "Due", type: "number" }
+      ],
+      rows: rows.map((row) => ({
+        invoiceNumber: row.invoice.invoiceNumber,
+        invoiceType: row.invoice.invoiceType,
+        customerName: row.invoice.customerNameSnapshot,
+        invoiceDate: formatDateValue(row.invoice.invoiceDate),
+        invoiceStatus: row.invoice.invoiceStatus,
+        paymentStatus: row.invoice.paymentStatus,
+        grandTotal: Number(normalizeMoney(row.invoice.grandTotal)),
+        paidAmount: Number(normalizeMoney(row.invoice.paidAmount)),
+        dueAmount: Number(normalizeMoney(row.invoice.dueAmount))
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `sales-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1958,11 +1999,7 @@ class SalesService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `sales-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async exportReturns(
@@ -1970,7 +2007,6 @@ class SalesService {
     query: ExportSalesReturnsQuery,
     context: SalesRequestContext
   ): Promise<SalesExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await salesRepository.listReturnsForExport({
       companyId: actor.companyId,
       search: query.search ?? null,
@@ -1980,17 +2016,24 @@ class SalesService {
       dateFrom: query.dateFrom ?? null,
       dateTo: query.dateTo ?? null
     });
-
-    const content = buildCsvBuffer(
-      ["Return No", "Invoice No", "Return Date", "Reason", "Grand Total"],
-      rows.map((row) => [
-        row.salesReturn.returnNumber,
-        row.invoiceNumber,
-        row.salesReturn.returnDate.toISOString(),
-        row.salesReturn.reason,
-        normalizeMoney(row.salesReturn.grandTotal)
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Sales Returns",
+      columns: [
+        { key: "returnNumber", label: "Return No" },
+        { key: "invoiceNumber", label: "Invoice No" },
+        { key: "returnDate", label: "Return Date" },
+        { key: "reason", label: "Reason" },
+        { key: "grandTotal", label: "Grand Total", type: "number" }
+      ],
+      rows: rows.map((row) => ({
+        returnNumber: row.salesReturn.returnNumber,
+        invoiceNumber: row.invoiceNumber,
+        returnDate: formatDateValue(row.salesReturn.returnDate),
+        reason: row.salesReturn.reason,
+        grandTotal: Number(normalizeMoney(row.salesReturn.grandTotal))
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `sales-returns-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -2005,15 +2048,72 @@ class SalesService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `sales-returns-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
-  public async generateInvoicePdf(actor: SalesActor, invoiceId: string, context: SalesRequestContext) {
+  public async generateInvoicePdf(actor: SalesActor, invoiceId: string, context: SalesRequestContext): Promise<SalesExportPayload> {
     const invoice = await this.loadInvoicePayload(actor.companyId, invoiceId);
+    const { company } = await this.getCompanyTaxContext(actor.companyId);
+    const items = (invoice.items ?? []) as Array<{
+      productNameSnapshot: string;
+      quantity: string;
+      saleRate: string;
+      taxableAmount: string;
+      cgstAmount: string;
+      sgstAmount: string;
+      igstAmount: string;
+      cessAmount: string;
+      lineTotal: string;
+    }>;
+    const itemLines = items.map((item) => {
+      const gstAmount = (
+        Number(item.cgstAmount) +
+        Number(item.sgstAmount) +
+        Number(item.igstAmount) +
+        Number(item.cessAmount)
+      ).toFixed(2);
+
+      return [
+        padCell(item.productNameSnapshot, 28),
+        padCell(item.quantity, 8, "right"),
+        padCell(item.saleRate, 10, "right"),
+        padCell(item.taxableAmount, 12, "right"),
+        padCell(gstAmount, 10, "right"),
+        padCell(item.lineTotal, 12, "right")
+      ].join(" ");
+    });
+    const lines = [
+      company.legalName || company.name,
+      [company.addressLine1, company.addressLine2, company.city, company.state, company.pincode].filter(Boolean).join(", ") || "Address not available",
+      `GSTIN: ${company.gstNumber || "-"}`,
+      "",
+      `SALES INVOICE ${invoice.invoiceNumber}`,
+      `Invoice Date : ${formatDateValue(invoice.invoiceDate)}`,
+      `Due Date     : ${formatDateValue(invoice.dueDate)}`,
+      `Type         : ${invoice.invoiceType}`,
+      `Status       : ${invoice.invoiceStatus}`,
+      `Payment      : ${invoice.paymentStatus}`,
+      `Customer     : ${invoice.customer?.name ?? invoice.walkInName ?? invoice.customerNameSnapshot}`,
+      `Mobile       : ${invoice.customer?.mobile ?? invoice.walkInMobile ?? "-"}`,
+      `Place Supply : ${invoice.placeOfSupply}`,
+      `Warehouse    : ${invoice.warehouse.name ?? "-"}`,
+      "",
+      [padCell("Product", 28), padCell("Qty", 8, "right"), padCell("Rate", 10, "right"), padCell("Taxable", 12, "right"), padCell("GST", 10, "right"), padCell("Total", 12, "right")].join(" "),
+      "-".repeat(86),
+      ...(itemLines.length ? itemLines : ["No line items available"]),
+      "",
+      `Subtotal     : ${invoice.subtotal}`,
+      `GST Total    : ${invoice.gstTotal}`,
+      `Round Off    : ${invoice.roundOffAmount}`,
+      `Grand Total  : ${invoice.grandTotal}`,
+      `Paid Amount  : ${invoice.paidAmount}`,
+      `Due Amount   : ${invoice.dueAmount}`,
+      `Notes        : ${invoice.notes || "-"}`,
+      `Terms        : ${invoice.termsConditions || "-"}`,
+      "",
+      `Generated At : ${formatDateTimeValue(new Date())}`
+    ];
+    const file = buildTextPdfFile(invoice.invoiceNumber, lines);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -2022,16 +2122,13 @@ class SalesService {
       entityType: "sales_invoice",
       entityId: invoiceId,
       metadata: {
-        fallback: "structured-data"
+        mode: "pdf"
       },
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
 
-    return {
-      pdfAvailable: false,
-      invoice
-    };
+    return file;
   }
 
   public async sendInvoiceEmail(
@@ -2119,13 +2216,20 @@ class SalesService {
       throw new AppError("No mobile number available for this invoice", 400);
     }
 
+    const defaultMessage = `Invoice ${detail.invoice.invoiceNumber} for amount INR ${normalizeMoney(detail.invoice.grandTotal)} is ready.`;
+    const whatsappUrl = buildWhatsappShareUrl(mobile, input.message?.trim() || defaultMessage);
+    if (!whatsappUrl) {
+      throw new AppError("Valid mobile number is required for WhatsApp sharing", 400);
+    }
+
     const log = await salesRepository.createSendLog({
       companyId: actor.companyId,
       salesInvoiceId: invoiceId,
       channel: "whatsapp",
       sentTo: mobile,
-      status: "pending",
-      errorMessage: "WhatsApp provider not configured",
+      status: "sent",
+      errorMessage: null,
+      sentAt: new Date(),
       createdBy: actor.id
     });
 
@@ -2136,7 +2240,7 @@ class SalesService {
       entityType: "sales_invoice",
       entityId: invoiceId,
       metadata: {
-        status: "pending",
+        status: "sent",
         sentTo: mobile
       },
       ipAddress: context.ipAddress,
@@ -2150,9 +2254,11 @@ class SalesService {
             channel: log.channel,
             status: log.status,
             sentTo: log.sentTo,
-            errorMessage: log.errorMessage
+            errorMessage: log.errorMessage,
+            sentAt: log.sentAt
           }
-        : null
+        : null,
+      whatsappUrl
     };
   }
 }

@@ -13,7 +13,6 @@ import type {
   SalesPaymentMutationResponse,
   SalesPaymentsQuery,
   SalesPaymentsResponse,
-  SalesPdfResponse,
   SalesReturnDetailResponse,
   SalesReturnInput,
   SalesReturnsListQuery,
@@ -31,7 +30,7 @@ const getFileNameFromDisposition = (contentDisposition: string | undefined, fall
     return decodeURIComponent(utfMatch[1]);
   }
 
-  const match = contentDisposition.match(/filename=\"?([^\"]+)\"?/i);
+  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
   return match?.[1] ?? fallback;
 };
 
@@ -112,8 +111,13 @@ export const salesApi = {
       "sales.csv",
     ),
 
-  getPdfPayload: async (invoiceId: string) =>
-    (await client.get<ApiResponse<SalesPdfResponse>>(`/sales/${invoiceId}/pdf`)).data,
+  getPdfFile: async (invoiceId: string) =>
+    extractDownload(
+      client.get(`/sales/${invoiceId}/pdf`, {
+        responseType: "blob",
+      }),
+      `sales-invoice-${invoiceId}.pdf`,
+    ),
 
   barcodeLookup: async (query: { q: string; warehouseId?: string }) =>
     (
@@ -183,5 +187,5 @@ export const salesApi = {
     (await client.post<ApiResponse<{ sendLog: unknown }>>(`/sales/${invoiceId}/send-email`, payload)).data,
 
   sendWhatsapp: async (invoiceId: string, payload: { mobile: string | null; message?: string | null }) =>
-    (await client.post<ApiResponse<{ sendLog: unknown }>>(`/sales/${invoiceId}/send-whatsapp`, payload)).data,
+    (await client.post<ApiResponse<{ sendLog: unknown; whatsappUrl?: string }>>(`/sales/${invoiceId}/send-whatsapp`, payload)).data,
 };

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
-import { useAuth } from "../providers/AuthProvider";
+import { useAuth } from "../providers/useAuth";
 import { LoadingState } from "../components/ui/LoadingState";
 import type { PermissionKey, Role } from "../types/auth";
 
@@ -54,3 +54,4 @@ export const PermissionRoute = ({
 
   return <>{children}</>;
 };
+

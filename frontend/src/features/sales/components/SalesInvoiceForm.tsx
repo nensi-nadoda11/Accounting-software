@@ -10,8 +10,8 @@ import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { ToggleSwitch } from "../../../components/ui/ToggleSwitch";
 import { getErrorMessage } from "../../../lib/errors";
-import { useAuth } from "../../../providers/AuthProvider";
-import { useToast } from "../../../providers/ToastProvider";
+import { useAuth } from "../../../providers/useAuth";
+import { useToast } from "../../../providers/useToast";
 import { customersApi } from "../../../services/customersApi";
 import { inventoryApi } from "../../../services/inventoryApi";
 import { productsApi } from "../../../services/productsApi";
@@ -593,3 +593,4 @@ export const SalesInvoiceForm = ({
     </form>
   );
 };
+

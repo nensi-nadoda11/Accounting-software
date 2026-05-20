@@ -12,8 +12,8 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { PermissionDeniedState } from "../../components/ui/PermissionDeniedState";
 import { Button } from "../../components/ui/Button";
 import { StatusBadge } from "../../components/ui/StatusBadge";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { getErrorMessage } from "../../lib/errors";
 import { applyUiPreferencesToDocument, settingsApi } from "../../services/settingsApi";
 import type { PermissionKey } from "../../types/auth";
@@ -740,3 +740,4 @@ export const SettingsFinalPage = () => {
     </div>
   );
 };
+

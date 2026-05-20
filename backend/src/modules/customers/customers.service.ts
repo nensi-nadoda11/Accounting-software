@@ -3,6 +3,8 @@ import { customers } from "../../db/schema";
 import { auditLogService } from "../audit-logs/audit-log.service";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
 import type {
   BlacklistInput,
   CreateCustomerInput,
@@ -123,13 +125,17 @@ const formatPercentageFromUsage = (usedReceivable: bigint, creditLimit: bigint):
   return formatCentsToDecimal(scaled);
 };
 
-const csvEscape = (value: string | null | undefined) => {
-  const safeValue = value ?? "";
-  if (/[",\n]/.test(safeValue)) {
-    return `"${safeValue.replace(/"/g, "\"\"")}"`;
+const formatDateValue = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return "-";
   }
 
-  return safeValue;
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toISOString().slice(0, 10);
 };
 
 class CustomersService {
@@ -421,25 +427,6 @@ class CustomersService {
       remainingCreditLimit: formatCentsToDecimal(remainingCreditLimit),
       isCreditLimitExceeded: usedReceivable > creditLimit
     };
-  }
-
-  private buildCsvFile(fileName: string, headers: string[], rows: string[][]): CustomerExportPayload {
-    const lines = [
-      headers.map((header) => csvEscape(header)).join(","),
-      ...rows.map((row) => row.map((entry) => csvEscape(entry)).join(","))
-    ];
-
-    return {
-      fileName,
-      contentType: "text/csv; charset=utf-8",
-      content: Buffer.from(`\uFEFF${lines.join("\n")}`, "utf-8")
-    };
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
   }
 
   private buildNextCustomerCode(previousCode: string | null): string {
@@ -1015,8 +1002,6 @@ class CustomersService {
     query: ExportCustomersQuery,
     context: CustomerRequestContext
   ): Promise<CustomerExportPayload> {
-    this.ensureCsvFormat(query.format);
-
     const params: {
       companyId: string;
       search?: string | null;
@@ -1058,42 +1043,40 @@ class CustomersService {
     }
 
     const rows = await customersRepository.listCustomersForExport(params);
-
-    const csv = this.buildCsvFile(
-      `customers-${new Date().toISOString().slice(0, 10)}.csv`,
-      [
-        "Customer Code",
-        "Name",
-        "Customer Type",
-        "Business Name",
-        "Mobile",
-        "Email",
-        "GST Number",
-        "Tax Type",
-        "Status",
-        "Blacklisted",
-        "Credit Limit",
-        "Outstanding Amount",
-        "Created At"
+    const dataset: ReportExportDataset = {
+      title: "Customers",
+      columns: [
+        { key: "customerCode", label: "Customer Code" },
+        { key: "name", label: "Name" },
+        { key: "customerType", label: "Customer Type" },
+        { key: "businessName", label: "Business Name" },
+        { key: "mobile", label: "Mobile" },
+        { key: "email", label: "Email" },
+        { key: "gstNumber", label: "GST Number" },
+        { key: "taxType", label: "Tax Type" },
+        { key: "status", label: "Status" },
+        { key: "isBlacklisted", label: "Blacklisted" },
+        { key: "creditLimit", label: "Credit Limit", type: "number" },
+        { key: "outstandingAmount", label: "Outstanding Amount", type: "number" },
+        { key: "createdAt", label: "Created At" }
       ],
-      rows.map((customer) => {
-        return [
-          customer.customerCode,
-          customer.name,
-          customer.customerType,
-          customer.businessName ?? "",
-          customer.mobile,
-          customer.email ?? "",
-          customer.gstNumber ?? "",
-          customer.taxType,
-          customer.status,
-          customer.isBlacklisted ? "yes" : "no",
-          normalizeDecimalString(customer.creditLimit),
-          normalizeDecimalString(customer.outstandingAmount),
-          customer.createdAt.toISOString()
-        ];
-      })
-    );
+      rows: rows.map((customer) => ({
+        customerCode: customer.customerCode,
+        name: customer.name,
+        customerType: customer.customerType,
+        businessName: customer.businessName ?? "",
+        mobile: customer.mobile,
+        email: customer.email ?? "",
+        gstNumber: customer.gstNumber ?? "",
+        taxType: customer.taxType,
+        status: customer.status,
+        isBlacklisted: customer.isBlacklisted ? "yes" : "no",
+        creditLimit: Number(normalizeDecimalString(customer.creditLimit)),
+        outstandingAmount: Number(normalizeDecimalString(customer.outstandingAmount)),
+        createdAt: formatDateValue(customer.createdAt)
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `customers-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1116,7 +1099,7 @@ class CustomersService {
       userAgent: context.userAgent
     });
 
-    return csv;
+    return file;
   }
 
   public async exportLedger(
@@ -1125,24 +1108,37 @@ class CustomersService {
     query: LedgerExportQuery,
     context: CustomerRequestContext
   ): Promise<CustomerExportPayload> {
-    this.ensureCsvFormat(query.format);
     const customer = await this.getCustomerOrThrow(actor.companyId, customerId);
     const ledgerRows = await this.buildLedgerRows(customer, query);
-
-    const csv = this.buildCsvFile(
-      `customer-ledger-${customer.customerCode}-${new Date().toISOString().slice(0, 10)}.csv`,
-      ["Date", "Transaction Type", "Reference No", "Description", "Debit", "Credit", "Balance", "Payment Mode", "Remarks"],
-      ledgerRows.map((item) => [
-        item.date.toISOString(),
-        item.transactionType,
-        item.referenceNo ?? "",
-        item.description,
-        item.debit,
-        item.credit,
-        item.balance,
-        item.paymentMode ?? "",
-        item.remarks ?? ""
-      ])
+    const dataset: ReportExportDataset = {
+      title: `${customer.name} Ledger`,
+      columns: [
+        { key: "date", label: "Date" },
+        { key: "transactionType", label: "Transaction Type" },
+        { key: "referenceNo", label: "Reference No" },
+        { key: "description", label: "Description" },
+        { key: "debit", label: "Debit", type: "number" },
+        { key: "credit", label: "Credit", type: "number" },
+        { key: "balance", label: "Balance", type: "number" },
+        { key: "paymentMode", label: "Payment Mode" },
+        { key: "remarks", label: "Remarks" }
+      ],
+      rows: ledgerRows.map((item) => ({
+        date: formatDateValue(item.date),
+        transactionType: item.transactionType,
+        referenceNo: item.referenceNo ?? "",
+        description: item.description,
+        debit: Number(item.debit),
+        credit: Number(item.credit),
+        balance: Number(item.balance),
+        paymentMode: item.paymentMode ?? "",
+        remarks: item.remarks ?? ""
+      }))
+    };
+    const file = buildReportFile(
+      dataset,
+      query.format,
+      `customer-ledger-${customer.customerCode}-${new Date().toISOString().slice(0, 10)}`
     );
 
     await auditLogService.log({
@@ -1161,7 +1157,7 @@ class CustomersService {
       userAgent: context.userAgent
     });
 
-    return csv;
+    return file;
   }
 }
 

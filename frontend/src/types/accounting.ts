@@ -423,7 +423,7 @@ export interface TrialBalanceQuery {
   dateTo?: string;
 }
 
-export interface ProfitLossQuery extends TrialBalanceQuery {}
+export type ProfitLossQuery = TrialBalanceQuery;
 
 export interface BalanceSheetQuery {
   asOfDate?: string;

@@ -25,8 +25,8 @@ import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Table, TableWrapper } from "../../components/ui/Table";
 import { TableActionIconButton } from "../../components/ui/TableActionIconButton";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { suppliersApi } from "../../services/suppliersApi";
 import type {
   SortOrder,
@@ -785,3 +785,4 @@ export const SuppliersPage = () => {
     </div>
   );
 };
+

@@ -241,13 +241,13 @@ class AuthService {
     context: RequestContext
   ) {
     const attemptKey = `${input.identifier.toLowerCase()}:${context.ipAddress}`;
-    loginAttemptService.assertNotLocked(attemptKey);
+    await loginAttemptService.assertNotLocked(attemptKey);
 
     const user = await usersRepository.findByIdentifier(input.identifier);
     const invalidCredentials = new AppError("Invalid credentials", 401);
 
     if (!user || !user.passwordHash) {
-      loginAttemptService.recordFailure(attemptKey);
+      await loginAttemptService.recordFailure(attemptKey);
       await securityAdminAuditService.logLoginEvent({
         email: input.identifier.toLowerCase(),
         loginType: "failed_login",
@@ -267,7 +267,7 @@ class AuthService {
 
     const passwordMatches = await comparePassword(input.password, user.passwordHash);
     if (!passwordMatches) {
-      loginAttemptService.recordFailure(attemptKey);
+      await loginAttemptService.recordFailure(attemptKey);
       await securityAdminAuditService.logLoginEvent({
         companyId: user.companyId,
         userId: user.id,
@@ -299,7 +299,7 @@ class AuthService {
       throw new AppError("Company is not active", 403);
     }
 
-    loginAttemptService.clear(attemptKey);
+    await loginAttemptService.clear(attemptKey);
 
     const sessionExpiresAt = new Date(Date.now() + this.refreshTtlMs);
     const sessionSeedToken = signRefreshToken({

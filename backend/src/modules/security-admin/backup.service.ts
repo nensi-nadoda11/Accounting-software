@@ -3,7 +3,12 @@ import path from "path";
 
 import { z } from "zod";
 
-import { buildPublicUploadUrl, ensureUploadDirectory, getRelativeUploadPathFromUrl, getUploadRootPath } from "../../utils/upload";
+import {
+  buildPrivateUploadReference,
+  ensureUploadDirectory,
+  getUploadRootPath,
+  resolveStoredUploadPath
+} from "../../utils/upload";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
 import { logAuditAction } from "./audit.service";
@@ -43,15 +48,6 @@ const sanitizeFileNameSegment = (value: string) =>
 const getBackupRelativeDirectory = (companyId: string) => path.posix.join("company", companyId, "backups");
 
 const resolveBackupDirectory = (companyId: string) => path.resolve(getUploadRootPath(), getBackupRelativeDirectory(companyId));
-
-const resolveStoredBackupPath = (fileUrl: string) => {
-  const relativePath = getRelativeUploadPathFromUrl(fileUrl);
-  if (!relativePath) {
-    return null;
-  }
-
-  return path.resolve(getUploadRootPath(), relativePath);
-};
 
 const toBuffer = (content: string) => Buffer.from(content, "utf-8");
 
@@ -133,7 +129,7 @@ export class SecurityAdminBackupService {
         backupName: row.backup.backupName,
         backupType: row.backup.backupType,
         fileName: row.backup.fileName,
-        fileUrl: row.backup.fileUrl,
+        fileUrl: null,
         sizeBytes: row.backup.sizeBytes,
         status: row.backup.status,
         includes: row.backup.includes,
@@ -195,11 +191,11 @@ export class SecurityAdminBackupService {
       await fs.writeFile(absolutePath, content, "utf-8");
 
       const relativePath = path.posix.join(getBackupRelativeDirectory(actor.companyId), fileName);
-      const fileUrl = buildPublicUploadUrl(relativePath);
+      const fileReference = buildPrivateUploadReference(relativePath);
       const sizeBytes = toBuffer(content).byteLength;
 
       await securityAdminBackupRepository.updateBackupRecord(backup.id, actor.companyId, {
-        fileUrl,
+        fileUrl: fileReference,
         sizeBytes,
         status: "completed",
         errorMessage: null
@@ -225,7 +221,7 @@ export class SecurityAdminBackupService {
       return {
         backupId: backup.id,
         fileName,
-        fileUrl,
+        fileUrl: null,
         sizeBytes,
         includes
       };
@@ -262,7 +258,7 @@ export class SecurityAdminBackupService {
       throw new AppError("Backup file is unavailable", 404);
     }
 
-    const absolutePath = resolveStoredBackupPath(backup.fileUrl);
+    const absolutePath = resolveStoredUploadPath(backup.fileUrl);
     if (!absolutePath) {
       throw new AppError("Backup file path is invalid", 400);
     }
@@ -324,7 +320,7 @@ export class SecurityAdminBackupService {
           throw new AppError("Backup file is unavailable", 404);
         }
 
-        const absolutePath = resolveStoredBackupPath(backup.fileUrl);
+        const absolutePath = resolveStoredUploadPath(backup.fileUrl);
         if (!absolutePath) {
           throw new AppError("Backup file path is invalid", 400);
         }

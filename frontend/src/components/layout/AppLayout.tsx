@@ -2,8 +2,8 @@ import { LogOut } from "lucide-react";
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { applyUiPreferencesToDocument, settingsApi } from "../../services/settingsApi";
 import { Button } from "../ui/Button";
 import { SubTabs } from "./SubTabs";
@@ -73,3 +73,4 @@ export const AppLayout = () => {
     </div>
   );
 };
+

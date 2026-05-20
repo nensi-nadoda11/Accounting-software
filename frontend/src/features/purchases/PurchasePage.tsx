@@ -8,9 +8,10 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { Select } from "../../components/ui/Select";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { useDebouncedValue } from "../customers/useDebouncedValue";
 import { applyFriendlyFieldErrors, saveDownloadedFile } from "../customers/customerUtils";
 import { bankApi } from "../../services/bankApi";
@@ -22,6 +23,7 @@ import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from 
 import type { Warehouse } from "../../types/inventory";
 import type {
   PaymentStatus,
+  PurchaseExportFormat,
   PurchaseInvoice,
   PurchaseInvoiceListItem,
   PurchaseListResponse,
@@ -41,7 +43,7 @@ import { PurchaseReturnList } from "./components/PurchaseReturnList";
 import { createPaymentPayload, createPurchaseUpdatePayload, createReturnPayload } from "./purchaseUtils";
 import type { LookupOption } from "./components/AsyncLookupSelect";
 
-type PurchasePageTab = "invoices" | "new" | "returns" | "payments";
+export type PurchasePageTab = "invoices" | "new" | "returns" | "payments";
 
 type ConfirmState =
   | { type: "delete"; invoice: PurchaseInvoiceListItem | PurchaseInvoice }
@@ -75,6 +77,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [submittingReturn, setSubmittingReturn] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<PurchaseExportFormat>("xlsx");
   const [pageError, setPageError] = useState<string | null>(null);
 
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -380,36 +383,44 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         actions={
           <div className="flex flex-wrap gap-2">
             {canExport ? (
-              <Button
-                type="button"
-                variant="secondary"
-                loading={exporting}
-                onClick={async () => {
-                  try {
-                    setExporting(true);
-                    const file = await purchasesApi.exportList({
-                      page,
-                      limit: 20,
-                      search: searchParams.get("search") || undefined,
-                      purchaseStatus: purchaseStatusFilter || undefined,
-                      paymentStatus: paymentStatusFilter || undefined,
-                      supplierId: supplierId || undefined,
-                      warehouseId: warehouseId || undefined,
-                      dateFrom: dateFrom || undefined,
-                      dateTo: dateTo || undefined,
-                    });
-                    saveDownloadedFile(file.blob, file.fileName);
-                    toast.success("Purchase export downloaded");
-                  } catch (error) {
-                    toast.error(getErrorMessage(error, "Failed to export purchases"));
-                  } finally {
-                    setExporting(false);
-                  }
-                }}
-              >
-                <Download className="mr-2 size-4" />
-                Export
-              </Button>
+              <>
+                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PurchaseExportFormat)} className="w-28">
+                  <option value="csv">CSV</option>
+                  <option value="xlsx">XLSX</option>
+                  <option value="pdf">PDF</option>
+                </Select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={exporting}
+                  onClick={async () => {
+                    try {
+                      setExporting(true);
+                      const file = await purchasesApi.exportList({
+                        page,
+                        limit: 20,
+                        search: searchParams.get("search") || undefined,
+                        purchaseStatus: purchaseStatusFilter || undefined,
+                        paymentStatus: paymentStatusFilter || undefined,
+                        supplierId: supplierId || undefined,
+                        warehouseId: warehouseId || undefined,
+                        dateFrom: dateFrom || undefined,
+                        dateTo: dateTo || undefined,
+                        format: exportFormat,
+                      });
+                      saveDownloadedFile(file.blob, file.fileName);
+                      toast.success("Purchase export downloaded");
+                    } catch (error) {
+                      toast.error(getErrorMessage(error, "Failed to export purchases"));
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                >
+                  <Download className="mr-2 size-4" />
+                  Export
+                </Button>
+              </>
             ) : null}
             {canCreate && tab === "invoices" ? (
               <Button type="button" onClick={() => navigate("/app/purchases/new")}>
@@ -549,34 +560,42 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         actions={
           <div className="flex flex-wrap gap-2">
             {canExport ? (
-              <Button
-                type="button"
-                variant="secondary"
-                loading={exporting}
-                onClick={async () => {
-                  try {
-                    setExporting(true);
-                    const file = await purchasesApi.exportReturns({
-                      page,
-                      limit: 20,
-                      search: searchParams.get("search") || undefined,
-                      supplierId: supplierId || undefined,
-                      warehouseId: warehouseId || undefined,
-                      dateFrom: dateFrom || undefined,
-                      dateTo: dateTo || undefined,
-                    });
-                    saveDownloadedFile(file.blob, file.fileName);
-                    toast.success("Purchase returns exported");
-                  } catch (error) {
-                    toast.error(getErrorMessage(error, "Failed to export purchase returns"));
-                  } finally {
-                    setExporting(false);
-                  }
-                }}
-              >
-                <Download className="mr-2 size-4" />
-                Export
-              </Button>
+              <>
+                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PurchaseExportFormat)} className="w-28">
+                  <option value="csv">CSV</option>
+                  <option value="xlsx">XLSX</option>
+                  <option value="pdf">PDF</option>
+                </Select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={exporting}
+                  onClick={async () => {
+                    try {
+                      setExporting(true);
+                      const file = await purchasesApi.exportReturns({
+                        page,
+                        limit: 20,
+                        search: searchParams.get("search") || undefined,
+                        supplierId: supplierId || undefined,
+                        warehouseId: warehouseId || undefined,
+                        dateFrom: dateFrom || undefined,
+                        dateTo: dateTo || undefined,
+                        format: exportFormat,
+                      });
+                      saveDownloadedFile(file.blob, file.fileName);
+                      toast.success("Purchase returns exported");
+                    } catch (error) {
+                      toast.error(getErrorMessage(error, "Failed to export purchase returns"));
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                >
+                  <Download className="mr-2 size-4" />
+                  Export
+                </Button>
+              </>
             ) : null}
             {canReturn ? (
               <Button type="button" onClick={() => void openReturnCreate()}>
@@ -822,3 +841,4 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
     </>
   );
 };
+

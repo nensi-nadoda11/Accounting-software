@@ -153,3 +153,232 @@ Error: .partial() cannot be used on object schemas containing refinements
     at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
 
 Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+node:internal/modules/cjs/loader:1244
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module './modules/notifications/notifications.scheduler'
+Require stack:
+- E:\Accounting_software\backend\src\server.ts
+    at node:internal/modules/cjs/loader:1244:15
+    at nextResolveSimple (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:10:965)
+    at e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:2720
+    at e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:2150
+    at resolveTsPaths (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:10:718)
+    at e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:10:1103
+    at S._resolveFilename (file:///e:/Accounting_software/backend/node_modules/tsx/dist/register-lJYvHe5s.mjs:2:12168)
+    at Function._load (node:internal/modules/cjs/loader:1070:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'E:\\Accounting_software\\backend\\src\\server.ts' ]
+}
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\src\db\schema\audit-logs.ts:89
+    sizeBytes: integer("size_bytes"),
+               ^
+
+
+ReferenceError: integer is not defined
+    at <anonymous> (E:\Accounting_software\backend\src\db\schema\audit-logs.ts:89:16)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\db\schema\audit-logs.ts:130:1)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\src\db\schema\audit-logs.ts:89
+    sizeBytes: integer("size_bytes"),
+               ^
+
+
+ReferenceError: integer is not defined
+    at <anonymous> (E:\Accounting_software\backend\src\db\schema\audit-logs.ts:89:16)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\db\schema\audit-logs.ts:130:1)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\src\db\schema\audit-logs.ts:89
+    sizeBytes: integer("size_bytes"),
+               ^
+
+
+ReferenceError: integer is not defined
+    at <anonymous> (E:\Accounting_software\backend\src\db\schema\audit-logs.ts:89:16)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\db\schema\audit-logs.ts:130:1)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+
+Node.js v22.13.1
+E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508
+        throw new Error(".partial() cannot be used on object schemas containing refinements");
+              ^
+
+Error: .partial() cannot be used on object schemas containing refinements
+    at Object.partial (E:\Accounting_software\backend\node_modules\zod\v4\core\util.cjs:508:15)
+    at _.partial (E:\Accounting_software\backend\node_modules\zod\v4\classic\schemas.cjs:897:36)
+    at <anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:179:58)
+    at Object.<anonymous> (E:\Accounting_software\backend\src\modules\payroll\payroll.validator.ts:432:2)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object.transformer (e:\Accounting_software\backend\node_modules\tsx\dist\register-DJgoUG_Q.cjs:9:1709)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+
+Node.js v22.13.1

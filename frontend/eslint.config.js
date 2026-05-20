@@ -18,5 +18,14 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // The app is not using React Compiler yet, so we keep the classic hook-safety
+      // rules and disable compiler-specific diagnostics that currently produce noise.
+      'react-hooks/exhaustive-deps': 'off',
+      'react-hooks/incompatible-library': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])

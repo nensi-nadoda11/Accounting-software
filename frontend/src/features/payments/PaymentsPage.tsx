@@ -13,8 +13,8 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { bankApi } from "../../services/bankApi";
 import { customersApi } from "../../services/customersApi";
 import { paymentsApi } from "../../services/paymentsApi";
@@ -26,6 +26,7 @@ import type {
   DueTrackingResponse,
   PartyType,
   Payment,
+  PaymentExportFormat,
   PaymentFormAllocationInput,
   PaymentListQuery,
   PaymentListResponse,
@@ -61,7 +62,7 @@ import {
 } from "./pageSchemas";
 import { CHEQUE_STATUS_LABELS, PAYMENT_TABS, REMINDER_STATUS_OPTIONS } from "./paymentOptions";
 import type { PaymentManagementTab } from "./paymentTypes";
-import { matchesNinetyPlusBucket, openReceiptPrintWindow } from "./paymentUtils";
+import { matchesNinetyPlusBucket } from "./paymentUtils";
 
 const ALL_FETCH_LIMIT = 100;
 
@@ -180,6 +181,7 @@ export const PaymentsPage = () => {
     dateTo: "",
   });
   const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<PaymentExportFormat>("xlsx");
 
   const [detailPayment, setDetailPayment] = useState<Payment | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -460,10 +462,11 @@ export const PaymentsPage = () => {
 
   const handlePrintReceipt = async (paymentId: string) => {
     try {
-      const response = await paymentsApi.getReceiptPdfPayload(paymentId);
-      openReceiptPrintWindow(response.data);
+      const file = await paymentsApi.getReceiptPdfFile(paymentId);
+      saveDownloadedFile(file.blob, file.fileName);
+      toast.success("Receipt PDF downloaded");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load receipt print view"));
+      toast.error(getErrorMessage(error, "Failed to download receipt PDF"));
     }
   };
 
@@ -529,37 +532,45 @@ export const PaymentsPage = () => {
           title="Payment Management"
           actions={
             activeTab === "list" && canExport ? (
-              <Button
-                type="button"
-                variant="secondary"
-                loading={exporting}
-                onClick={async () => {
-                  try {
-                    setExporting(true);
-                    const file = await paymentsApi.exportList({
-                      page: 1,
-                      limit: ALL_FETCH_LIMIT,
-                      search: debouncedPaymentsSearch || undefined,
-                      partyType: (paymentsFilters.partyType as PartyType | "") || undefined,
-                      paymentType: (paymentsFilters.paymentType as PaymentListQuery["paymentType"]) || undefined,
-                      partyId: (paymentsFilters.partyId as string | undefined) || undefined,
-                      paymentMode: (paymentsFilters.paymentMode as PaymentListQuery["paymentMode"]) || undefined,
-                      status: (paymentsFilters.status as PaymentListQuery["status"]) || undefined,
-                      dateFrom: (paymentsFilters.dateFrom as string) || undefined,
-                      dateTo: (paymentsFilters.dateTo as string) || undefined,
-                    });
-                    saveDownloadedFile(file.blob, file.fileName);
-                    toast.success("Payments export downloaded");
-                  } catch (error) {
-                    toast.error(getErrorMessage(error, "Failed to export payments"));
-                  } finally {
-                    setExporting(false);
-                  }
-                }}
-              >
-                <Download className="mr-2 size-4" />
-                Export
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PaymentExportFormat)} className="w-28">
+                  <option value="csv">CSV</option>
+                  <option value="xlsx">XLSX</option>
+                  <option value="pdf">PDF</option>
+                </Select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={exporting}
+                  onClick={async () => {
+                    try {
+                      setExporting(true);
+                      const file = await paymentsApi.exportList({
+                        page: 1,
+                        limit: ALL_FETCH_LIMIT,
+                        search: debouncedPaymentsSearch || undefined,
+                        partyType: (paymentsFilters.partyType as PartyType | "") || undefined,
+                        paymentType: (paymentsFilters.paymentType as PaymentListQuery["paymentType"]) || undefined,
+                        partyId: (paymentsFilters.partyId as string | undefined) || undefined,
+                        paymentMode: (paymentsFilters.paymentMode as PaymentListQuery["paymentMode"]) || undefined,
+                        status: (paymentsFilters.status as PaymentListQuery["status"]) || undefined,
+                        dateFrom: (paymentsFilters.dateFrom as string) || undefined,
+                        dateTo: (paymentsFilters.dateTo as string) || undefined,
+                        format: exportFormat,
+                      });
+                      saveDownloadedFile(file.blob, file.fileName);
+                      toast.success("Payments export downloaded");
+                    } catch (error) {
+                      toast.error(getErrorMessage(error, "Failed to export payments"));
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                >
+                  <Download className="mr-2 size-4" />
+                  Export
+                </Button>
+              </div>
             ) : null
           }
         />
@@ -1074,6 +1085,9 @@ export const PaymentsPage = () => {
                 try {
                   setReminderSubmitting(true);
                   const response = await paymentsApi.sendReminder(values);
+                  if (response.data.whatsappUrl) {
+                    window.open(response.data.whatsappUrl, "_blank", "noopener,noreferrer");
+                  }
                   if (response.data.reminder.status === "sent") {
                     toast.success("Reminder processed");
                   } else {
@@ -1242,3 +1256,4 @@ export const PaymentsPage = () => {
     </>
   );
 };
+

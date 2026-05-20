@@ -7,7 +7,7 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { LoadingState } from "../../../components/ui/LoadingState";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { getErrorMessage } from "../../../lib/errors";
-import { useToast } from "../../../providers/ToastProvider";
+import { useToast } from "../../../providers/useToast";
 import { paymentsApi } from "../../../services/paymentsApi";
 import type { PaymentReceipt, PaymentReceiptData } from "../../../types/payment";
 import { formatDateTime } from "../../customers/customerUtils";
@@ -113,3 +113,4 @@ export const ReceiptDrawer = ({
     </SideSheet>
   );
 };
+

@@ -6,7 +6,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { getErrorMessage } from "../../../lib/errors";
-import { useToast } from "../../../providers/ToastProvider";
+import { useToast } from "../../../providers/useToast";
 import { notificationsApi } from "../../../services/notificationsApi";
 import type { ManualNotificationInput, NotificationPriority, NotificationType } from "../../../types/notification";
 import {
@@ -155,3 +155,4 @@ export const ManualNotificationModal = ({
     </Modal>
   );
 };
+

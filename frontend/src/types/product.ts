@@ -232,7 +232,7 @@ export interface ProductLookupItem {
   stockTrackingEnabled: boolean;
 }
 
-export interface ProductLookupResponse extends Array<ProductLookupItem> {}
+export type ProductLookupResponse = ProductLookupItem[];
 
 export interface ProductPriceHistorySnapshot {
   taxType: TaxType;

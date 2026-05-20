@@ -7,8 +7,8 @@ import { ROLE_LABELS } from "../../constants/permissions";
 import { usersApi } from "../../services/usersApi";
 import type { PaginatedUsersResponse } from "../../types/api";
 import type { PermissionKey, Role, User, UserStatus } from "../../types/auth";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent } from "../../components/ui/Card";
@@ -298,3 +298,4 @@ export const UsersPage = () => {
     </div>
   );
 };
+

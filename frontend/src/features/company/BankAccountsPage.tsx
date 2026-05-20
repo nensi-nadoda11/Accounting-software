@@ -4,7 +4,7 @@ import type { z } from "zod";
 
 import { getErrorMessage } from "../../lib/errors";
 import { bankApi } from "../../services/bankApi";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent } from "../../components/ui/Card";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
@@ -267,3 +267,4 @@ export const BankAccountsPage = () => {
     </div>
   );
 };
+

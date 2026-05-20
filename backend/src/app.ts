@@ -8,7 +8,7 @@ import { env } from "./config/env";
 import { errorHandler } from "./middlewares/error-handler.middleware";
 import { notFoundHandler } from "./middlewares/not-found.middleware";
 import apiRoutes from "./routes";
-import { ensureUploadDirectory, getPublicUploadMountPath, getUploadRootPath } from "./utils/upload";
+import { ensureUploadDirectory, getUploadRootPath } from "./utils/upload";
 
 export const app = express();
 
@@ -26,13 +26,6 @@ app.use(cookieParser());
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
 ensureUploadDirectory(getUploadRootPath());
-app.use(
-  getPublicUploadMountPath(),
-  express.static(getUploadRootPath(), {
-    index: false,
-    redirect: false
-  })
-);
 
 app.get("/health", (_request, response) => {
   response.json({

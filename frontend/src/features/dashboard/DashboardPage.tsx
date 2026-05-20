@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { useAuth } from "../../providers/AuthProvider";
+import { useAuth } from "../../providers/useAuth";
 import { dashboardApi } from "../../services/dashboardApi";
 import type {
   DashboardAlertsResponse,
@@ -229,3 +229,4 @@ export const DashboardPage = () => {
     </div>
   );
 };
+

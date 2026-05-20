@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 
 import { getErrorMessage } from "../../lib/errors";
 import { authApi } from "../../services/authApi";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { AuthShell } from "./AuthShell";
 import { resetPasswordSchema } from "./authSchemas";
 import { Button } from "../../components/ui/Button";
@@ -17,6 +17,7 @@ type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 export const ResetPasswordPage = () => {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const toast = useToast();
   const [formError, setFormError] = useState<string>();
   const form = useForm<ResetPasswordValues>({
@@ -34,7 +35,7 @@ export const ResetPasswordPage = () => {
     try {
       await authApi.resetPassword(values);
       toast.success("Password reset successful");
-      window.location.href = "/login";
+      navigate("/login", { replace: true });
     } catch (error) {
       setFormError(getErrorMessage(error, "Reset failed"));
     }
@@ -72,3 +73,4 @@ export const ResetPasswordPage = () => {
     </AuthShell>
   );
 };
+

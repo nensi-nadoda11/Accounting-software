@@ -261,7 +261,7 @@ export class SalesController {
   };
 
   public generateInvoicePdf = async (request: Request, response: Response): Promise<void> => {
-    const data = await salesService.generateInvoicePdf(
+    const file = await salesService.generateInvoicePdf(
       {
         id: request.currentUser!.id,
         companyId: request.currentUser!.companyId!,
@@ -274,7 +274,9 @@ export class SalesController {
       }
     );
 
-    response.json(successResponse("Sales invoice PDF payload fetched successfully", data));
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `attachment; filename="${file.fileName}"`);
+    response.send(file.content);
   };
 
   public sendInvoiceEmail = async (request: Request, response: Response): Promise<void> => {

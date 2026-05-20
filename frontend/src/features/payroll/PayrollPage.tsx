@@ -18,8 +18,8 @@ import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Table, TableWrapper } from "../../components/ui/Table";
 import { Textarea } from "../../components/ui/Textarea";
 import { getErrorMessage } from "../../lib/errors";
-import { useAuth } from "../../providers/AuthProvider";
-import { useToast } from "../../providers/ToastProvider";
+import { useAuth } from "../../providers/useAuth";
+import { useToast } from "../../providers/useToast";
 import { bankApi } from "../../services/bankApi";
 import { payrollApi } from "../../services/payrollApi";
 import type { CompanyBankAccount } from "../../types/company";
@@ -27,6 +27,7 @@ import type {
   Attendance,
   Employee,
   PaginationMeta,
+  PayrollExportFormat,
   PayrollItem,
   PayrollPaymentMode,
   PayrollRun,
@@ -267,6 +268,7 @@ export const PayrollPage = () => {
   const [reportSummary, setReportSummary] = useState<Array<{ label: string; value: string | number }>>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [exportingReport, setExportingReport] = useState(false);
+  const [exportFormat, setExportFormat] = useState<PayrollExportFormat>("xlsx");
 
   const runForm = useForm<z.input<typeof payrollRunFormSchema>, undefined, PayrollRunFormValues>({
     resolver: zodResolver(payrollRunFormSchema),
@@ -710,14 +712,11 @@ export const PayrollPage = () => {
   const handleDownloadSlip = async (itemId: string) => {
     try {
       setSlipDownloading(true);
-      const response = await payrollApi.getSlipPdf(itemId);
-      setActiveSlip(response.data.slip);
-      setSlipDrawerOpen(true);
-      if (!response.data.pdfAvailable) {
-        toast.success("PDF is not available from backend. Opening salary slip preview.");
-      }
+      const file = await payrollApi.getSlipPdf(itemId);
+      saveDownloadedFile(file.blob, file.fileName);
+      toast.success("Salary slip PDF downloaded");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load salary slip PDF"));
+      toast.error(getErrorMessage(error, "Failed to download salary slip PDF"));
     } finally {
       setSlipDownloading(false);
     }
@@ -827,13 +826,12 @@ export const PayrollPage = () => {
         page: 1,
         limit: 100,
         runId: run.id,
-        format: "csv",
+        format: exportFormat,
       });
       saveDownloadedFile(file.blob, file.fileName);
       toast.success("Payroll exported");
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to export payroll run"));
-    } finally {
     }
   };
 
@@ -846,7 +844,7 @@ export const PayrollPage = () => {
         month: reportFilters.month || undefined,
         employeeId: reportFilters.employeeId || undefined,
         department: reportFilters.department || undefined,
-        format: "csv",
+        format: exportFormat,
       });
       saveDownloadedFile(file.blob, file.fileName);
       toast.success("Report exported");
@@ -913,11 +911,20 @@ export const PayrollPage = () => {
                   Create Run
                 </Button>
               ) : null}
-              {activeTab === "reports" && canExport ? (
-                <Button variant="secondary" loading={exportingReport} onClick={() => void handleReportExport()}>
-                  <Download className="mr-2 size-4" />
-                  Export
-                </Button>
+              {(activeTab === "reports" || activeTab === "payroll-runs") && canExport ? (
+                <>
+                  <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PayrollExportFormat)} className="w-28">
+                    <option value="csv">CSV</option>
+                    <option value="xlsx">XLSX</option>
+                    <option value="pdf">PDF</option>
+                  </Select>
+                  {activeTab === "reports" ? (
+                    <Button variant="secondary" loading={exportingReport} onClick={() => void handleReportExport()}>
+                      <Download className="mr-2 size-4" />
+                      Export
+                    </Button>
+                  ) : null}
+                </>
               ) : null}
             </div>
           }
@@ -1807,3 +1814,4 @@ export const PayrollPage = () => {
     </>
   );
 };
+

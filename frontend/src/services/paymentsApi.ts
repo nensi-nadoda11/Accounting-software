@@ -15,9 +15,9 @@ import type {
   PaymentFormInput,
   PaymentListQuery,
   PaymentListResponse,
-  PaymentPdfPayload,
   PaymentReminderQuery,
   PaymentRemindersResponse,
+  PaymentExportFormat,
   SendReceiptInput,
   SendReminderInput,
   UpdateChequeStatusInput,
@@ -35,7 +35,7 @@ const getFileNameFromDisposition = (contentDisposition: string | undefined, fall
     return decodeURIComponent(utfMatch[1]);
   }
 
-  const match = contentDisposition.match(/filename=\"?([^\"]+)\"?/i);
+  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
   return match?.[1] ?? fallback;
 };
 
@@ -90,7 +90,7 @@ export const paymentsApi = {
   cancel: async (paymentId: string, payload: CancelPaymentInput) =>
     (await client.post<ApiResponse<PaymentDetailResponse>>(`/payments/${paymentId}/cancel`, payload)).data,
 
-  exportList: async (query: PaymentListQuery) =>
+  exportList: async (query: PaymentListQuery & { format?: PaymentExportFormat }) =>
     extractDownload(
       client.get("/payments/export", {
         params: {
@@ -105,7 +105,7 @@ export const paymentsApi = {
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
           isAdvance: query.isAdvance,
-          format: "csv",
+          format: query.format ?? "csv",
         },
         responseType: "blob",
       }),
@@ -158,8 +158,13 @@ export const paymentsApi = {
     (await client.get<ApiResponse<{ receipt: PaymentDetailResponse["payment"]["receipt"] & { receiptData: unknown } }>>(`/payments/${paymentId}/receipt`))
       .data,
 
-  getReceiptPdfPayload: async (paymentId: string) =>
-    (await client.get<ApiResponse<PaymentPdfPayload>>(`/payments/${paymentId}/receipt/pdf`)).data,
+  getReceiptPdfFile: async (paymentId: string) =>
+    extractDownload(
+      client.get(`/payments/${paymentId}/receipt/pdf`, {
+        responseType: "blob",
+      }),
+      `payment-receipt-${paymentId}.pdf`,
+    ),
 
   sendReceipt: async (paymentId: string, payload: SendReceiptInput) =>
     (await client.post<ApiResponse<{ sentTo: string; status: "sent" | "failed"; errorMessage: string | null }>>(`/payments/${paymentId}/send-receipt`, payload))
@@ -181,7 +186,7 @@ export const paymentsApi = {
     ).data,
 
   sendReminder: async (payload: SendReminderInput) =>
-    (await client.post<ApiResponse<{ reminder: { id: string; status: string; channel: string; errorMessage: string | null; sentAt: string | null } }>>("/payments/reminders/send", payload)).data,
+    (await client.post<ApiResponse<{ reminder: { id: string; status: string; channel: string; errorMessage: string | null; sentAt: string | null }; whatsappUrl?: string }>>("/payments/reminders/send", payload)).data,
 
   updateReminderStatus: async (reminderId: string, payload: UpdateReminderStatusInput) =>
     (await client.patch<ApiResponse<{ reminder: { id: string; status: string; errorMessage: string | null; sentAt: string | null } }>>(`/payments/reminders/${reminderId}/status`, payload)).data,

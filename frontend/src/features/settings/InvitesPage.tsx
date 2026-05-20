@@ -7,7 +7,7 @@ import { getErrorMessage } from "../../lib/errors";
 import { upsertStoredInvite, getStoredInvites, saveStoredInvites } from "../../lib/invite-storage";
 import { usersApi } from "../../services/usersApi";
 import type { InviteRecord } from "../../types/api";
-import { useToast } from "../../providers/ToastProvider";
+import { useToast } from "../../providers/useToast";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -201,3 +201,4 @@ export const InvitesPage = () => {
     </div>
   );
 };
+

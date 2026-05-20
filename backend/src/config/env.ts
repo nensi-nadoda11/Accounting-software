@@ -35,6 +35,8 @@ const envSchema = z.object({
   INVITE_EXPIRY_HOURS: z.coerce.number().int().positive(),
   PASSWORD_RESET_EXPIRY_MINUTES: z.coerce.number().int().positive(),
   INVENTORY_EXPIRY_ALERT_DAYS: z.coerce.number().int().positive().default(30),
+  DB_POOL_MAX: z.coerce.number().int().positive().default(20),
+  DB_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   UPLOAD_DIR: z.string().trim().min(1).default("uploads"),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(2),
   EXPENSE_UPLOAD_DIR: z.string().trim().min(1).default("uploads/expenses"),

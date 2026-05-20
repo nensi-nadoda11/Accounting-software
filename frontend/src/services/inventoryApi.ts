@@ -34,7 +34,7 @@ const getFileNameFromDisposition = (contentDisposition: string | undefined, fall
     return decodeURIComponent(utfMatch[1]);
   }
 
-  const match = contentDisposition.match(/filename=\"?([^\"]+)\"?/i);
+  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
   return match?.[1] ?? fallback;
 };
 

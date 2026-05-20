@@ -1,10 +1,20 @@
-export const TOP_NAV_ITEMS = [
+import type { PermissionKey } from "../types/auth";
+
+export type TopNavMenu = "dashboard" | "accounting" | "sales" | "purchases" | "inventory" | "hr-payroll" | "reports" | "settings";
+
+type NavPermissionChecker = (permission: PermissionKey | PermissionKey[]) => boolean;
+type PermissionAwareRoute = {
+  href: string;
+  permissions?: readonly PermissionKey[];
+};
+
+export const TOP_NAV_ITEMS: ReadonlyArray<{ label: string; href: string; menu: TopNavMenu }> = [
   { label: "Dashboard", href: "/app/dashboard", menu: "dashboard" },
-  { label: "Accounting", href: "/app/accounting/core", menu: "accounting" },
-  { label: "Sales", href: "/app/sales/customers", menu: "sales" },
-  { label: "Purchases", href: "/app/purchases/suppliers", menu: "purchases" },
-  { label: "Inventory", href: "/app/inventory/stock", menu: "inventory" },
-  { label: "HR & Payroll", href: "/app/hr-payroll/payroll", menu: "hr-payroll" },
+  { label: "Accounting", href: "/app/accounting", menu: "accounting" },
+  { label: "Sales", href: "/app/sales", menu: "sales" },
+  { label: "Purchases", href: "/app/purchases", menu: "purchases" },
+  { label: "Inventory", href: "/app/inventory", menu: "inventory" },
+  { label: "HR & Payroll", href: "/app/hr-payroll", menu: "hr-payroll" },
   { label: "Reports", href: "/app/reports", menu: "reports" },
   { label: "Settings", href: "/app/settings", menu: "settings" },
 ] as const;
@@ -136,3 +146,44 @@ export const HR_PAYROLL_TABS = [
     ],
   },
 ] as const;
+
+const DASHBOARD_ROUTES = [{ href: "/app/dashboard", permissions: ["dashboard.view"] }] as const satisfies readonly PermissionAwareRoute[];
+const REPORTS_ROUTES = [{ href: "/app/reports", permissions: ["reports.view", "report.view"] }] as const satisfies readonly PermissionAwareRoute[];
+
+const isRouteAccessible = (route: PermissionAwareRoute, hasPermission: NavPermissionChecker) =>
+  route.permissions ? hasPermission(Array.from(route.permissions)) : true;
+
+const getRoutesForMenu = (menu: TopNavMenu): readonly PermissionAwareRoute[] => {
+  switch (menu) {
+    case "dashboard":
+      return DASHBOARD_ROUTES;
+    case "accounting":
+      return ACCOUNTING_TABS;
+    case "sales":
+      return SALES_TABS;
+    case "purchases":
+      return PURCHASES_TABS;
+    case "inventory":
+      return INVENTORY_TABS;
+    case "hr-payroll":
+      return HR_PAYROLL_TABS;
+    case "reports":
+      return REPORTS_ROUTES;
+    case "settings":
+      return SETTINGS_TABS;
+    default:
+      return [];
+  }
+};
+
+export const getFirstAccessibleTopNavHref = (menu: TopNavMenu, hasPermission: NavPermissionChecker) =>
+  getRoutesForMenu(menu).find((route) => isRouteAccessible(route, hasPermission))?.href ?? null;
+
+export const getAccessibleTopNavItems = (hasPermission: NavPermissionChecker) =>
+  TOP_NAV_ITEMS.flatMap((item) => {
+    const href = getFirstAccessibleTopNavHref(item.menu, hasPermission);
+    return href ? [{ ...item, href }] : [];
+  });
+
+export const getDefaultAppHref = (hasPermission: NavPermissionChecker) =>
+  getAccessibleTopNavItems(hasPermission)[0]?.href ?? "/app/settings/profile";

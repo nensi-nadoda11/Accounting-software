@@ -2,6 +2,7 @@ import { Suspense, lazy, type ComponentType } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AppLayout } from "../components/layout/AppLayout";
+import { getDefaultAppHref, getFirstAccessibleTopNavHref, type TopNavMenu } from "../constants/navigation";
 import { useAuth } from "../providers/useAuth";
 import { PermissionRoute, ProtectedRoute, PublicOnlyRoute } from "./guards";
 import type { PurchasePageTab } from "../features/purchases/PurchasePage";
@@ -55,6 +56,17 @@ const UnauthorizedPage = lazyNamed<Record<string, never>>(() => import("../featu
 
 const RouteFallback = () => <div className="p-6 text-sm text-slate-500">Loading page...</div>;
 
+const AppIndexRedirect = () => {
+  const auth = useAuth();
+  return <Navigate to={getDefaultAppHref(auth.hasPermission)} replace />;
+};
+
+const SectionIndexRedirect = ({ menu }: { menu: Extract<TopNavMenu, "accounting" | "sales" | "purchases" | "inventory" | "hr-payroll"> }) => {
+  const auth = useAuth();
+  const href = getFirstAccessibleTopNavHref(menu, auth.hasPermission) ?? getDefaultAppHref(auth.hasPermission);
+  return <Navigate to={href} replace />;
+};
+
 const SettingsIndexRedirect = () => {
   const auth = useAuth();
 
@@ -104,7 +116,7 @@ export const AppRouter = () => (
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/app/dashboard" replace />} />
+          <Route index element={<AppIndexRedirect />} />
           <Route
             path="dashboard"
             element={
@@ -131,6 +143,7 @@ export const AppRouter = () => (
               </PermissionRoute>
             }
           />
+          <Route path="accounting" element={<SectionIndexRedirect menu="accounting" />} />
           <Route
             path="accounting/core"
             element={
@@ -207,6 +220,7 @@ export const AppRouter = () => (
               </PermissionRoute>
             }
           />
+          <Route path="sales" element={<SectionIndexRedirect menu="sales" />} />
           <Route
             path="sales/invoices"
             element={
@@ -247,6 +261,7 @@ export const AppRouter = () => (
               </PermissionRoute>
             }
           />
+          <Route path="purchases" element={<SectionIndexRedirect menu="purchases" />} />
           <Route
             path="purchases/invoices"
             element={
@@ -287,6 +302,7 @@ export const AppRouter = () => (
               </PermissionRoute>
             }
           />
+          <Route path="inventory" element={<SectionIndexRedirect menu="inventory" />} />
           <Route
             path="inventory/stock"
             element={
@@ -303,6 +319,7 @@ export const AppRouter = () => (
               </PermissionRoute>
             }
           />
+          <Route path="hr-payroll" element={<SectionIndexRedirect menu="hr-payroll" />} />
           <Route
             path="hr-payroll/payroll"
             element={

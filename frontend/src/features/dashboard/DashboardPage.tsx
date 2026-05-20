@@ -81,28 +81,45 @@ export const DashboardPage = () => {
     setTasks((current) => ({ ...current, loading: true, error: null }));
     setTopProducts((current) => ({ ...current, loading: true, error: null }));
 
-    try {
-      const [summaryResponse, roleResponse, alertsResponse, tasksResponse, topProductsResponse] = await Promise.all([
-        dashboardApi.getSummary(),
-        dashboardApi.getRoleDashboard(),
-        dashboardApi.getAlerts(),
-        dashboardApi.getPendingTasks(),
-        dashboardApi.getTopProducts(filters)
-      ]);
+    const [summaryResponse, roleResponse, alertsResponse, tasksResponse, topProductsResponse] = await Promise.allSettled([
+      dashboardApi.getSummary(),
+      dashboardApi.getRoleDashboard(),
+      dashboardApi.getAlerts(),
+      dashboardApi.getPendingTasks(),
+      dashboardApi.getTopProducts(filters)
+    ]);
 
-      setSummary({ data: summaryResponse.data, loading: false, error: null });
-      setRoleDashboard({ data: roleResponse.data, loading: false, error: null });
-      setAlerts({ data: alertsResponse.data, loading: false, error: null });
-      setTasks({ data: tasksResponse.data, loading: false, error: null });
-      setTopProducts({ data: topProductsResponse.data, loading: false, error: null });
-    } catch {
-      const message = "Dashboard widgets could not be loaded.";
-      setSummary((current) => ({ ...current, loading: false, error: current.data ? current.error : message }));
-      setRoleDashboard((current) => ({ ...current, loading: false, error: message }));
-      setAlerts((current) => ({ ...current, loading: false, error: message }));
-      setTasks((current) => ({ ...current, loading: false, error: message }));
-      setTopProducts((current) => ({ ...current, loading: false, error: message }));
-    }
+    const message = "Dashboard widgets could not be loaded.";
+
+    setSummary((current) =>
+      summaryResponse.status === "fulfilled"
+        ? { data: summaryResponse.value.data, loading: false, error: null }
+        : { ...current, loading: false, error: current.data ? current.error : message }
+    );
+
+    setRoleDashboard((current) =>
+      roleResponse.status === "fulfilled"
+        ? { data: roleResponse.value.data, loading: false, error: null }
+        : { ...current, loading: false, error: current.data ? current.error : message }
+    );
+
+    setAlerts((current) =>
+      alertsResponse.status === "fulfilled"
+        ? { data: alertsResponse.value.data, loading: false, error: null }
+        : { ...current, loading: false, error: message }
+    );
+
+    setTasks((current) =>
+      tasksResponse.status === "fulfilled"
+        ? { data: tasksResponse.value.data, loading: false, error: null }
+        : { ...current, loading: false, error: message }
+    );
+
+    setTopProducts((current) =>
+      topProductsResponse.status === "fulfilled"
+        ? { data: topProductsResponse.value.data, loading: false, error: null }
+        : { ...current, loading: false, error: message }
+    );
   };
 
   const loadActivities = async (page: number) => {

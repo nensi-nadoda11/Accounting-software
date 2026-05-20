@@ -10,33 +10,28 @@ type ValidationSchemas = {
   params?: ZodTypeAny;
 };
 
+const setRequestValue = (request: Request, key: "body" | "query" | "params", value: unknown) => {
+  Object.defineProperty(request, key, {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value
+  });
+};
+
 export const validateRequest = (schemas: ValidationSchemas) => {
   return (request: Request, response: Response, next: NextFunction): void => {
     try {
       if (schemas.body) {
-        request.body = schemas.body.parse(request.body);
+        setRequestValue(request, "body", schemas.body.parse(request.body));
       }
 
       if (schemas.query) {
-        const parsedQuery = schemas.query.parse(request.query) as Record<string, unknown>;
-        const currentQuery = request.query as Record<string, unknown>;
-
-        for (const key of Object.keys(currentQuery)) {
-          delete currentQuery[key];
-        }
-
-        Object.assign(currentQuery, parsedQuery);
+        setRequestValue(request, "query", schemas.query.parse(request.query));
       }
 
       if (schemas.params) {
-        const parsedParams = schemas.params.parse(request.params) as Record<string, string>;
-        const currentParams = request.params as Record<string, string>;
-
-        for (const key of Object.keys(currentParams)) {
-          delete currentParams[key];
-        }
-
-        Object.assign(currentParams, parsedParams);
+        setRequestValue(request, "params", schemas.params.parse(request.params));
       }
 
       next();

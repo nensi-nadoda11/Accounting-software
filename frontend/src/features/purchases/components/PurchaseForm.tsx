@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFieldArray, useForm, type UseFormSetError } from "react-hook-form";
 import { ArrowLeft, Plus, Save } from "lucide-react";
 
@@ -16,8 +16,8 @@ import { productsApi } from "../../../services/productsApi";
 import { suppliersApi } from "../../../services/suppliersApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../../types/company";
 import type { Warehouse } from "../../../types/inventory";
-import type { Product } from "../../../types/product";
-import type { Supplier, SupplierFormInput } from "../../../types/supplier";
+import type { Product, ProductListItem, ProductLookupItem } from "../../../types/product";
+import type { Supplier, SupplierFormInput, SupplierListItem } from "../../../types/supplier";
 import type { PurchaseFormInput, PurchaseInvoice, PurchasePaymentMode } from "../../../types/purchase";
 import { SupplierFormDrawer } from "../../suppliers/components/SupplierFormDrawer";
 import { createSupplierPayload } from "../../suppliers/supplierUtils";
@@ -37,6 +37,58 @@ import { PurchaseItemsTable } from "./PurchaseItemsTable";
 import { PurchaseTotalsPanel } from "./PurchaseTotalsPanel";
 
 type SupplierLookupValue = LookupOption | null;
+const SUPPLIER_DIRECTORY_LIMIT = 100;
+const PRODUCT_DIRECTORY_LIMIT = 100;
+
+const buildSupplierLookupOption = (supplier: Pick<SupplierListItem, "id" | "name" | "supplierCode" | "mobile">): LookupOption => ({
+  id: supplier.id,
+  label: supplier.name,
+  description: supplier.supplierCode,
+  meta: supplier.mobile,
+});
+
+const doesSupplierMatch = (supplier: Pick<SupplierListItem, "name" | "supplierCode" | "mobile" | "businessName" | "email">, search: string) => {
+  const normalizedSearch = search.trim().toLowerCase();
+
+  if (!normalizedSearch) {
+    return false;
+  }
+
+  return [supplier.name, supplier.supplierCode, supplier.mobile, supplier.businessName, supplier.email]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.toLowerCase().includes(normalizedSearch));
+};
+
+const buildProductLookupOptionFromListItem = (
+  product: Pick<ProductListItem, "id" | "name" | "productCode" | "sku" | "barcode" | "purchasePrice" | "unit">,
+): LookupOption => ({
+  id: product.id,
+  label: product.name,
+  description: [product.productCode, product.sku, product.barcode].filter(Boolean).join(" · "),
+  meta: product.unit.symbol ? `${product.purchasePrice} · ${product.unit.symbol}` : product.purchasePrice,
+});
+
+const buildProductLookupOptionFromLookupItem = (product: ProductLookupItem): LookupOption => ({
+  id: product.id,
+  label: product.name,
+  description: [product.productCode, product.sku, product.barcode].filter(Boolean).join(" · "),
+  meta: product.unit.symbol ? `${product.purchasePrice} · ${product.unit.symbol}` : product.purchasePrice,
+});
+
+const doesProductMatch = (
+  product: Pick<ProductListItem, "name" | "productCode" | "sku" | "barcode" | "brand" | "hsnSacCode">,
+  search: string,
+) => {
+  const normalizedSearch = search.trim().toLowerCase();
+
+  if (!normalizedSearch) {
+    return false;
+  }
+
+  return [product.name, product.productCode, product.sku, product.barcode, product.brand, product.hsnSacCode]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.toLowerCase().includes(normalizedSearch));
+};
 
 export const PurchaseForm = ({
   initialInvoice,
@@ -65,7 +117,13 @@ export const PurchaseForm = ({
   const toast = useToast();
   const [submitMode, setSubmitMode] = useState<"draft" | "posted">("draft");
   const [supplierLookup, setSupplierLookup] = useState<LookupOption[]>([]);
+  const [supplierDirectory, setSupplierDirectory] = useState<SupplierListItem[]>([]);
+  const [supplierDirectoryLoaded, setSupplierDirectoryLoaded] = useState(false);
+  const [supplierLookupMessage, setSupplierLookupMessage] = useState<string | null>(null);
   const [productLookup, setProductLookup] = useState<LookupOption[]>([]);
+  const [productDirectory, setProductDirectory] = useState<ProductListItem[]>([]);
+  const [productDirectoryLoaded, setProductDirectoryLoaded] = useState(false);
+  const [productLookupMessage, setProductLookupMessage] = useState<string | null>(null);
   const [supplierLookupValue, setSupplierLookupValue] = useState<SupplierLookupValue>(null);
   const [supplierLoading, setSupplierLoading] = useState(false);
   const [supplierDrawerOpen, setSupplierDrawerOpen] = useState(false);
@@ -73,6 +131,8 @@ export const PurchaseForm = ({
   const [productLookupLoading, setProductLookupLoading] = useState(false);
   const [supplierDetail, setSupplierDetail] = useState<Supplier | null>(null);
   const [productDetails, setProductDetails] = useState<Record<string, Product>>({});
+  const supplierLookupRequestRef = useRef(0);
+  const productLookupRequestRef = useRef(0);
   const canCreateSupplier = auth.hasPermission("supplier.create");
 
   const form = useForm<PurchaseFormValues, undefined, PurchaseFormInput>({
@@ -107,6 +167,78 @@ export const PurchaseForm = ({
   useEffect(() => {
     form.setValue("grandTotalPreview", Number(preview.grandTotal), { shouldDirty: false, shouldValidate: true });
   }, [form, preview.grandTotal]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await suppliersApi.list({
+          page: 1,
+          limit: SUPPLIER_DIRECTORY_LIMIT,
+          status: "active",
+          sortBy: "name",
+          sortOrder: "asc",
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setSupplierDirectory(response.data.items);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setSupplierDirectory([]);
+      } finally {
+        if (!cancelled) {
+          setSupplierDirectoryLoaded(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await productsApi.list({
+          page: 1,
+          limit: PRODUCT_DIRECTORY_LIMIT,
+          status: "active",
+          sortBy: "name",
+          sortOrder: "asc",
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setProductDirectory(response.data.items);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setProductDirectory([]);
+      } finally {
+        if (!cancelled) {
+          setProductDirectoryLoaded(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!initialInvoice) {
@@ -149,32 +281,108 @@ export const PurchaseForm = ({
     })();
   }, [form, initialInvoice, invoiceSettings]);
 
-  const loadSuppliers = async (search: string) => {
+  const stopSupplierLookup = useCallback(() => {
+    supplierLookupRequestRef.current += 1;
+    setSupplierLoading(false);
+    setSupplierLookup([]);
+    setSupplierLookupMessage(null);
+  }, []);
+
+  const loadSuppliers = useCallback(async (search: string) => {
+    const normalizedSearch = search.trim();
+    const requestId = supplierLookupRequestRef.current + 1;
+    supplierLookupRequestRef.current = requestId;
+    setSupplierLookupMessage(null);
+
+    if (!normalizedSearch) {
+      setSupplierLoading(false);
+      setSupplierLookup([]);
+      return;
+    }
+
+    const cachedMatches = supplierDirectory
+      .filter((supplier) => doesSupplierMatch(supplier, normalizedSearch))
+      .slice(0, 20)
+      .map(buildSupplierLookupOption);
+
+    if (cachedMatches.length > 0) {
+      setSupplierLookup(cachedMatches);
+    }
+
+    if (supplierDirectoryLoaded && (cachedMatches.length > 0 || supplierDirectory.length < SUPPLIER_DIRECTORY_LIMIT)) {
+      setSupplierLoading(false);
+
+      if (cachedMatches.length === 0) {
+        setSupplierLookup([]);
+      }
+
+      return;
+    }
+
     try {
       setSupplierLoading(true);
       const response = await suppliersApi.list({
         page: 1,
         limit: 20,
-        search,
+        search: normalizedSearch,
         status: "active",
       });
-      setSupplierLookup(
-        response.data.items.map((supplier) => ({
-          id: supplier.id,
-          label: supplier.name,
-          description: supplier.supplierCode,
-          meta: supplier.mobile,
-        })),
-      );
-    } finally {
-      setSupplierLoading(false);
-    }
-  };
+      if (supplierLookupRequestRef.current !== requestId) {
+        return;
+      }
 
-  const loadProducts = async (search: string) => {
+      setSupplierDirectory((current) => {
+        const next = new Map(current.map((supplier) => [supplier.id, supplier]));
+        response.data.items.forEach((supplier) => {
+          next.set(supplier.id, supplier);
+        });
+        return Array.from(next.values());
+      });
+
+      const remoteOptions = response.data.items.map(buildSupplierLookupOption);
+      const mergedOptions = new Map<string, LookupOption>();
+
+      [...cachedMatches, ...remoteOptions].forEach((option) => {
+        mergedOptions.set(option.id, option);
+      });
+
+      setSupplierLookup(Array.from(mergedOptions.values()));
+    } catch {
+      if (supplierLookupRequestRef.current !== requestId) {
+        return;
+      }
+
+      if (cachedMatches.length > 0) {
+        setSupplierLookup(cachedMatches);
+        setSupplierLookupMessage("Showing cached suppliers. Live search is temporarily unavailable.");
+      } else {
+        setSupplierLookup([]);
+        setSupplierLookupMessage("Could not load suppliers. Check backend/database connection.");
+      }
+    } finally {
+      if (supplierLookupRequestRef.current === requestId) {
+        setSupplierLoading(false);
+      }
+    }
+  }, [supplierDirectory, supplierDirectoryLoaded]);
+
+  const loadProducts = useCallback(async (search: string) => {
+    const normalizedSearch = search.trim();
+    const requestId = productLookupRequestRef.current + 1;
+    productLookupRequestRef.current = requestId;
+
+    if (!normalizedSearch) {
+      setProductLookupLoading(false);
+      setProductLookup([]);
+      return;
+    }
+
     try {
       setProductLookupLoading(true);
-      const response = await productsApi.lookup(search, 20);
+      const response = await productsApi.lookup(normalizedSearch, 20);
+      if (productLookupRequestRef.current !== requestId) {
+        return;
+      }
       setProductLookup(
         response.data.map((product) => ({
           id: product.id,
@@ -183,12 +391,88 @@ export const PurchaseForm = ({
           meta: product.unit.symbol ? `${product.purchasePrice} · ${product.unit.symbol}` : product.purchasePrice,
         })),
       );
+    } catch {
+      if (productLookupRequestRef.current !== requestId) {
+        return;
+      }
+
+      setProductLookup([]);
     } finally {
-      setProductLookupLoading(false);
+      if (productLookupRequestRef.current === requestId) {
+        setProductLookupLoading(false);
+      }
     }
-  };
+  }, []);
+
+  const loadProductsWithFallback = useCallback(async (search: string) => {
+    const normalizedSearch = search.trim();
+    const requestId = productLookupRequestRef.current + 1;
+    productLookupRequestRef.current = requestId;
+    setProductLookupMessage(null);
+
+    if (!normalizedSearch) {
+      setProductLookupLoading(false);
+      setProductLookup([]);
+      return;
+    }
+
+    const cachedMatches = productDirectory
+      .filter((product) => doesProductMatch(product, normalizedSearch))
+      .slice(0, 20)
+      .map(buildProductLookupOptionFromListItem);
+
+    if (cachedMatches.length > 0) {
+      setProductLookup(cachedMatches);
+    }
+
+    if (productDirectoryLoaded && (cachedMatches.length > 0 || productDirectory.length < PRODUCT_DIRECTORY_LIMIT)) {
+      setProductLookupLoading(false);
+
+      if (cachedMatches.length === 0) {
+        setProductLookup([]);
+      }
+
+      return;
+    }
+
+    try {
+      setProductLookupLoading(true);
+      const response = await productsApi.lookup(normalizedSearch, 20);
+      if (productLookupRequestRef.current !== requestId) {
+        return;
+      }
+
+      const remoteOptions = response.data.map(buildProductLookupOptionFromLookupItem);
+      const mergedOptions = new Map<string, LookupOption>();
+
+      [...cachedMatches, ...remoteOptions].forEach((option) => {
+        mergedOptions.set(option.id, option);
+      });
+
+      setProductLookup(Array.from(mergedOptions.values()));
+    } catch {
+      if (productLookupRequestRef.current !== requestId) {
+        return;
+      }
+
+      if (cachedMatches.length > 0) {
+        setProductLookup(cachedMatches);
+        setProductLookupMessage("Showing cached products. Live search is temporarily unavailable.");
+      } else {
+        setProductLookup([]);
+        setProductLookupMessage("Could not load products. Check backend/database connection.");
+      }
+    } finally {
+      if (productLookupRequestRef.current === requestId) {
+        setProductLookupLoading(false);
+      }
+    }
+  }, [productDirectory, productDirectoryLoaded]);
+
+  void loadProducts;
 
   const handleSupplierSelect = async (option: LookupOption) => {
+    stopSupplierLookup();
     setSupplierLookupValue(option);
     form.setValue("supplierId", option.id, { shouldDirty: true, shouldValidate: true });
 
@@ -254,6 +538,28 @@ export const PurchaseForm = ({
         meta: supplier.mobile,
       };
 
+      setSupplierDirectory((current) => {
+        const next = new Map(current.map((item) => [item.id, item]));
+        next.set(supplier.id, {
+          id: supplier.id,
+          supplierCode: supplier.supplierCode,
+          name: supplier.name,
+          supplierType: supplier.supplierType,
+          businessName: supplier.businessName,
+          mobile: supplier.mobile,
+          email: supplier.email,
+          gstNumber: supplier.gstNumber,
+          taxType: supplier.taxType,
+          status: supplier.status,
+          isBlacklisted: supplier.isBlacklisted,
+          isPreferred: supplier.isPreferred,
+          createdAt: supplier.createdAt,
+          updatedAt: supplier.updatedAt,
+          creditDays: supplier.creditDays,
+          outstandingSummary: response.data.outstandingSummary,
+        });
+        return Array.from(next.values());
+      });
       setSupplierLookup((current) => [lookupOption, ...current.filter((option) => option.id !== supplier.id)]);
       setSupplierLookupValue(lookupOption);
       setSupplierDetail(supplier);
@@ -326,9 +632,11 @@ export const PurchaseForm = ({
               options={supplierLookup}
               placeholder="Search supplier"
               error={form.formState.errors.supplierId?.message}
+              noResultsLabel={supplierLookupMessage ?? "No matching active suppliers found"}
               onSearch={loadSuppliers}
               onSelect={(option) => void handleSupplierSelect(option)}
               onClear={() => {
+                stopSupplierLookup();
                 setSupplierLookupValue(null);
                 setSupplierDetail(null);
                 form.setValue("supplierId", "", { shouldDirty: true, shouldValidate: true });
@@ -370,11 +678,12 @@ export const PurchaseForm = ({
         warehouses={warehouses}
         productLookupOptions={productLookup}
         productLookupLoading={productLookupLoading}
+        productLookupNoResultsLabel={productLookupMessage ?? "No matching active products found"}
         productDetails={productDetails}
         preview={preview}
         append={append}
         remove={remove}
-        onProductSearch={(value) => void loadProducts(value)}
+        onProductSearch={(value) => void loadProductsWithFallback(value)}
         onProductSelect={(index, option) => void handleProductSelect(index, option)}
         getLookupValue={(index) => {
           const item = values.items[index];

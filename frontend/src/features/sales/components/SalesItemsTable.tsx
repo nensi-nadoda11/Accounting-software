@@ -37,6 +37,7 @@ export const SalesItemsTable = ({
   warehouses,
   productLookupOptions,
   productLookupLoading,
+  productLookupNoResultsLabel,
   batchOptions,
   loadingBatchIndex,
   preview,
@@ -54,6 +55,7 @@ export const SalesItemsTable = ({
   warehouses: Warehouse[];
   productLookupOptions: LookupOption[];
   productLookupLoading?: boolean;
+  productLookupNoResultsLabel?: string;
   batchOptions: Record<number, BatchOption[]>;
   loadingBatchIndex: number | null;
   preview: SalesPreviewTotals;
@@ -99,6 +101,7 @@ export const SalesItemsTable = ({
                   options={productLookupOptions}
                   placeholder={compact ? "Scan barcode / search product" : "Search product / SKU / barcode"}
                   error={form.formState.errors.items?.[index]?.productId?.message}
+                  noResultsLabel={productLookupNoResultsLabel ?? "No matching active products found"}
                   onSearch={onProductSearch}
                   onSelect={(option) => onProductSelect(index, option)}
                   onClear={() => {

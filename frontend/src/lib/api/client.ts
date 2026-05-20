@@ -7,9 +7,11 @@ const API_BASE_URL = getApiBaseUrl({
   configuredBaseUrl: import.meta.env.VITE_API_BASE_URL,
   isDev: import.meta.env.DEV
 });
+const REQUEST_TIMEOUT_MS = 15000;
 
 const client = axios.create({
   baseURL: API_BASE_URL,
+  timeout: REQUEST_TIMEOUT_MS,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -18,6 +20,7 @@ const client = axios.create({
 
 const refreshClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: REQUEST_TIMEOUT_MS,
   withCredentials: true,
 });
 

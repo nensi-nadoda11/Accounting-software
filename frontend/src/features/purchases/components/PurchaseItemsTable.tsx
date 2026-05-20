@@ -19,6 +19,7 @@ export const PurchaseItemsTable = ({
   warehouses,
   productLookupOptions,
   productLookupLoading,
+  productLookupNoResultsLabel,
   productDetails,
   preview,
   getLookupValue,
@@ -32,6 +33,7 @@ export const PurchaseItemsTable = ({
   warehouses: Warehouse[];
   productLookupOptions: LookupOption[];
   productLookupLoading?: boolean;
+  productLookupNoResultsLabel?: string;
   productDetails: Record<string, Product>;
   preview: PurchasePreviewTotals;
   getLookupValue: (index: number) => LookupOption | null;
@@ -90,6 +92,7 @@ export const PurchaseItemsTable = ({
                   options={productLookupOptions}
                   placeholder="Search product / SKU / barcode"
                   error={form.formState.errors.items?.[index]?.productId?.message}
+                  noResultsLabel={productLookupNoResultsLabel ?? "No matching active products found"}
                   onSearch={onProductSearch}
                   onSelect={(option) => onProductSelect(index, option)}
                   onClear={() => {

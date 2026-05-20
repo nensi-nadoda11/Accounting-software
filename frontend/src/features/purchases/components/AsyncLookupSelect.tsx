@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { cn } from "../../../lib/utils";
 import { useDebouncedValue } from "../../customers/useDebouncedValue";
@@ -20,6 +20,7 @@ export const AsyncLookupSelect = ({
   error,
   disabled,
   noResultsLabel = "No results found",
+  idleLabel = "Type to search",
   onSearch,
   onSelect,
   onClear,
@@ -32,6 +33,7 @@ export const AsyncLookupSelect = ({
   error?: string;
   disabled?: boolean;
   noResultsLabel?: string;
+  idleLabel?: string;
   onSearch: (value: string) => void;
   onSelect: (option: LookupOption) => void;
   onClear?: () => void;
@@ -40,10 +42,18 @@ export const AsyncLookupSelect = ({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 250);
+  const normalizedQuery = debouncedQuery.trim();
+  const triggerSearch = useEffectEvent((searchValue: string) => {
+    onSearch(searchValue);
+  });
 
   useEffect(() => {
-    onSearch(debouncedQuery);
-  }, [debouncedQuery, onSearch]);
+    if (!open || disabled || !normalizedQuery) {
+      return;
+    }
+
+    triggerSearch(normalizedQuery);
+  }, [disabled, normalizedQuery, open, triggerSearch]);
 
   useEffect(() => {
     if (!open) {
@@ -107,7 +117,9 @@ export const AsyncLookupSelect = ({
         {open ? (
           <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div className="max-h-64 overflow-y-auto py-2">
-              {loading ? (
+              {!normalizedQuery ? (
+                <div className="px-3 py-3 text-sm text-slate-500">{idleLabel}</div>
+              ) : loading ? (
                 <div className="px-3 py-3 text-sm text-slate-500">Loading...</div>
               ) : options.length ? (
                 options.map((option) => (

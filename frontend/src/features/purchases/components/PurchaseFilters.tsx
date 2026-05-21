@@ -15,6 +15,8 @@ export const PurchaseFilters = ({
   values,
   suppliers,
   warehouses,
+  showPurchaseStatus = true,
+  showPaymentStatus = true,
   onSearchChange,
   onChange,
   onReset,
@@ -30,31 +32,37 @@ export const PurchaseFilters = ({
   };
   suppliers: SupplierListItem[];
   warehouses: Warehouse[];
+  showPurchaseStatus?: boolean;
+  showPaymentStatus?: boolean;
   onSearchChange: (value: string) => void;
   onChange: (value: Partial<{ purchaseStatus: string; paymentStatus: string; supplierId: string; warehouseId: string; dateFrom: string; dateTo: string }>) => void;
   onReset: () => void;
 }) => (
   <Card>
-    <CardContent className="grid gap-3 lg:grid-cols-[2fr_repeat(5,minmax(0,1fr))_auto]">
+    <CardContent className="grid gap-3 xl:grid-cols-[minmax(16rem,2fr)_repeat(6,minmax(0,1fr))_auto]">
       <Input
         value={search}
         placeholder="Search purchase no, supplier, supplier invoice no"
         onChange={(event) => onSearchChange(event.target.value)}
       />
-      <Select value={values.purchaseStatus} onChange={(event) => onChange({ purchaseStatus: event.target.value })}>
-        {PURCHASE_STATUS_OPTIONS.map((option) => (
-          <option key={option.label} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
-      <Select value={values.paymentStatus} onChange={(event) => onChange({ paymentStatus: event.target.value })}>
-        {PURCHASE_PAYMENT_STATUS_OPTIONS.map((option) => (
-          <option key={option.label} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
+      {showPurchaseStatus ? (
+        <Select value={values.purchaseStatus} onChange={(event) => onChange({ purchaseStatus: event.target.value })}>
+          {PURCHASE_STATUS_OPTIONS.map((option) => (
+            <option key={option.label} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+      {showPaymentStatus ? (
+        <Select value={values.paymentStatus} onChange={(event) => onChange({ paymentStatus: event.target.value })}>
+          {PURCHASE_PAYMENT_STATUS_OPTIONS.map((option) => (
+            <option key={option.label} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      ) : null}
       <Select value={values.supplierId} onChange={(event) => onChange({ supplierId: event.target.value })}>
         <option value="">All Suppliers</option>
         {suppliers.map((supplier) => (

@@ -10,7 +10,6 @@ import {
   ne,
   or,
   sql,
-  sum,
   type SQL
 } from "drizzle-orm";
 
@@ -636,8 +635,7 @@ class PurchasesRepository {
 
     const [summaryRow] = await db
       .select({
-        grandTotal: sql<string>`coalesce(sum(${purchaseReturns.grandTotal}), 0)`
-        ,
+        grandTotal: sql<string>`coalesce(sum(${purchaseReturns.grandTotal}), 0)`,
         refundedAmount: sql<string>`coalesce(sum((
           select coalesce(sum(${purchaseReturnRefunds.amount}), 0)
           from ${purchaseReturnRefunds}

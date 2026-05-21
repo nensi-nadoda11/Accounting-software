@@ -5,12 +5,16 @@ import { getRequestIp, getUserAgent } from "../../utils/request";
 import { purchasesService } from "./purchases.service";
 
 export class PurchasesController {
+  private getValidatedQuery(request: Request, response: Response) {
+    return (response.locals.validatedQuery ?? request.query) as never;
+  }
+
   public listPurchases = async (request: Request, response: Response): Promise<void> => {
     const data = await purchasesService.listPurchases(
       {
         companyId: request.currentUser!.companyId!
       },
-      request.query as never
+      this.getValidatedQuery(request, response)
     );
 
     response.json(successResponse("Purchases fetched successfully", data));
@@ -122,7 +126,7 @@ export class PurchasesController {
         companyId: request.currentUser!.companyId!
       },
       String(request.params.id),
-      request.query as never
+      this.getValidatedQuery(request, response)
     );
 
     response.json(successResponse("Purchase payments fetched successfully", data));
@@ -151,7 +155,7 @@ export class PurchasesController {
       {
         companyId: request.currentUser!.companyId!
       },
-      request.query as never
+      this.getValidatedQuery(request, response)
     );
 
     response.json(successResponse("Purchase returns fetched successfully", data));
@@ -210,7 +214,7 @@ export class PurchasesController {
         companyId: request.currentUser!.companyId!,
         role: request.currentUser!.role
       },
-      request.query as never,
+      this.getValidatedQuery(request, response),
       {
         ipAddress: getRequestIp(request),
         userAgent: getUserAgent(request)
@@ -248,7 +252,7 @@ export class PurchasesController {
         companyId: request.currentUser!.companyId!,
         role: request.currentUser!.role
       },
-      request.query as never,
+      this.getValidatedQuery(request, response),
       {
         ipAddress: getRequestIp(request),
         userAgent: getUserAgent(request)

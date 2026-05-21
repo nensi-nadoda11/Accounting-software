@@ -105,7 +105,8 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  const searchInput = searchParams.get("search") ?? "";
+  const searchQuery = searchParams.get("search") ?? "";
+  const searchInput = searchQuery;
   const [search, setSearch] = useState(searchInput);
   const debouncedSearch = useDebouncedValue(search, 350);
 
@@ -144,11 +145,11 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   };
 
   useEffect(() => {
-    setSearch(searchParams.get("search") ?? "");
-  }, [searchParams]);
+    setSearch(searchQuery);
+  }, [searchQuery]);
 
   useEffect(() => {
-    if ((searchParams.get("search") ?? "") === debouncedSearch) {
+    if (searchQuery === debouncedSearch) {
       return;
     }
 
@@ -156,7 +157,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
       search: debouncedSearch || null,
       page: "1",
     });
-  }, [debouncedSearch]);
+  }, [debouncedSearch, searchQuery]);
 
   const loadReferenceData = async () => {
     const [warehouseResult, supplierResult] = await Promise.allSettled([
@@ -203,7 +204,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
       const response = await purchasesApi.list({
         page,
         limit: 20,
-        search: searchParams.get("search") || undefined,
+        search: searchQuery || undefined,
         purchaseStatus: purchaseStatusFilter || undefined,
         paymentStatus: paymentStatusFilter || undefined,
         supplierId: supplierId || undefined,
@@ -226,7 +227,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
       const response = await purchasesApi.listReturns({
         page,
         limit: 20,
-        search: searchParams.get("search") || undefined,
+        search: searchQuery || undefined,
         supplierId: supplierId || undefined,
         warehouseId: warehouseId || undefined,
         dateFrom: dateFrom || undefined,
@@ -332,7 +333,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
     if (tab === "returns") {
       void loadReturns();
     }
-  }, [tab, page, purchaseStatus, paymentStatus, supplierId, warehouseId, dateFrom, dateTo, searchParams]);
+  }, [tab, page, purchaseStatusFilter, paymentStatusFilter, supplierId, warehouseId, dateFrom, dateTo, searchQuery]);
 
   useEffect(() => {
     if (tab !== "new") {
@@ -363,6 +364,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
     if (!invoice) {
       setSelectedReturnInvoice(null);
       setReturnLookupValue(null);
+      void loadReturnInvoices("");
       return;
     }
 
@@ -627,6 +629,8 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         }}
         suppliers={filterSuppliers}
         warehouses={warehouses}
+        showPurchaseStatus={false}
+        showPaymentStatus={false}
         onSearchChange={setSearch}
         onChange={(values) => {
           updateQuery({

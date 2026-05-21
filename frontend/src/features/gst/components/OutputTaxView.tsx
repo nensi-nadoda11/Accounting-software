@@ -6,10 +6,11 @@ import type { OutputTaxSummary } from "../../../types/gst";
 export const OutputTaxView = ({ summary }: { summary: OutputTaxSummary }) => {
   const cards = [
     { label: "Taxable Outward Supplies", value: summary.taxableSales },
-    { label: "Output GST", value: summary.outputGst },
+    { label: "Sales GST", value: summary.salesGst },
     { label: "Sales Return GST", value: summary.salesReturnGst },
     { label: "Output Adjustments", value: summary.outputAdjustments },
-    { label: "Sales GST", value: summary.salesGst },
+    { label: "Net Output GST", value: summary.netOutputGst },
+    { label: "Payable Output GST", value: summary.outputGst },
     { label: "Sales Return Taxable", value: summary.salesReturnsTaxable },
   ];
 
@@ -44,7 +45,8 @@ export const OutputTaxView = ({ summary }: { summary: OutputTaxSummary }) => {
                   ["Sales Returns Taxable", summary.salesReturnsTaxable],
                   ["Sales Return GST", summary.salesReturnGst],
                   ["Output Adjustments", summary.outputAdjustments],
-                  ["Net Output GST", summary.outputGst],
+                  ["Net Output GST", summary.netOutputGst],
+                  ["Payable Output GST", summary.outputGst],
                 ].map(([label, value]) => (
                   <tr key={label}>
                     <td className="px-4 py-3">{label}</td>

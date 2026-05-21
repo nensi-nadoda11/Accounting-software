@@ -180,6 +180,7 @@ export const GstManagementPage = () => {
   const [purchaseState, setPurchaseState] = useState("");
   const [purchaseGstRate, setPurchaseGstRate] = useState("");
   const [purchaseEligibilityStatus, setPurchaseEligibilityStatus] = useState("");
+  const [purchaseClaimStatus, setPurchaseClaimStatus] = useState("");
   const [purchasePage, setPurchasePage] = useState(1);
   const [purchaseData, setPurchaseData] = useState<GstListResponse<PurchaseGstRow>>({ items: [], pagination: EMPTY_PAGINATION });
   const [purchaseLoading, setPurchaseLoading] = useState(false);
@@ -332,6 +333,7 @@ export const GstManagementPage = () => {
     state: debouncedPurchaseState || undefined,
     gstRate: purchaseGstRate ? Number(purchaseGstRate) : undefined,
     eligibilityStatus: purchaseEligibilityStatus ? (purchaseEligibilityStatus as keyof typeof GST_ELIGIBILITY_LABELS) : undefined,
+    claimStatus: purchaseClaimStatus ? (purchaseClaimStatus as keyof typeof GST_CLAIM_STATUS_LABELS) : undefined,
   });
 
   const buildItcFilters = (): GstFilters => ({
@@ -444,7 +446,7 @@ export const GstManagementPage = () => {
     };
 
     void loadPurchases();
-  }, [activeTab, canView, debouncedPurchaseState, purchaseDateFrom, purchaseDateTo, purchaseEligibilityStatus, purchaseGstRate, purchasePage, purchaseRefreshKey, purchaseSupplierId]);
+  }, [activeTab, canView, debouncedPurchaseState, purchaseClaimStatus, purchaseDateFrom, purchaseDateTo, purchaseEligibilityStatus, purchaseGstRate, purchasePage, purchaseRefreshKey, purchaseSupplierId]);
 
   useEffect(() => {
     if (!canView || activeTab !== "itc") {
@@ -843,6 +845,12 @@ export const GstManagementPage = () => {
               <Select value={purchaseEligibilityStatus} onChange={(event) => { setPurchaseEligibilityStatus(event.target.value); setPurchasePage(1); }}>
                 <option value="">ITC Status</option>
                 {Object.entries(GST_ELIGIBILITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </Select>
+              <Select value={purchaseClaimStatus} onChange={(event) => { setPurchaseClaimStatus(event.target.value); setPurchasePage(1); }}>
+                <option value="">Claim Status</option>
+                {Object.entries(GST_CLAIM_STATUS_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
               </Select>

@@ -6,10 +6,14 @@ import { getSummaryAdjustmentTotal } from "../gstUtils";
 export const GstSummaryCards = ({ summary }: { summary: GstSummary }) => {
   const cards = [
     { label: "Taxable Sales", value: summary.taxableSales },
-    { label: "Output GST", value: summary.outputGst },
+    { label: "Sales GST", value: summary.salesGst },
+    { label: "Net Output GST", value: summary.netOutputGst },
+    { label: "Payable Output GST", value: summary.outputGst },
     { label: "Taxable Purchases", value: summary.taxablePurchases },
-    { label: "Input GST", value: summary.inputGst },
-    { label: "Expense Input GST", value: summary.expenseInputGst },
+    { label: "Purchase GST", value: summary.purchaseGst },
+    { label: "Eligible ITC", value: summary.eligibleItc },
+    { label: "Claimed ITC Used", value: summary.inputGst },
+    { label: "Eligible Expense ITC", value: summary.expenseInputGst },
     { label: "Sales Return GST", value: summary.returns.salesReturnGst },
     { label: "Purchase Return GST", value: summary.returns.purchaseReturnGst },
     { label: "Adjustments", value: getSummaryAdjustmentTotal(summary) },

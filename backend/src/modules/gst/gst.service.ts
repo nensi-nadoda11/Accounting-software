@@ -286,8 +286,10 @@ class GstService {
     salesReturns: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
     purchases: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
     purchaseReturns: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
-    purchaseItc: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
-    expenseItc: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
+    purchaseEligibleItc: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
+    purchaseClaimedItc: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
+    expenseEligibleItc: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
+    expenseClaimedItc: Array<{ month: string; taxableAmount: string; totalGstAmount: string }>;
     adjustments: Array<{ month: string; adjustmentType: string; amount: string }>;
   }) {
     const monthMap = new Map(
@@ -345,8 +347,11 @@ class GstService {
       entry.purchaseReturnGst = normalizeMoney(row.totalGstAmount);
     }
 
-    const purchaseItcMap = new Map(data.purchaseItc.map((row) => [row.month, row.totalGstAmount]));
-    const expenseItcMap = new Map(data.expenseItc.map((row) => [row.month, row.totalGstAmount]));
+    const purchaseGstMap = new Map(data.purchases.map((row) => [row.month, row.totalGstAmount]));
+    const purchaseEligibleItcMap = new Map(data.purchaseEligibleItc.map((row) => [row.month, row.totalGstAmount]));
+    const purchaseClaimedItcMap = new Map(data.purchaseClaimedItc.map((row) => [row.month, row.totalGstAmount]));
+    const expenseEligibleItcMap = new Map(data.expenseEligibleItc.map((row) => [row.month, row.totalGstAmount]));
+    const expenseClaimedItcMap = new Map(data.expenseClaimedItc.map((row) => [row.month, row.totalGstAmount]));
     const adjustmentMap = new Map<string, AdjustmentBreakdown>();
 
     for (const row of data.adjustments) {
@@ -363,8 +368,11 @@ class GstService {
     }
 
     for (const [month, entry] of monthMap) {
-      const purchaseGst = normalizeMoney(purchaseItcMap.get(month) ?? "0.00");
-      const expenseInputGst = normalizeMoney(expenseItcMap.get(month) ?? "0.00");
+      const purchaseGst = normalizeMoney(purchaseGstMap.get(month) ?? "0.00");
+      const purchaseEligibleGst = normalizeMoney(purchaseEligibleItcMap.get(month) ?? "0.00");
+      const purchaseClaimedGst = normalizeMoney(purchaseClaimedItcMap.get(month) ?? "0.00");
+      const expenseEligibleGst = normalizeMoney(expenseEligibleItcMap.get(month) ?? "0.00");
+      const expenseClaimedGst = normalizeMoney(expenseClaimedItcMap.get(month) ?? "0.00");
       const monthAdjustments = adjustmentMap.get(month) ?? EMPTY_ADJUSTMENT_BREAKDOWN();
       const outputTax = calculateOutputTax({
         salesGst: entry.outputGst,
@@ -373,19 +381,22 @@ class GstService {
       });
       const inputTax = calculateInputTax({
         purchaseGst,
-        eligibleExpenseGst: expenseInputGst,
+        eligiblePurchaseGst: purchaseEligibleGst,
+        claimedPurchaseGst: purchaseClaimedGst,
+        eligibleExpenseGst: expenseEligibleGst,
+        claimedExpenseGst: expenseClaimedGst,
         purchaseReturnGst: entry.purchaseReturnGst,
         itcReversals: monthAdjustments.itcReversals,
         itcClaims: monthAdjustments.itcClaims
       });
       const net = calculateNetGstPayable({
-        outputGst: outputTax.outputGst,
+        netOutputGst: outputTax.netOutputGst,
         inputGst: inputTax.inputGst
       });
 
       entry.outputGst = outputTax.outputGst;
       entry.inputGst = inputTax.inputGst;
-      entry.expenseInputGst = expenseInputGst;
+      entry.expenseInputGst = expenseEligibleGst;
       entry.netGstPayable = net.netGstPayable;
       entry.netGstCredit = net.netGstCredit;
     }
@@ -484,15 +495,19 @@ class GstService {
       salesReturnTotals,
       purchaseTotals,
       purchaseReturnTotals,
-      purchaseItcTotals,
-      expenseItcTotals,
+      purchaseEligibleItcTotals,
+      purchaseClaimedItcTotals,
+      expenseEligibleItcTotals,
+      expenseClaimedItcTotals,
       adjustmentRows,
       salesMonthly,
       salesReturnMonthly,
       purchaseMonthly,
       purchaseReturnMonthly,
-      purchaseItcMonthly,
-      expenseItcMonthly,
+      purchaseEligibleItcMonthly,
+      purchaseClaimedItcMonthly,
+      expenseEligibleItcMonthly,
+      expenseClaimedItcMonthly,
       adjustmentsMonthly
     ] = await Promise.all([
       gstRepository.getSalesTotals(actor.companyId, range),
@@ -500,14 +515,18 @@ class GstService {
       gstRepository.getPurchaseTotals(actor.companyId, range),
       gstRepository.getPurchaseReturnTotals(actor.companyId, range),
       gstRepository.getEligibleItcTotals(actor.companyId, range, "purchase"),
+      gstRepository.getClaimedItcTotals(actor.companyId, range, "purchase"),
       gstRepository.getEligibleItcTotals(actor.companyId, range, "expense"),
+      gstRepository.getClaimedItcTotals(actor.companyId, range, "expense"),
       gstRepository.getAdjustmentsTotals(actor.companyId, range),
       gstRepository.getSalesMonthlyTotals(actor.companyId, range),
       gstRepository.getSalesReturnMonthlyTotals(actor.companyId, range),
       gstRepository.getPurchaseMonthlyTotals(actor.companyId, range),
       gstRepository.getPurchaseReturnMonthlyTotals(actor.companyId, range),
       gstRepository.getEligibleItcMonthlyTotals(actor.companyId, range, "purchase"),
+      gstRepository.getClaimedItcMonthlyTotals(actor.companyId, range, "purchase"),
       gstRepository.getEligibleItcMonthlyTotals(actor.companyId, range, "expense"),
+      gstRepository.getClaimedItcMonthlyTotals(actor.companyId, range, "expense"),
       gstRepository.getAdjustmentsMonthlyTotals(actor.companyId, range)
     ]);
 
@@ -518,14 +537,17 @@ class GstService {
       outputAdjustments: adjustments.outputTaxAdjustments
     });
     const inputTax = calculateInputTax({
-      purchaseGst: purchaseItcTotals.totalGstAmount,
-      eligibleExpenseGst: expenseItcTotals.totalGstAmount,
+      purchaseGst: purchaseTotals.totalGstAmount,
+      eligiblePurchaseGst: purchaseEligibleItcTotals.totalGstAmount,
+      claimedPurchaseGst: purchaseClaimedItcTotals.totalGstAmount,
+      eligibleExpenseGst: expenseEligibleItcTotals.totalGstAmount,
+      claimedExpenseGst: expenseClaimedItcTotals.totalGstAmount,
       purchaseReturnGst: purchaseReturnTotals.totalGstAmount,
       itcReversals: adjustments.itcReversals,
       itcClaims: adjustments.itcClaims
     });
     const net = calculateNetGstPayable({
-      outputGst: outputTax.outputGst,
+      netOutputGst: outputTax.netOutputGst,
       inputGst: inputTax.inputGst
     });
     const monthWiseTrend = this.createMonthlyTrend(range, {
@@ -533,8 +555,10 @@ class GstService {
       salesReturns: salesReturnMonthly,
       purchases: purchaseMonthly,
       purchaseReturns: purchaseReturnMonthly,
-      purchaseItc: purchaseItcMonthly,
-      expenseItc: expenseItcMonthly,
+      purchaseEligibleItc: purchaseEligibleItcMonthly,
+      purchaseClaimedItc: purchaseClaimedItcMonthly,
+      expenseEligibleItc: expenseEligibleItcMonthly,
+      expenseClaimedItc: expenseClaimedItcMonthly,
       adjustments: adjustmentsMonthly
     });
 
@@ -564,10 +588,18 @@ class GstService {
       dateFrom: range.dateFrom,
       dateTo: range.dateTo,
       taxableSales: normalizeMoney(salesTotals.taxableAmount),
+      salesGst: normalizeMoney(salesTotals.totalGstAmount),
+      netOutputGst: outputTax.netOutputGst,
       outputGst: outputTax.outputGst,
       taxablePurchases: normalizeMoney(purchaseTotals.taxableAmount),
+      purchaseGst: normalizeMoney(purchaseTotals.totalGstAmount),
+      eligiblePurchaseGst: inputTax.eligiblePurchaseGst,
+      claimedPurchaseGst: inputTax.claimedPurchaseGst,
       inputGst: inputTax.inputGst,
-      expenseInputGst: normalizeMoney(expenseItcTotals.totalGstAmount),
+      eligibleItc: inputTax.eligibleItc,
+      claimedItc: inputTax.claimedItc,
+      expenseInputGst: normalizeMoney(expenseEligibleItcTotals.totalGstAmount),
+      claimedExpenseInputGst: inputTax.claimedExpenseGst,
       returns: {
         salesReturnTaxable: normalizeMoney(salesReturnTotals.taxableAmount),
         salesReturnGst: normalizeMoney(salesReturnTotals.totalGstAmount),
@@ -813,6 +845,7 @@ class GstService {
       salesReturnsTaxable: normalizeMoney(returnsRow.taxableAmount),
       salesReturnGst: normalizeMoney(returnsRow.totalGstAmount),
       outputAdjustments: adjustments.outputTaxAdjustments,
+      netOutputGst: outputTax.netOutputGst,
       outputGst: outputTax.outputGst
     };
   }

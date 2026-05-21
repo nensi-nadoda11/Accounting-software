@@ -8,7 +8,7 @@ export const DashboardGstSnapshot = ({ snapshot }: { snapshot: DashboardGstSnaps
     <CardContent className="grid grid-cols-2 gap-3 p-4">
       <Metric label="Taxable Sales" value={snapshot.taxableSales} />
       <Metric label="Output GST" value={snapshot.outputGst} />
-      <Metric label="Input GST" value={snapshot.inputGst} />
+      <Metric label="ITC Used" value={snapshot.inputGst} />
       <Metric label="Net Payable" value={snapshot.netGstPayable} />
       <Metric label="Unclaimed ITC" value={snapshot.unclaimedItc} />
     </CardContent>

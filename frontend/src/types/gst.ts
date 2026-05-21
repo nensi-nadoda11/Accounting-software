@@ -50,10 +50,18 @@ export type GstSummary = {
   dateFrom: string;
   dateTo: string;
   taxableSales: string;
+  salesGst: string;
+  netOutputGst: string;
   outputGst: string;
   taxablePurchases: string;
+  purchaseGst: string;
+  eligiblePurchaseGst: string;
+  claimedPurchaseGst: string;
   inputGst: string;
+  eligibleItc: string;
+  claimedItc: string;
   expenseInputGst: string;
+  claimedExpenseInputGst: string;
   returns: {
     salesReturnTaxable: string;
     salesReturnGst: string;
@@ -141,6 +149,7 @@ export type OutputTaxSummary = {
   salesReturnsTaxable: string;
   salesReturnGst: string;
   outputAdjustments: string;
+  netOutputGst: string;
   outputGst: string;
 };
 

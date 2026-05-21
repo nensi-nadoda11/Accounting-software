@@ -108,18 +108,6 @@ export class GstRepository {
       conditions.push(sql`(${salesInvoices.customerGstSnapshot} is null or ${salesInvoices.customerGstSnapshot} = '')`);
     }
 
-    if (filters.gstRate !== undefined) {
-      conditions.push(
-        sql`exists (
-          select 1
-          from ${salesInvoiceItems}
-          where ${salesInvoiceItems.companyId} = ${filters.companyId}
-            and ${salesInvoiceItems.salesInvoiceId} = ${salesInvoices.id}
-            and ${salesInvoiceItems.gstRate} = ${String(filters.gstRate)}
-        )`
-      );
-    }
-
     return conditions;
   }
 
@@ -139,18 +127,6 @@ export class GstRepository {
     if (filters.state) {
       conditions.push(
         sql`coalesce(${suppliers.gstState}, ${suppliers.billingState}, ${suppliers.shippingState}, '') ilike ${`%${filters.state}%`}`
-      );
-    }
-
-    if (filters.gstRate !== undefined) {
-      conditions.push(
-        sql`exists (
-          select 1
-          from ${purchaseInvoiceItems}
-          where ${purchaseInvoiceItems.companyId} = ${filters.companyId}
-            and ${purchaseInvoiceItems.purchaseInvoiceId} = ${purchaseInvoices.id}
-            and ${purchaseInvoiceItems.gstRate} = ${String(filters.gstRate)}
-        )`
       );
     }
 
@@ -294,7 +270,11 @@ export class GstRepository {
   }
 
   public async listSales(filters: GstSalesQuery & { companyId: string }) {
-    const whereClause = and(...this.buildSalesConditions(filters));
+    const conditions = [...this.buildSalesConditions(filters), eq(salesInvoiceItems.companyId, filters.companyId)];
+    if (filters.gstRate !== undefined) {
+      conditions.push(eq(salesInvoiceItems.gstRate, String(filters.gstRate)));
+    }
+    const whereClause = and(...conditions);
 
     const rows = await db
       .select({
@@ -305,30 +285,53 @@ export class GstRepository {
         customerName: salesInvoices.customerNameSnapshot,
         gstin: salesInvoices.customerGstSnapshot,
         placeOfSupply: salesInvoices.placeOfSupply,
-        taxableAmount: salesInvoices.taxableAmount,
-        cgstAmount: salesInvoices.cgstTotal,
-        sgstAmount: salesInvoices.sgstTotal,
-        igstAmount: salesInvoices.igstTotal,
-        cessAmount: salesInvoices.cessTotal,
-        totalGst: salesInvoices.gstTotal,
-        invoiceTotal: salesInvoices.grandTotal
+        taxableAmount: sql<string>`coalesce(sum(${salesInvoiceItems.taxableAmount}), 0)`,
+        cgstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.cgstAmount}), 0)`,
+        sgstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.sgstAmount}), 0)`,
+        igstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.igstAmount}), 0)`,
+        cessAmount: sql<string>`coalesce(sum(${salesInvoiceItems.cessAmount}), 0)`,
+        totalGst: sql<string>`coalesce(sum(${salesInvoiceItems.cgstAmount} + ${salesInvoiceItems.sgstAmount} + ${salesInvoiceItems.igstAmount} + ${salesInvoiceItems.cessAmount}), 0)`,
+        invoiceTotal:
+          filters.gstRate === undefined
+            ? salesInvoices.grandTotal
+            : sql<string>`coalesce(sum(${salesInvoiceItems.lineTotal}), 0)`
       })
       .from(salesInvoices)
+      .innerJoin(salesInvoiceItems, eq(salesInvoiceItems.salesInvoiceId, salesInvoices.id))
       .where(whereClause)
+      .groupBy(
+        salesInvoices.id,
+        salesInvoices.invoiceDate,
+        salesInvoices.invoiceNumber,
+        salesInvoices.invoiceType,
+        salesInvoices.customerNameSnapshot,
+        salesInvoices.customerGstSnapshot,
+        salesInvoices.placeOfSupply,
+        salesInvoices.grandTotal,
+        salesInvoices.createdAt
+      )
       .orderBy(desc(salesInvoices.invoiceDate), desc(salesInvoices.createdAt))
       .limit(filters.limit)
       .offset((filters.page - 1) * filters.limit);
 
-    const [totalRow] = await db.select({ value: count() }).from(salesInvoices).where(whereClause);
+    const [totalRow] = await db
+      .select({ value: sql<number>`count(distinct ${salesInvoices.id})` })
+      .from(salesInvoices)
+      .innerJoin(salesInvoiceItems, eq(salesInvoiceItems.salesInvoiceId, salesInvoices.id))
+      .where(whereClause);
 
     return {
       rows,
-      total: totalRow?.value ?? 0
+      total: Number(totalRow?.value ?? 0)
     };
   }
 
   public async listPurchases(filters: GstPurchasesQuery & { companyId: string }) {
-    const whereClause = and(...this.buildPurchasesConditions(filters));
+    const conditions = [...this.buildPurchasesConditions(filters), eq(purchaseInvoiceItems.companyId, filters.companyId)];
+    if (filters.gstRate !== undefined) {
+      conditions.push(eq(purchaseInvoiceItems.gstRate, String(filters.gstRate)));
+    }
+    const whereClause = and(...conditions);
 
     const rows = await db
       .select({
@@ -338,19 +341,23 @@ export class GstRepository {
         supplierName: suppliers.name,
         gstin: suppliers.gstNumber,
         supplierInvoiceNumber: purchaseInvoices.supplierInvoiceNumber,
-        taxableAmount: purchaseInvoices.taxableAmount,
-        cgstAmount: purchaseInvoices.cgstTotal,
-        sgstAmount: purchaseInvoices.sgstTotal,
-        igstAmount: purchaseInvoices.igstTotal,
-        cessAmount: purchaseInvoices.cessTotal,
-        totalGst: purchaseInvoices.gstTotal,
-        invoiceTotal: purchaseInvoices.grandTotal,
+        taxableAmount: sql<string>`coalesce(sum(${purchaseInvoiceItems.taxableAmount}), 0)`,
+        cgstAmount: sql<string>`coalesce(sum(${purchaseInvoiceItems.cgstAmount}), 0)`,
+        sgstAmount: sql<string>`coalesce(sum(${purchaseInvoiceItems.sgstAmount}), 0)`,
+        igstAmount: sql<string>`coalesce(sum(${purchaseInvoiceItems.igstAmount}), 0)`,
+        cessAmount: sql<string>`coalesce(sum(${purchaseInvoiceItems.cessAmount}), 0)`,
+        totalGst: sql<string>`coalesce(sum(${purchaseInvoiceItems.cgstAmount} + ${purchaseInvoiceItems.sgstAmount} + ${purchaseInvoiceItems.igstAmount} + ${purchaseInvoiceItems.cessAmount}), 0)`,
+        invoiceTotal:
+          filters.gstRate === undefined
+            ? purchaseInvoices.grandTotal
+            : sql<string>`coalesce(sum(${purchaseInvoiceItems.lineTotal}), 0)`,
         eligibilityStatus: gstItcStatus.eligibilityStatus,
         claimStatus: gstItcStatus.claimStatus,
         claimedAmount: gstItcStatus.claimedAmount
       })
       .from(purchaseInvoices)
       .innerJoin(suppliers, eq(purchaseInvoices.supplierId, suppliers.id))
+      .innerJoin(purchaseInvoiceItems, eq(purchaseInvoiceItems.purchaseInvoiceId, purchaseInvoices.id))
       .leftJoin(
         gstItcStatus,
         and(
@@ -360,14 +367,28 @@ export class GstRepository {
         )
       )
       .where(whereClause)
+      .groupBy(
+        purchaseInvoices.id,
+        purchaseInvoices.invoiceDate,
+        purchaseInvoices.purchaseNumber,
+        purchaseInvoices.supplierInvoiceNumber,
+        purchaseInvoices.grandTotal,
+        purchaseInvoices.createdAt,
+        suppliers.name,
+        suppliers.gstNumber,
+        gstItcStatus.eligibilityStatus,
+        gstItcStatus.claimStatus,
+        gstItcStatus.claimedAmount
+      )
       .orderBy(desc(purchaseInvoices.invoiceDate), desc(purchaseInvoices.createdAt))
       .limit(filters.limit)
       .offset((filters.page - 1) * filters.limit);
 
     const [totalRow] = await db
-      .select({ value: count() })
+      .select({ value: sql<number>`count(distinct ${purchaseInvoices.id})` })
       .from(purchaseInvoices)
       .innerJoin(suppliers, eq(purchaseInvoices.supplierId, suppliers.id))
+      .innerJoin(purchaseInvoiceItems, eq(purchaseInvoiceItems.purchaseInvoiceId, purchaseInvoices.id))
       .leftJoin(
         gstItcStatus,
         and(
@@ -380,7 +401,7 @@ export class GstRepository {
 
     return {
       rows,
-      total: totalRow?.value ?? 0
+      total: Number(totalRow?.value ?? 0)
     };
   }
 
@@ -554,17 +575,18 @@ export class GstRepository {
   public async getSalesTotals(companyId: string, range: DateRange) {
     const [row] = await db
       .select({
-        taxableAmount: sql<string>`coalesce(sum(${salesInvoices.taxableAmount}), 0)`,
-        cgstAmount: sql<string>`coalesce(sum(${salesInvoices.cgstTotal}), 0)`,
-        sgstAmount: sql<string>`coalesce(sum(${salesInvoices.sgstTotal}), 0)`,
-        igstAmount: sql<string>`coalesce(sum(${salesInvoices.igstTotal}), 0)`,
-        cessAmount: sql<string>`coalesce(sum(${salesInvoices.cessTotal}), 0)`,
-        totalGstAmount: sql<string>`coalesce(sum(${salesInvoices.gstTotal}), 0)`
+        taxableAmount: sql<string>`coalesce(sum(${salesInvoiceItems.taxableAmount}), 0)`,
+        cgstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.cgstAmount}), 0)`,
+        sgstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.sgstAmount}), 0)`,
+        igstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.igstAmount}), 0)`,
+        cessAmount: sql<string>`coalesce(sum(${salesInvoiceItems.cessAmount}), 0)`,
+        totalGstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.cgstAmount} + ${salesInvoiceItems.sgstAmount} + ${salesInvoiceItems.igstAmount} + ${salesInvoiceItems.cessAmount}), 0)`
       })
-      .from(salesInvoices)
+      .from(salesInvoiceItems)
+      .innerJoin(salesInvoices, eq(salesInvoiceItems.salesInvoiceId, salesInvoices.id))
       .where(
         and(
-          eq(salesInvoices.companyId, companyId),
+          eq(salesInvoiceItems.companyId, companyId),
           isNull(salesInvoices.deletedAt),
           inArray(salesInvoices.invoiceStatus, SALES_REPORT_STATUSES),
           gte(salesInvoices.invoiceDate, range.dateFrom),
@@ -632,13 +654,14 @@ export class GstRepository {
   public async getPurchaseTotals(companyId: string, range: DateRange) {
     const [row] = await db
       .select({
-        taxableAmount: sql<string>`coalesce(sum(${purchaseInvoices.taxableAmount}), 0)`,
-        totalGstAmount: sql<string>`coalesce(sum(${purchaseInvoices.gstTotal}), 0)`
+        taxableAmount: sql<string>`coalesce(sum(${purchaseInvoiceItems.taxableAmount}), 0)`,
+        totalGstAmount: sql<string>`coalesce(sum(${purchaseInvoiceItems.cgstAmount} + ${purchaseInvoiceItems.sgstAmount} + ${purchaseInvoiceItems.igstAmount} + ${purchaseInvoiceItems.cessAmount}), 0)`
       })
-      .from(purchaseInvoices)
+      .from(purchaseInvoiceItems)
+      .innerJoin(purchaseInvoices, eq(purchaseInvoiceItems.purchaseInvoiceId, purchaseInvoices.id))
       .where(
         and(
-          eq(purchaseInvoices.companyId, companyId),
+          eq(purchaseInvoiceItems.companyId, companyId),
           isNull(purchaseInvoices.deletedAt),
           inArray(purchaseInvoices.purchaseStatus, PURCHASE_REPORT_STATUSES),
           gte(purchaseInvoices.invoiceDate, range.dateFrom),
@@ -709,6 +732,33 @@ export class GstRepository {
         totalGstAmount: "0.00"
       }
     );
+  }
+
+  public async getClaimedItcTotals(companyId: string, range: DateRange, sourceType: "purchase" | "expense") {
+    const claimedAmountExpr = sql<string>`coalesce(sum(case
+      when ${gstItcStatus.claimStatus} = 'claimed' then ${gstItcStatus.totalGstAmount}
+      when ${gstItcStatus.claimStatus} = 'partially_claimed' then ${gstItcStatus.claimedAmount}
+      else 0
+    end), 0)`;
+
+    const [row] = await db
+      .select({
+        totalGstAmount: claimedAmountExpr
+      })
+      .from(gstItcStatus)
+      .where(
+        and(
+          eq(gstItcStatus.companyId, companyId),
+          eq(gstItcStatus.sourceType, sourceType),
+          eq(gstItcStatus.eligibilityStatus, "eligible"),
+          gte(gstItcStatus.invoiceDate, range.dateFrom),
+          lte(gstItcStatus.invoiceDate, range.dateTo)
+        )
+      );
+
+    return {
+      totalGstAmount: row?.totalGstAmount ?? "0.00"
+    };
   }
 
   public async getAdjustmentsTotals(companyId: string, range: DateRange) {
@@ -843,6 +893,36 @@ export class GstRepository {
       .orderBy(monthExpr);
   }
 
+  public async getClaimedItcMonthlyTotals(
+    companyId: string,
+    range: DateRange,
+    sourceType: "purchase" | "expense"
+  ): Promise<MonthlyTotalsRow[]> {
+    const monthExpr = sql<string>`to_char(date_trunc('month', ${gstItcStatus.invoiceDate}), 'YYYY-MM-01')`;
+    return db
+      .select({
+        month: monthExpr,
+        taxableAmount: sql<string>`0`,
+        totalGstAmount: sql<string>`coalesce(sum(case
+          when ${gstItcStatus.claimStatus} = 'claimed' then ${gstItcStatus.totalGstAmount}
+          when ${gstItcStatus.claimStatus} = 'partially_claimed' then ${gstItcStatus.claimedAmount}
+          else 0
+        end), 0)`
+      })
+      .from(gstItcStatus)
+      .where(
+        and(
+          eq(gstItcStatus.companyId, companyId),
+          eq(gstItcStatus.sourceType, sourceType),
+          eq(gstItcStatus.eligibilityStatus, "eligible"),
+          gte(gstItcStatus.invoiceDate, range.dateFrom),
+          lte(gstItcStatus.invoiceDate, range.dateTo)
+        )
+      )
+      .groupBy(monthExpr)
+      .orderBy(monthExpr);
+  }
+
   public async getAdjustmentsMonthlyTotals(companyId: string, range: DateRange) {
     const monthExpr = sql<string>`to_char(date_trunc('month', ${gstAdjustments.adjustmentDate}), 'YYYY-MM-01')`;
     return db
@@ -894,6 +974,44 @@ export class GstRepository {
         );
 
       rows.push(...salesRows);
+
+      const salesReturnRows = await db
+        .select({
+          hsnSacCode: salesInvoiceItems.hsnSacSnapshot,
+          description: salesInvoiceItems.productNameSnapshot,
+          unit: salesInvoiceItems.unitSnapshot,
+          quantity: sql<string>`(${salesReturnItems.quantity}::numeric * -1)::text`,
+          taxableValue: sql<string>`(${salesReturnItems.taxableAmount}::numeric * -1)::text`,
+          gstRate: salesReturnItems.gstRate,
+          cgstAmount: sql<string>`coalesce(case
+            when ${salesInvoiceItems.quantity} = 0 then 0
+            else round((${salesInvoiceItems.cgstAmount}::numeric * ${salesReturnItems.quantity}::numeric) / ${salesInvoiceItems.quantity}::numeric, 2) * -1
+          end, 0)::text`,
+          sgstAmount: sql<string>`coalesce(case
+            when ${salesInvoiceItems.quantity} = 0 then 0
+            else round((${salesInvoiceItems.sgstAmount}::numeric * ${salesReturnItems.quantity}::numeric) / ${salesInvoiceItems.quantity}::numeric, 2) * -1
+          end, 0)::text`,
+          igstAmount: sql<string>`coalesce(case
+            when ${salesInvoiceItems.quantity} = 0 then 0
+            else round((${salesInvoiceItems.igstAmount}::numeric * ${salesReturnItems.quantity}::numeric) / ${salesInvoiceItems.quantity}::numeric, 2) * -1
+          end, 0)::text`,
+          cessAmount: sql<string>`coalesce(case
+            when ${salesInvoiceItems.quantity} = 0 then 0
+            else round((${salesInvoiceItems.cessAmount}::numeric * ${salesReturnItems.quantity}::numeric) / ${salesInvoiceItems.quantity}::numeric, 2) * -1
+          end, 0)::text`
+        })
+        .from(salesReturnItems)
+        .innerJoin(salesReturns, eq(salesReturnItems.salesReturnId, salesReturns.id))
+        .innerJoin(salesInvoiceItems, eq(salesReturnItems.salesInvoiceItemId, salesInvoiceItems.id))
+        .where(
+          and(
+            eq(salesReturnItems.companyId, companyId),
+            gte(salesReturns.returnDate, query.dateFrom),
+            lte(salesReturns.returnDate, query.dateTo)
+          )
+        );
+
+      rows.push(...salesReturnRows);
     }
 
     if (query.source === "purchase" || query.source === "all") {
@@ -923,6 +1041,44 @@ export class GstRepository {
         );
 
       rows.push(...purchaseRows);
+
+      const purchaseReturnRows = await db
+        .select({
+          hsnSacCode: purchaseInvoiceItems.hsnSacSnapshot,
+          description: purchaseInvoiceItems.productNameSnapshot,
+          unit: purchaseInvoiceItems.unitSnapshot,
+          quantity: sql<string>`(${purchaseReturnItems.quantity}::numeric * -1)::text`,
+          taxableValue: sql<string>`(${purchaseReturnItems.taxableAmount}::numeric * -1)::text`,
+          gstRate: purchaseReturnItems.gstRate,
+          cgstAmount: sql<string>`coalesce(case
+            when (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric) = 0 then 0
+            else round((${purchaseInvoiceItems.cgstAmount}::numeric * ${purchaseReturnItems.quantity}::numeric) / (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric), 2) * -1
+          end, 0)::text`,
+          sgstAmount: sql<string>`coalesce(case
+            when (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric) = 0 then 0
+            else round((${purchaseInvoiceItems.sgstAmount}::numeric * ${purchaseReturnItems.quantity}::numeric) / (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric), 2) * -1
+          end, 0)::text`,
+          igstAmount: sql<string>`coalesce(case
+            when (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric) = 0 then 0
+            else round((${purchaseInvoiceItems.igstAmount}::numeric * ${purchaseReturnItems.quantity}::numeric) / (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric), 2) * -1
+          end, 0)::text`,
+          cessAmount: sql<string>`coalesce(case
+            when (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric) = 0 then 0
+            else round((${purchaseInvoiceItems.cessAmount}::numeric * ${purchaseReturnItems.quantity}::numeric) / (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric), 2) * -1
+          end, 0)::text`
+        })
+        .from(purchaseReturnItems)
+        .innerJoin(purchaseReturns, eq(purchaseReturnItems.purchaseReturnId, purchaseReturns.id))
+        .innerJoin(purchaseInvoiceItems, eq(purchaseReturnItems.purchaseInvoiceItemId, purchaseInvoiceItems.id))
+        .where(
+          and(
+            eq(purchaseReturnItems.companyId, companyId),
+            gte(purchaseReturns.returnDate, query.dateFrom),
+            lte(purchaseReturns.returnDate, query.dateTo)
+          )
+        );
+
+      rows.push(...purchaseReturnRows);
     }
 
     if (query.source === "expense" || query.source === "all") {
@@ -993,13 +1149,26 @@ export class GstRepository {
         outputGst: sql<string>`coalesce(sum(${salesReturnItems.gstAmount}) * -1, 0)`,
         taxablePurchases: sql<string>`0`,
         inputGst: sql<string>`0`,
-        cgstAmount: sql<string>`0`,
-        sgstAmount: sql<string>`0`,
-        igstAmount: sql<string>`0`,
-        cessAmount: sql<string>`0`
+        cgstAmount: sql<string>`coalesce(sum(case
+          when ${salesInvoiceItems.quantity} = 0 then 0
+          else round((${salesInvoiceItems.cgstAmount}::numeric * ${salesReturnItems.quantity}::numeric) / ${salesInvoiceItems.quantity}::numeric, 2)
+        end) * -1, 0)`,
+        sgstAmount: sql<string>`coalesce(sum(case
+          when ${salesInvoiceItems.quantity} = 0 then 0
+          else round((${salesInvoiceItems.sgstAmount}::numeric * ${salesReturnItems.quantity}::numeric) / ${salesInvoiceItems.quantity}::numeric, 2)
+        end) * -1, 0)`,
+        igstAmount: sql<string>`coalesce(sum(case
+          when ${salesInvoiceItems.quantity} = 0 then 0
+          else round((${salesInvoiceItems.igstAmount}::numeric * ${salesReturnItems.quantity}::numeric) / ${salesInvoiceItems.quantity}::numeric, 2)
+        end) * -1, 0)`,
+        cessAmount: sql<string>`coalesce(sum(case
+          when ${salesInvoiceItems.quantity} = 0 then 0
+          else round((${salesInvoiceItems.cessAmount}::numeric * ${salesReturnItems.quantity}::numeric) / ${salesInvoiceItems.quantity}::numeric, 2)
+        end) * -1, 0)`
       })
       .from(salesReturnItems)
       .innerJoin(salesReturns, eq(salesReturnItems.salesReturnId, salesReturns.id))
+      .innerJoin(salesInvoiceItems, eq(salesReturnItems.salesInvoiceItemId, salesInvoiceItems.id))
       .where(
         and(
           eq(salesReturnItems.companyId, companyId),
@@ -1047,13 +1216,26 @@ export class GstRepository {
         outputGst: sql<string>`0`,
         taxablePurchases: sql<string>`coalesce(sum(${purchaseReturnItems.taxableAmount}) * -1, 0)`,
         inputGst: sql<string>`coalesce(sum(${purchaseReturnItems.gstAmount}) * -1, 0)`,
-        cgstAmount: sql<string>`0`,
-        sgstAmount: sql<string>`0`,
-        igstAmount: sql<string>`0`,
-        cessAmount: sql<string>`0`
+        cgstAmount: sql<string>`coalesce(sum(case
+          when (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric) = 0 then 0
+          else round((${purchaseInvoiceItems.cgstAmount}::numeric * ${purchaseReturnItems.quantity}::numeric) / (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric), 2)
+        end) * -1, 0)`,
+        sgstAmount: sql<string>`coalesce(sum(case
+          when (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric) = 0 then 0
+          else round((${purchaseInvoiceItems.sgstAmount}::numeric * ${purchaseReturnItems.quantity}::numeric) / (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric), 2)
+        end) * -1, 0)`,
+        igstAmount: sql<string>`coalesce(sum(case
+          when (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric) = 0 then 0
+          else round((${purchaseInvoiceItems.igstAmount}::numeric * ${purchaseReturnItems.quantity}::numeric) / (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric), 2)
+        end) * -1, 0)`,
+        cessAmount: sql<string>`coalesce(sum(case
+          when (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric) = 0 then 0
+          else round((${purchaseInvoiceItems.cessAmount}::numeric * ${purchaseReturnItems.quantity}::numeric) / (${purchaseInvoiceItems.quantity}::numeric + ${purchaseInvoiceItems.freeQuantity}::numeric), 2)
+        end) * -1, 0)`
       })
       .from(purchaseReturnItems)
       .innerJoin(purchaseReturns, eq(purchaseReturnItems.purchaseReturnId, purchaseReturns.id))
+      .innerJoin(purchaseInvoiceItems, eq(purchaseReturnItems.purchaseInvoiceItemId, purchaseInvoiceItems.id))
       .where(
         and(
           eq(purchaseReturnItems.companyId, companyId),
@@ -1094,8 +1276,8 @@ export class GstRepository {
   }
 
   public async getOutputTaxBase(companyId: string, query: GstOutputTaxQuery) {
-    const conditions: SQL[] = [
-      eq(salesInvoices.companyId, companyId),
+    const salesConditions: SQL[] = [
+      eq(salesInvoiceItems.companyId, companyId),
       isNull(salesInvoices.deletedAt),
       inArray(salesInvoices.invoiceStatus, SALES_REPORT_STATUSES),
       gte(salesInvoices.invoiceDate, query.dateFrom),
@@ -1103,32 +1285,39 @@ export class GstRepository {
     ];
 
     if (query.state) {
-      conditions.push(ilike(salesInvoices.placeOfSupply, `%${query.state}%`));
+      salesConditions.push(ilike(salesInvoices.placeOfSupply, `%${query.state}%`));
     }
 
     if (query.gstRate !== undefined) {
-      conditions.push(
-        sql`exists (
-          select 1
-          from ${salesInvoiceItems}
-          where ${salesInvoiceItems.companyId} = ${companyId}
-            and ${salesInvoiceItems.salesInvoiceId} = ${salesInvoices.id}
-            and ${salesInvoiceItems.gstRate} = ${String(query.gstRate)}
-        )`
-      );
+      salesConditions.push(eq(salesInvoiceItems.gstRate, String(query.gstRate)));
     }
 
     const [salesRow] = await db
       .select({
-        taxableAmount: sql<string>`coalesce(sum(${salesInvoices.taxableAmount}), 0)`,
-        cgstAmount: sql<string>`coalesce(sum(${salesInvoices.cgstTotal}), 0)`,
-        sgstAmount: sql<string>`coalesce(sum(${salesInvoices.sgstTotal}), 0)`,
-        igstAmount: sql<string>`coalesce(sum(${salesInvoices.igstTotal}), 0)`,
-        cessAmount: sql<string>`coalesce(sum(${salesInvoices.cessTotal}), 0)`,
-        totalGstAmount: sql<string>`coalesce(sum(${salesInvoices.gstTotal}), 0)`
+        taxableAmount: sql<string>`coalesce(sum(${salesInvoiceItems.taxableAmount}), 0)`,
+        cgstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.cgstAmount}), 0)`,
+        sgstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.sgstAmount}), 0)`,
+        igstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.igstAmount}), 0)`,
+        cessAmount: sql<string>`coalesce(sum(${salesInvoiceItems.cessAmount}), 0)`,
+        totalGstAmount: sql<string>`coalesce(sum(${salesInvoiceItems.cgstAmount} + ${salesInvoiceItems.sgstAmount} + ${salesInvoiceItems.igstAmount} + ${salesInvoiceItems.cessAmount}), 0)`
       })
-      .from(salesInvoices)
-      .where(and(...conditions));
+      .from(salesInvoiceItems)
+      .innerJoin(salesInvoices, eq(salesInvoiceItems.salesInvoiceId, salesInvoices.id))
+      .where(and(...salesConditions));
+
+    const returnConditions: SQL[] = [
+      eq(salesReturnItems.companyId, companyId),
+      gte(salesReturns.returnDate, query.dateFrom),
+      lte(salesReturns.returnDate, query.dateTo)
+    ];
+
+    if (query.state) {
+      returnConditions.push(ilike(salesInvoices.placeOfSupply, `%${query.state}%`));
+    }
+
+    if (query.gstRate !== undefined) {
+      returnConditions.push(eq(salesReturnItems.gstRate, String(query.gstRate)));
+    }
 
     const [returnsRow] = await db
       .select({
@@ -1137,13 +1326,9 @@ export class GstRepository {
       })
       .from(salesReturnItems)
       .innerJoin(salesReturns, eq(salesReturnItems.salesReturnId, salesReturns.id))
-      .where(
-        and(
-          eq(salesReturns.companyId, companyId),
-          gte(salesReturns.returnDate, query.dateFrom),
-          lte(salesReturns.returnDate, query.dateTo)
-        )
-      );
+      .innerJoin(salesInvoiceItems, eq(salesReturnItems.salesInvoiceItemId, salesInvoiceItems.id))
+      .innerJoin(salesInvoices, eq(salesInvoiceItems.salesInvoiceId, salesInvoices.id))
+      .where(and(...returnConditions));
 
     return {
       salesRow: salesRow ?? {

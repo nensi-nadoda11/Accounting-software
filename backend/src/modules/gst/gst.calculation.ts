@@ -3,6 +3,7 @@ import {
   compareDecimals,
   decimalToScaledBigInt,
   normalizeMoney as normalizeMoneyValue,
+  subtractDecimals,
   scaledBigIntToDecimal
 } from "../inventory/inventory.utils";
 import type { GstTaxComponent } from "./gst.types";
@@ -51,53 +52,69 @@ export const calculateOutputTax = (input: {
   salesReturnGst: string;
   outputAdjustments: string;
 }) => {
-  const total = addDecimals(
-    addDecimals(input.salesGst, normalizeMoney(-Number(input.salesReturnGst)), 2),
+  const netOutputGst = addDecimals(
+    subtractDecimals(input.salesGst, input.salesReturnGst, 2),
     input.outputAdjustments,
     2
   );
+  const outputGst = compareDecimals(netOutputGst, "0.00", 2) >= 0 ? normalizeMoney(netOutputGst) : "0.00";
 
   return {
     salesGst: normalizeMoney(input.salesGst),
     salesReturnGst: normalizeMoney(input.salesReturnGst),
     outputAdjustments: normalizeMoney(input.outputAdjustments),
-    outputGst: normalizeMoney(total)
+    netOutputGst: normalizeMoney(netOutputGst),
+    outputGst
   };
 };
 
 export const calculateInputTax = (input: {
   purchaseGst: string;
+  eligiblePurchaseGst: string;
+  claimedPurchaseGst: string;
   eligibleExpenseGst: string;
+  claimedExpenseGst: string;
   purchaseReturnGst: string;
   itcReversals: string;
   itcClaims: string;
 }) => {
+  const eligibleItc = addDecimals(
+    addDecimals(input.eligiblePurchaseGst, input.eligibleExpenseGst, 2),
+    normalizeMoney(-Number(input.purchaseReturnGst)),
+    2
+  );
+  const claimedItc = addDecimals(
+    addDecimals(input.claimedPurchaseGst, input.claimedExpenseGst, 2),
+    normalizeMoney(-Number(input.purchaseReturnGst)),
+    2
+  );
   const total = addDecimals(
-    addDecimals(input.purchaseGst, input.eligibleExpenseGst, 2),
-    addDecimals(
-      normalizeMoney(-Number(input.purchaseReturnGst)),
-      addDecimals(normalizeMoney(-Number(input.itcReversals)), input.itcClaims, 2),
-      2
-    ),
+    claimedItc,
+    addDecimals(normalizeMoney(-Number(input.itcReversals)), input.itcClaims, 2),
     2
   );
 
   return {
     purchaseGst: normalizeMoney(input.purchaseGst),
+    eligiblePurchaseGst: normalizeMoney(input.eligiblePurchaseGst),
+    claimedPurchaseGst: normalizeMoney(input.claimedPurchaseGst),
     eligibleExpenseGst: normalizeMoney(input.eligibleExpenseGst),
+    claimedExpenseGst: normalizeMoney(input.claimedExpenseGst),
     purchaseReturnGst: normalizeMoney(input.purchaseReturnGst),
+    eligibleItc: normalizeMoney(eligibleItc),
+    claimedItc: normalizeMoney(claimedItc),
     itcReversals: normalizeMoney(input.itcReversals),
     itcClaims: normalizeMoney(input.itcClaims),
     inputGst: normalizeMoney(total)
   };
 };
 
-export const calculateNetGstPayable = (input: { outputGst: string; inputGst: string }) => {
-  const difference = addDecimals(input.outputGst, normalizeMoney(-Number(input.inputGst)), 2);
+export const calculateNetGstPayable = (input: { netOutputGst: string; inputGst: string }) => {
+  const difference = addDecimals(input.netOutputGst, normalizeMoney(-Number(input.inputGst)), 2);
   const isPayable = compareDecimals(difference, "0.00", 2) >= 0;
 
   return {
-    outputGst: normalizeMoney(input.outputGst),
+    netOutputGst: normalizeMoney(input.netOutputGst),
     inputGst: normalizeMoney(input.inputGst),
     netGstPayable: isPayable ? normalizeMoney(difference) : "0.00",
     netGstCredit: isPayable ? "0.00" : normalizeMoney(-Number(difference))

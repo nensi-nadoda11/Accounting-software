@@ -829,7 +829,7 @@ const renderTab = ({
       <div className="space-y-4">
         <ReportSummaryCards items={[
           { label: "Output GST", value: gstData.summary.outputGst },
-          { label: "Input GST", value: gstData.summary.inputGst },
+          { label: "Claimed ITC Used", value: gstData.summary.inputGst },
           { label: "Net Payable", value: gstData.summary.netGstPayable, tone: "warning" },
           { label: "Net Credit", value: gstData.summary.netGstCredit },
         ]} />

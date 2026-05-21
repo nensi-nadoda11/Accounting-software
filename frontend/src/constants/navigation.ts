@@ -106,7 +106,6 @@ export const PURCHASES_TABS = [
   { label: "Purchase Invoices", href: "/app/purchases/invoices", permissions: ["purchase.view"] },
   { label: "New Purchase", href: "/app/purchases/new", permissions: ["purchase.create", "purchase.update"] },
   { label: "Returns", href: "/app/purchases/returns", permissions: ["purchase.view", "purchase.return"] },
-  { label: "Payments", href: "/app/purchases/payments", permissions: ["purchase.payment.view", "purchase.payment.manage"] },
 ] as const;
 
 export const SALES_TABS = [

@@ -70,7 +70,7 @@ export const SalesReturnList = ({
                     <tr key={salesReturn.id} className="transition hover:bg-slate-50">
                       <td className="px-4 py-4 font-medium text-slate-900">{salesReturn.returnNumber}</td>
                       <td className="px-4 py-4">{salesReturn.invoiceNumber}</td>
-                      <td className="px-4 py-4">{salesReturn.customerName ?? "-"}</td>
+                      <td className="px-4 py-4">{salesReturn.customerName || "Walk-in Customer"}</td>
                       <td className="px-4 py-4 whitespace-nowrap">{formatDate(salesReturn.returnDate)}</td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <AmountText value={salesReturn.grandTotal} />

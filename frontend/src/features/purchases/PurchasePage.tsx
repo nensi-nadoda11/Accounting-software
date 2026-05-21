@@ -43,7 +43,7 @@ import { PurchaseReturnList } from "./components/PurchaseReturnList";
 import { createPaymentPayload, createPurchaseUpdatePayload, createReturnPayload } from "./purchaseUtils";
 import type { LookupOption } from "./components/AsyncLookupSelect";
 
-export type PurchasePageTab = "invoices" | "new" | "returns" | "payments";
+export type PurchasePageTab = "invoices" | "new" | "returns";
 
 type ConfirmState =
   | { type: "delete"; invoice: PurchaseInvoiceListItem | PurchaseInvoice }
@@ -200,7 +200,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         page,
         limit: 20,
         search: searchParams.get("search") || undefined,
-        purchaseStatus: tab === "payments" ? undefined : purchaseStatusFilter || undefined,
+        purchaseStatus: purchaseStatusFilter || undefined,
         paymentStatus: paymentStatusFilter || undefined,
         supplierId: supplierId || undefined,
         warehouseId: warehouseId || undefined,
@@ -322,7 +322,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   }, [canManageSettings]);
 
   useEffect(() => {
-    if (tab === "invoices" || tab === "payments") {
+    if (tab === "invoices") {
       void loadInvoices();
     }
     if (tab === "returns") {
@@ -383,7 +383,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   const renderListPage = () => (
     <div className="space-y-5">
       <PageHeader
-        title={tab === "payments" ? "Purchase Payments" : "Purchase Invoices"}
+        title="Purchase Invoices"
         actions={
           <div className="flex flex-wrap gap-2">
             {canExport ? (

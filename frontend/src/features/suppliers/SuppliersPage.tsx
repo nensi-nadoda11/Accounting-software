@@ -58,7 +58,6 @@ import {
   saveDownloadedFile,
 } from "./supplierUtils";
 
-type InternalTab = "suppliers" | "ledger" | "purchases" | "payments";
 type SupplierActionTarget = Pick<Supplier, "id" | "name" | "status" | "isBlacklisted" | "isPreferred">;
 type ActionDialogState =
   | { type: "delete"; supplier: SupplierActionTarget }
@@ -124,8 +123,6 @@ export const SuppliersPage = () => {
   const [exporting, setExporting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [preparingFormId, setPreparingFormId] = useState<string | null>(null);
-  const [activeInternalTab, setActiveInternalTab] = useState<InternalTab>("suppliers");
-  const [focusedSupplier, setFocusedSupplier] = useState<{ id: string; name: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formSupplier, setFormSupplier] = useState<Supplier | null>(null);
   const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
@@ -248,17 +245,10 @@ export const SuppliersPage = () => {
   };
 
   const openDetail = (supplier: SupplierListItem) => {
-    setFocusedSupplier({ id: supplier.id, name: supplier.name });
-    setActiveInternalTab("suppliers");
-    setLedgerSupplier(null);
-    setPurchasesSupplier(null);
-    setPaymentsSupplier(null);
     setDetailSupplierId(supplier.id);
   };
 
   const openLedger = (supplier: { id: string; name: string }) => {
-    setFocusedSupplier({ id: supplier.id, name: supplier.name });
-    setActiveInternalTab("ledger");
     setDetailSupplierId(null);
     setPurchasesSupplier(null);
     setPaymentsSupplier(null);
@@ -266,8 +256,6 @@ export const SuppliersPage = () => {
   };
 
   const openPurchases = (supplier: { id: string; name: string }) => {
-    setFocusedSupplier({ id: supplier.id, name: supplier.name });
-    setActiveInternalTab("purchases");
     setDetailSupplierId(null);
     setLedgerSupplier(null);
     setPaymentsSupplier(null);
@@ -275,20 +263,10 @@ export const SuppliersPage = () => {
   };
 
   const openPayments = (supplier: { id: string; name: string }) => {
-    setFocusedSupplier({ id: supplier.id, name: supplier.name });
-    setActiveInternalTab("payments");
     setDetailSupplierId(null);
     setLedgerSupplier(null);
     setPurchasesSupplier(null);
     setPaymentsSupplier({ id: supplier.id, name: supplier.name });
-  };
-
-  const closeSecondaryDrawers = () => {
-    setDetailSupplierId(null);
-    setLedgerSupplier(null);
-    setPurchasesSupplier(null);
-    setPaymentsSupplier(null);
-    setActiveInternalTab("suppliers");
   };
 
   const refreshAfterMutation = async (supplierId?: string) => {
@@ -363,59 +341,6 @@ export const SuppliersPage = () => {
           </div>
         }
       />
-
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-2">
-          {(["suppliers", "ledger", "purchases", "payments"] as InternalTab[]).map((tab) => {
-            const disabled =
-              tab === "ledger"
-                ? !focusedSupplier || !canLedgerView
-                : tab === "purchases"
-                  ? !focusedSupplier || !canViewPurchases
-                  : tab === "payments"
-                    ? !focusedSupplier || !canViewPayments
-                    : false;
-
-            return (
-              <button
-                key={tab}
-                type="button"
-                disabled={disabled}
-                onClick={() => {
-                  if (tab === "suppliers") {
-                    closeSecondaryDrawers();
-                    return;
-                  }
-
-                  if (!focusedSupplier) {
-                    return;
-                  }
-
-                  if (tab === "ledger") {
-                    openLedger(focusedSupplier);
-                    return;
-                  }
-
-                  if (tab === "purchases") {
-                    openPurchases(focusedSupplier);
-                    return;
-                  }
-
-                  openPayments(focusedSupplier);
-                }}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  activeInternalTab === tab
-                    ? "bg-emerald-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                } disabled:cursor-not-allowed disabled:opacity-50`}
-              >
-                {tab === "suppliers" ? "Suppliers" : tab === "ledger" ? "Ledger" : tab === "purchases" ? "Purchases" : "Payments"}
-              </button>
-            );
-          })}
-          {focusedSupplier ? <span className="text-sm text-slate-500">{focusedSupplier.name}</span> : null}
-        </CardContent>
-      </Card>
 
       <SupplierFilters
         search={searchInput}
@@ -688,10 +613,7 @@ export const SuppliersPage = () => {
         open={Boolean(ledgerSupplier)}
         supplierId={ledgerSupplier?.id ?? null}
         supplierName={ledgerSupplier?.name ?? ""}
-        onClose={() => {
-          setLedgerSupplier(null);
-          setActiveInternalTab("suppliers");
-        }}
+        onClose={() => setLedgerSupplier(null)}
         canExport={canExport}
         onExport={async (filters) => {
           if (!ledgerSupplier) {
@@ -712,20 +634,14 @@ export const SuppliersPage = () => {
         open={Boolean(purchasesSupplier)}
         supplierId={purchasesSupplier?.id ?? null}
         supplierName={purchasesSupplier?.name ?? ""}
-        onClose={() => {
-          setPurchasesSupplier(null);
-          setActiveInternalTab("suppliers");
-        }}
+        onClose={() => setPurchasesSupplier(null)}
       />
 
       <SupplierPaymentsDrawer
         open={Boolean(paymentsSupplier)}
         supplierId={paymentsSupplier?.id ?? null}
         supplierName={paymentsSupplier?.name ?? ""}
-        onClose={() => {
-          setPaymentsSupplier(null);
-          setActiveInternalTab("suppliers");
-        }}
+        onClose={() => setPaymentsSupplier(null)}
       />
 
       <ConfirmDialog

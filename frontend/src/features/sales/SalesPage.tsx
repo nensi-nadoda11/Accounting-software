@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Plus } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent } from "../../components/ui/Card";
@@ -127,6 +127,7 @@ void buildPrintHtml;
 export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   const auth = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
@@ -421,6 +422,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
     if (!invoice) {
       setSelectedReturnInvoice(null);
       setReturnLookupValue(null);
+      void loadReturnInvoices("");
       return;
     }
 
@@ -642,10 +644,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
                 {canCreate && tab === "invoices" ? (
                   <Button
                     type="button"
-                    onClick={() => {
-                      setEditInvoice(null);
-                      setFormOpen(true);
-                    }}
+                    onClick={() => navigate("/app/sales/pos")}
                   >
                     <Plus className="mr-2 size-4" />
                     New Invoice

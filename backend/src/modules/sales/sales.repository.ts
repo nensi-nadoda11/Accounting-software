@@ -118,7 +118,8 @@ class SalesRepository {
         or(
           ilike(salesReturns.returnNumber, searchPattern),
           ilike(salesInvoices.invoiceNumber, searchPattern),
-          ilike(salesInvoices.customerNameSnapshot, searchPattern)
+          ilike(salesInvoices.customerNameSnapshot, searchPattern),
+          ilike(salesInvoices.walkInName, searchPattern)
         )!
       );
     }
@@ -542,6 +543,8 @@ class SalesRepository {
       .select({
         salesReturn: salesReturns,
         invoiceNumber: salesInvoices.invoiceNumber,
+        customerNameSnapshot: salesInvoices.customerNameSnapshot,
+        walkInName: salesInvoices.walkInName,
         warehouseName: warehouses.name,
         warehouseCode: warehouses.warehouseCode
       })
@@ -584,6 +587,8 @@ class SalesRepository {
       .select({
         salesReturn: salesReturns,
         invoiceNumber: salesInvoices.invoiceNumber,
+        customerNameSnapshot: salesInvoices.customerNameSnapshot,
+        walkInName: salesInvoices.walkInName,
         warehouseName: warehouses.name,
         warehouseCode: warehouses.warehouseCode
       })

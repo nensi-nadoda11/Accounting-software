@@ -125,7 +125,7 @@ export const SalesReturnDrawer = ({
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-400">Customer</p>
-                  <p className="mt-1 text-sm text-slate-900">{salesReturn.customerName ?? "-"}</p>
+                  <p className="mt-1 text-sm text-slate-900">{salesReturn.customerName || "Walk-in Customer"}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-400">Return Date</p>

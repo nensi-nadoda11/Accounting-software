@@ -661,7 +661,7 @@ export const SalesInvoiceForm = ({
       <Card>
         <CardHeader title={mode === "pos" ? "Quick Entry" : "Header"} />
         <CardContent className={`grid gap-4 ${mode === "pos" ? "md:grid-cols-2 xl:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-4"}`}>
-          {mode === "invoice" ? (
+          {mode === "invoice" || !isWalkIn ? (
             <div className="flex flex-col gap-2">
               <AsyncLookupSelect
                 label="Customer"

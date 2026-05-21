@@ -284,11 +284,7 @@ export const AppRouter = () => (
           />
           <Route
             path="purchases/payments"
-            element={
-              <PermissionRoute permissions={["purchase.payment.view", "purchase.payment.manage"]}>
-                <PurchasePage tab="payments" />
-              </PermissionRoute>
-            }
+            element={<Navigate to="/app/purchases/invoices" replace />}
           />
           <Route
             path="purchases/suppliers"

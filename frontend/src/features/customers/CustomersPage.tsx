@@ -42,7 +42,6 @@ import {
 } from "./customerUtils";
 import { useDebouncedValue } from "./useDebouncedValue";
 
-type InternalTab = "customers" | "ledger" | "payments";
 type CustomerActionTarget = Pick<Customer, "id" | "name" | "status" | "isBlacklisted">;
 
 const isCustomerStatus = (value: string | null): value is CustomerStatus =>
@@ -129,8 +128,6 @@ export const CustomersPage = () => {
   const [exportFormat, setExportFormat] = useState<CustomerExportFormat>("xlsx");
   const [submitting, setSubmitting] = useState(false);
   const [preparingFormId, setPreparingFormId] = useState<string | null>(null);
-  const [activeInternalTab, setActiveInternalTab] = useState<InternalTab>("customers");
-  const [focusedCustomer, setFocusedCustomer] = useState<{ id: string; name: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formCustomer, setFormCustomer] = useState<Customer | null>(null);
   const [detailCustomerId, setDetailCustomerId] = useState<string | null>(null);
@@ -247,34 +244,19 @@ export const CustomersPage = () => {
   };
 
   const openDetail = (customer: CustomerListItem) => {
-    setFocusedCustomer({ id: customer.id, name: customer.name });
-    setActiveInternalTab("customers");
-    setLedgerCustomer(null);
-    setPaymentsCustomer(null);
     setDetailCustomerId(customer.id);
   };
 
   const openLedger = (customer: { id: string; name: string }) => {
-    setFocusedCustomer({ id: customer.id, name: customer.name });
-    setActiveInternalTab("ledger");
     setDetailCustomerId(null);
     setPaymentsCustomer(null);
     setLedgerCustomer({ id: customer.id, name: customer.name });
   };
 
   const openPayments = (customer: { id: string; name: string }) => {
-    setFocusedCustomer({ id: customer.id, name: customer.name });
-    setActiveInternalTab("payments");
     setDetailCustomerId(null);
     setLedgerCustomer(null);
     setPaymentsCustomer({ id: customer.id, name: customer.name });
-  };
-
-  const closeSecondaryDrawers = () => {
-    setDetailCustomerId(null);
-    setLedgerCustomer(null);
-    setPaymentsCustomer(null);
-    setActiveInternalTab("customers");
   };
 
   const refreshAfterMutation = async (customerId?: string) => {
@@ -343,52 +325,6 @@ export const CustomersPage = () => {
           </div>
         }
       />
-
-        <Card>
-        <CardContent className="flex flex-wrap items-center gap-2">
-          {(["customers", "ledger", "payments"] as InternalTab[]).map((tab) => {
-            const disabled =
-              tab === "ledger"
-                ? !focusedCustomer || !canLedgerView
-                : tab === "payments"
-                  ? !focusedCustomer || !canPaymentsView
-                  : false;
-
-            return (
-              <button
-                key={tab}
-                type="button"
-                disabled={disabled}
-                onClick={() => {
-                  if (tab === "customers") {
-                    closeSecondaryDrawers();
-                    return;
-                  }
-
-                  if (!focusedCustomer) {
-                    return;
-                  }
-
-                  if (tab === "ledger") {
-                    openLedger(focusedCustomer);
-                    return;
-                  }
-
-                  openPayments(focusedCustomer);
-                }}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  activeInternalTab === tab
-                    ? "bg-emerald-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                } disabled:cursor-not-allowed disabled:opacity-50`}
-              >
-                {tab === "customers" ? "Customers" : tab === "ledger" ? "Ledger" : "Payments"}
-              </button>
-            );
-          })}
-          {focusedCustomer ? <span className="text-sm text-slate-500">{focusedCustomer.name}</span> : null}
-        </CardContent>
-      </Card>
 
       <CustomerFilters
         search={searchInput}
@@ -649,10 +585,7 @@ export const CustomersPage = () => {
         open={Boolean(ledgerCustomer)}
         customerId={ledgerCustomer?.id ?? null}
         customerName={ledgerCustomer?.name ?? ""}
-        onClose={() => {
-          setLedgerCustomer(null);
-          setActiveInternalTab("customers");
-        }}
+        onClose={() => setLedgerCustomer(null)}
         canExport={canExport}
         onExport={async () => {
           if (!ledgerCustomer) {
@@ -673,10 +606,7 @@ export const CustomersPage = () => {
         open={Boolean(paymentsCustomer)}
         customerId={paymentsCustomer?.id ?? null}
         customerName={paymentsCustomer?.name ?? ""}
-        onClose={() => {
-          setPaymentsCustomer(null);
-          setActiveInternalTab("customers");
-        }}
+        onClose={() => setPaymentsCustomer(null)}
       />
 
       <ConfirmDialog

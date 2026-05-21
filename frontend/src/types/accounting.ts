@@ -158,6 +158,8 @@ export interface LedgerRow {
   journalId: string;
   journalNumber: string;
   entryDate: string;
+  createdAt: string;
+  lineNumber: number;
   voucherType: JournalVoucherType;
   referenceType: string | null;
   referenceId: string | null;

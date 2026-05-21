@@ -462,6 +462,7 @@ class CustomersService {
 
     const openingRow = {
       date: customer.createdAt,
+      createdAt: customer.createdAt,
       transactionType: "opening_balance",
       referenceNo: customer.customerCode,
       description: "Opening balance",

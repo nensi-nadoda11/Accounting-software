@@ -721,12 +721,14 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
 
           try {
             setSubmittingPayment(true);
-            await purchasesApi.createPayment(paymentInvoice.id, createPaymentPayload(values));
+            const invoiceId = paymentInvoice.id;
+            await purchasesApi.createPayment(invoiceId, createPaymentPayload(values));
             toast.success("Payment recorded");
-            await loadPaymentDrawer(paymentInvoice.id);
+            setPaymentInvoice(null);
+            setPaymentData(null);
             await refreshCurrentTab();
-            if (detailId === paymentInvoice.id) {
-              await loadPurchaseDetail(paymentInvoice.id);
+            if (detailId === invoiceId) {
+              await loadPurchaseDetail(invoiceId);
             }
           } catch (error) {
             toast.error(getErrorMessage(error, "Failed to record payment"));

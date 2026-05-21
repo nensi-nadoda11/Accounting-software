@@ -445,6 +445,7 @@ class CustomersRepository {
         : db
             .select({
               date: salesInvoices.invoiceDate,
+              createdAt: salesInvoices.createdAt,
               transactionType: sql<string>`'sale'`,
               referenceNo: salesInvoices.invoiceNumber,
               description: sql<string>`'Sales invoice posted'`,
@@ -460,6 +461,7 @@ class CustomersRepository {
         : db
             .select({
               date: salesReturns.returnDate,
+              createdAt: salesReturns.createdAt,
               transactionType: sql<string>`'sales_return'`,
               referenceNo: salesReturns.returnNumber,
               description: salesReturns.reason,
@@ -475,6 +477,7 @@ class CustomersRepository {
         : db
             .select({
               date: salesPayments.paymentDate,
+              createdAt: salesPayments.createdAt,
               transactionType: sql<string>`'payment'`,
               referenceNo: salesPayments.referenceNumber,
               description: sql<string>`'Payment received'`,
@@ -487,7 +490,19 @@ class CustomersRepository {
             .where(and(...paymentConditions))
     ]);
 
-    const rows = [...invoiceRows, ...returnRows, ...paymentRows].sort((left, right) => left.date.getTime() - right.date.getTime());
+    const rows = [...invoiceRows, ...returnRows, ...paymentRows].sort((left, right) => {
+      const dateDiff = left.date.getTime() - right.date.getTime();
+      if (dateDiff !== 0) {
+        return dateDiff;
+      }
+
+      const createdAtDiff = left.createdAt.getTime() - right.createdAt.getTime();
+      if (createdAtDiff !== 0) {
+        return createdAtDiff;
+      }
+
+      return (left.referenceNo ?? "").localeCompare(right.referenceNo ?? "");
+    });
 
     return {
       rows,

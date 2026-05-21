@@ -194,6 +194,7 @@ export interface SupplierLedgerQuery {
 
 export interface SupplierLedgerRow {
   date: string;
+  createdAt: string;
   transactionType: string;
   referenceNo: string | null;
   description: string;

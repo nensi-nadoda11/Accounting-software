@@ -551,6 +551,7 @@ class SuppliersService {
 
     const openingRow = {
       date: supplier.createdAt,
+      createdAt: supplier.createdAt,
       transactionType: "opening_balance",
       referenceNo: supplier.supplierCode,
       description: "Opening balance",

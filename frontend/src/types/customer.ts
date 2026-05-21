@@ -165,6 +165,7 @@ export interface CustomerLedgerQuery {
 
 export interface CustomerLedgerRow {
   date: string;
+  createdAt: string;
   transactionType: string;
   referenceNo: string | null;
   description: string;

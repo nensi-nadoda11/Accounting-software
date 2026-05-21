@@ -411,6 +411,7 @@ class SuppliersRepository {
         ? db
             .select({
               date: purchaseInvoices.invoiceDate,
+              createdAt: purchaseInvoices.createdAt,
               transactionType: sql<string>`'purchase'`,
               referenceNo: purchaseInvoices.purchaseNumber,
               description: sql<string>`concat('Purchase invoice ', ${purchaseInvoices.purchaseNumber})`,
@@ -426,6 +427,7 @@ class SuppliersRepository {
         ? db
             .select({
               date: purchaseReturns.returnDate,
+              createdAt: purchaseReturns.createdAt,
               transactionType: sql<string>`'purchase_return'`,
               referenceNo: purchaseReturns.returnNumber,
               description: sql<string>`concat('Purchase return ', ${purchaseReturns.returnNumber})`,
@@ -441,6 +443,7 @@ class SuppliersRepository {
         ? db
             .select({
               date: purchasePayments.paymentDate,
+              createdAt: purchasePayments.createdAt,
               transactionType: sql<string>`'payment'`,
               referenceNo: purchasePayments.referenceNumber,
               description: sql<string>`concat('Purchase payment ', ${purchasePayments.paymentMode})`,
@@ -459,7 +462,19 @@ class SuppliersRepository {
         ...row,
         date: new Date(row.date)
       }))
-      .sort((left, right) => left.date.getTime() - right.date.getTime());
+      .sort((left, right) => {
+        const dateDiff = left.date.getTime() - right.date.getTime();
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+
+        const createdAtDiff = left.createdAt.getTime() - right.createdAt.getTime();
+        if (createdAtDiff !== 0) {
+          return createdAtDiff;
+        }
+
+        return (left.referenceNo ?? "").localeCompare(right.referenceNo ?? "");
+      });
 
     return {
       rows,

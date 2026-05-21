@@ -14,7 +14,7 @@ import { getErrorMessage } from "../../../lib/errors";
 import { suppliersApi } from "../../../services/suppliersApi";
 import type { SupplierLedgerTransactionType } from "../../../types/supplier";
 import { SUPPLIER_LEDGER_TRANSACTION_LABELS, SUPPLIER_LEDGER_TRANSACTION_OPTIONS } from "../supplierOptions";
-import { formatDate, formatInr } from "../supplierUtils";
+import { formatDate, formatDateTime, formatInr } from "../supplierUtils";
 
 export const SupplierLedgerDrawer = ({
   open,
@@ -199,7 +199,7 @@ export const SupplierLedgerDrawer = ({
                 <Table>
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      {["Date", "Type", "Reference No", "Description", "Debit", "Credit", "Balance", "Payment Mode", "Remarks"].map((head) => (
+                      {["Sr", "Date & Time", "Type", "Reference No", "Description", "Debit", "Credit", "Balance", "Payment Mode", "Remarks"].map((head) => (
                         <th key={head} className="px-5 py-3 font-semibold">
                           {head}
                         </th>
@@ -209,7 +209,13 @@ export const SupplierLedgerDrawer = ({
                   <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-700">
                     {data.items.map((item, index) => (
                       <tr key={`${item.referenceNo ?? "ledger"}-${index}`}>
-                        <td className="px-5 py-4 whitespace-nowrap">{formatDate(item.date)}</td>
+                        <td className="px-5 py-4 whitespace-nowrap font-medium text-slate-900">
+                          {((data.pagination.page - 1) * data.pagination.limit) + index + 1}
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div>{formatDate(item.date)}</div>
+                          <div className="text-xs text-slate-500">{formatDateTime(item.createdAt)}</div>
+                        </td>
                         <td className="px-5 py-4 whitespace-nowrap">
                           {SUPPLIER_LEDGER_TRANSACTION_LABELS[item.transactionType as keyof typeof SUPPLIER_LEDGER_TRANSACTION_LABELS] ??
                             item.transactionType.replaceAll("_", " ")}

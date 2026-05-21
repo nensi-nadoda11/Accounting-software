@@ -13,7 +13,7 @@ import { getErrorMessage } from "../../../lib/errors";
 import { customersApi } from "../../../services/customersApi";
 import type { CustomerLedgerTransactionType } from "../../../types/customer";
 import { LEDGER_TRANSACTION_OPTIONS } from "../customerOptions";
-import { formatDate, formatInr } from "../customerUtils";
+import { formatDate, formatDateTime, formatInr } from "../customerUtils";
 import { CustomerSideSheet } from "./CustomerSideSheet";
 
 export const CustomerLedgerDrawer = ({
@@ -191,7 +191,7 @@ export const CustomerLedgerDrawer = ({
                 <Table>
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      {["Date", "Type", "Reference No", "Description", "Debit", "Credit", "Balance", "Payment Mode", "Remarks"].map((head) => (
+                      {["Sr", "Date & Time", "Type", "Reference No", "Description", "Debit", "Credit", "Balance", "Payment Mode", "Remarks"].map((head) => (
                         <th key={head} className="px-5 py-3 font-semibold">
                           {head}
                         </th>
@@ -201,7 +201,13 @@ export const CustomerLedgerDrawer = ({
                   <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-700">
                     {data.items.map((item, index) => (
                       <tr key={`${item.referenceNo ?? "ledger"}-${index}`}>
-                        <td className="px-5 py-4 whitespace-nowrap">{formatDate(item.date)}</td>
+                        <td className="px-5 py-4 whitespace-nowrap font-medium text-slate-900">
+                          {((data.pagination.page - 1) * data.pagination.limit) + index + 1}
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div>{formatDate(item.date)}</div>
+                          <div className="text-xs text-slate-500">{formatDateTime(item.createdAt)}</div>
+                        </td>
                         <td className="px-5 py-4 whitespace-nowrap">{item.transactionType.replaceAll("_", " ")}</td>
                         <td className="px-5 py-4 whitespace-nowrap">{item.referenceNo || "-"}</td>
                         <td className="px-5 py-4 min-w-56">{item.description}</td>

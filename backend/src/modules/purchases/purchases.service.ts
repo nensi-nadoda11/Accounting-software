@@ -275,10 +275,31 @@ class PurchasesService {
     };
   }
 
+  private mapReturnItemRow(
+    row: Awaited<ReturnType<typeof purchasesRepository.listPurchaseReturnItems>>[number]
+  ) {
+    return {
+      id: row.item.id,
+      purchaseInvoiceItemId: row.item.purchaseInvoiceItemId,
+      productId: row.item.productId,
+      productName: row.product.name,
+      productCode: row.product.productCode,
+      quantity: normalizeQuantity(row.item.quantity),
+      returnRate: normalizeMoney(row.item.returnRate),
+      taxableAmount: normalizeMoney(row.item.taxableAmount),
+      gstRate: normalizeMoney(row.item.gstRate),
+      gstAmount: normalizeMoney(row.item.gstAmount),
+      lineTotal: normalizeMoney(row.item.lineTotal)
+    };
+  }
+
   private mapReturnRow(
     row:
       | Awaited<ReturnType<typeof purchasesRepository.listPurchaseReturns>>["rows"][number]
-      | NonNullable<Awaited<ReturnType<typeof purchasesRepository.findPurchaseReturnDetail>>>
+      | NonNullable<Awaited<ReturnType<typeof purchasesRepository.findPurchaseReturnDetail>>>,
+    extras?: {
+      items?: Array<ReturnType<PurchasesService["mapReturnItemRow"]>>;
+    }
   ) {
     if ("purchaseReturn" in row && "supplierName" in row) {
       return {
@@ -303,7 +324,8 @@ class PurchasesService {
           : null,
         notes: row.purchaseReturn.notes,
         createdAt: row.purchaseReturn.createdAt,
-        updatedAt: row.purchaseReturn.updatedAt
+        updatedAt: row.purchaseReturn.updatedAt,
+        ...(extras?.items ? { items: extras.items } : {})
       };
     }
 
@@ -329,7 +351,8 @@ class PurchasesService {
         : null,
       notes: row.purchaseReturn.notes,
       createdAt: row.purchaseReturn.createdAt,
-      updatedAt: row.purchaseReturn.updatedAt
+      updatedAt: row.purchaseReturn.updatedAt,
+      ...(extras?.items ? { items: extras.items } : {})
     };
   }
 
@@ -1035,11 +1058,20 @@ class PurchasesService {
       })
     ]);
 
+    const returnsWithItems = await Promise.all(
+      returns.rows.map(async (entry) => {
+        const returnItems = await purchasesRepository.listPurchaseReturnItems(actor.companyId, entry.purchaseReturn.id);
+        return this.mapReturnRow(entry, {
+          items: returnItems.map((item) => this.mapReturnItemRow(item))
+        });
+      })
+    );
+
     return {
       invoice: this.mapInvoiceRow(detail, {
         items: items.map((item) => this.mapInvoiceItemRow(item)),
         payments: payments.map((payment) => this.mapPaymentRow(payment)),
-        returns: returns.rows.map((entry) => this.mapReturnRow(entry))
+        returns: returnsWithItems
       })
     };
   }
@@ -1533,20 +1565,9 @@ class PurchasesService {
     const items = await purchasesRepository.listPurchaseReturnItems(actor.companyId, purchaseReturnId);
     return {
       purchaseReturn: {
-        ...this.mapReturnRow(detail),
-        items: items.map((row) => ({
-          id: row.item.id,
-          purchaseInvoiceItemId: row.item.purchaseInvoiceItemId,
-          productId: row.item.productId,
-          productName: row.product.name,
-          productCode: row.product.productCode,
-          quantity: normalizeQuantity(row.item.quantity),
-          returnRate: normalizeMoney(row.item.returnRate),
-          taxableAmount: normalizeMoney(row.item.taxableAmount),
-          gstRate: normalizeMoney(row.item.gstRate),
-          gstAmount: normalizeMoney(row.item.gstAmount),
-          lineTotal: normalizeMoney(row.item.lineTotal)
-        }))
+        ...this.mapReturnRow(detail, {
+          items: items.map((row) => this.mapReturnItemRow(row))
+        })
       }
     };
   }

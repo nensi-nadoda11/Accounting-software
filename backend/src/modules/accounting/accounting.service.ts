@@ -2290,6 +2290,8 @@ class AccountingService {
         journalId: row.journal.id,
         journalNumber: row.journal.journalNumber,
         entryDate: row.journal.entryDate,
+        createdAt: row.journal.createdAt,
+        lineNumber: row.line.lineNumber,
         voucherType: row.journal.voucherType,
         referenceType: row.journal.referenceType,
         referenceId: row.journal.referenceId,

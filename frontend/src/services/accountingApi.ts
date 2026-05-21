@@ -85,6 +85,7 @@ export const accountingApi = {
           status: query.status || undefined,
           parentId: query.parentId || undefined,
           hierarchy: query.hierarchy || undefined,
+          excludeSystem: query.excludeSystem || undefined,
         },
       })
     ).data,
@@ -97,9 +98,6 @@ export const accountingApi = {
 
   removeAccount: async (accountId: string) =>
     (await client.delete<ApiResponse<{ account: Account; deactivated: boolean }>>(`/accounting/accounts/${accountId}`)).data,
-
-  seedDefaultAccounts: async () =>
-    (await client.post<ApiResponse<{ createdIds: string[]; existingIds: string[] }>>("/accounting/accounts/defaults", {})).data,
 
   listOpeningBalances: async (query: ListOpeningBalancesQuery) =>
     (

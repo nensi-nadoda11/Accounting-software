@@ -300,6 +300,7 @@ export interface ListAccountsQuery {
   status?: AccountStatus | "";
   parentId?: string;
   hierarchy?: boolean;
+  excludeSystem?: boolean;
 }
 
 export interface CreateAccountInput {

@@ -117,6 +117,30 @@ class PayrollService {
     return date;
   }
 
+  private toDateOnly(value: Date) {
+    const date = new Date(value);
+    date.setUTCHours(0, 0, 0, 0);
+    return date;
+  }
+
+  private rangesOverlap(startA: Date, endA: Date, startB: Date, endB: Date) {
+    return this.toDateOnly(startA).getTime() <= this.toDateOnly(endB).getTime()
+      && this.toDateOnly(endA).getTime() >= this.toDateOnly(startB).getTime();
+  }
+
+  private async findLockedFinancialYearForPeriod(
+    companyId: string,
+    periodStart: Date,
+    periodEnd: Date,
+    executor?: TransactionClient
+  ) {
+    const years = await accountingRepository.listFinancialYears(companyId, executor);
+
+    return years.find(
+      (year) => year.isLocked && this.rangesOverlap(year.startDate, year.endDate, periodStart, periodEnd)
+    ) ?? null;
+  }
+
   private mapEmployee(row: typeof employees.$inferSelect) {
     return {
       id: row.id,
@@ -271,14 +295,14 @@ class PayrollService {
     const [startLock, endLock, year] = await Promise.all([
       accountingRepository.findBlockingPeriodLock(companyId, periodStart, executor),
       accountingRepository.findBlockingPeriodLock(companyId, periodEnd, executor),
-      companyRepository.findActiveFinancialYear(companyId)
+      this.findLockedFinancialYearForPeriod(companyId, periodStart, periodEnd, executor)
     ]);
 
     if (startLock || endLock) {
       throw new AppError("The selected payroll period is locked for accounting", 409);
     }
 
-    if (year && year.isLocked && year.startDate <= periodEnd && year.endDate >= periodStart) {
+    if (year) {
       throw new AppError("The selected financial year is locked for accounting", 409);
     }
 
@@ -1462,6 +1486,7 @@ class PayrollService {
         paymentBatchAmount,
         paymentMode: input.paymentMode,
         bankAccountId: input.bankAccountId ?? null,
+        paymentDate: input.paymentDate,
         referenceNumber: input.referenceNumber ?? null
       });
       return updatedRun;
@@ -1737,6 +1762,7 @@ class PayrollService {
         paymentBatchAmount: paymentAmount,
         paymentMode: input.paymentMode,
         bankAccountId: input.bankAccountId ?? null,
+        paymentDate: input.paymentDate,
         referenceNumber: input.referenceNumber ?? null
       });
       return updated;

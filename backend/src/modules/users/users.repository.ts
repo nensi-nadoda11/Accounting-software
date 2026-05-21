@@ -30,6 +30,10 @@ type ListUsersParams = {
   status?: SafeUser["status"];
 };
 
+type ListInvitesParams = {
+  companyId: string;
+};
+
 export class UsersRepository {
   public async create(data: typeof users.$inferInsert): Promise<typeof users.$inferSelect> {
     const [user] = await db.insert(users).values(data).returning();
@@ -236,6 +240,14 @@ export class UsersRepository {
       .limit(1);
 
     return invite ?? null;
+  }
+
+  public async listInvitesByCompany(params: ListInvitesParams): Promise<(typeof userInvites.$inferSelect)[]> {
+    return db
+      .select()
+      .from(userInvites)
+      .where(eq(userInvites.companyId, params.companyId))
+      .orderBy(desc(userInvites.createdAt), asc(userInvites.fullName));
   }
 
   public async updateInvite(inviteId: string, data: Partial<typeof userInvites.$inferInsert>): Promise<void> {

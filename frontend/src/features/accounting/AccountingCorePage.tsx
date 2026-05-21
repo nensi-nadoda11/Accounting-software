@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Ban, Download, Eye, Lock, Pencil, Play, Plus, RefreshCcw, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, Download, Eye, Lock, Pencil, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
@@ -171,8 +171,6 @@ export const AccountingCorePage = () => {
   const [accountSaving, setAccountSaving] = useState(false);
   const [deleteAccountTarget, setDeleteAccountTarget] = useState<Account | null>(null);
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [seedingDefaults, setSeedingDefaults] = useState(false);
-
   const [openingBalancesData, setOpeningBalancesData] = useState<{ items: OpeningBalance[]; pagination: { page: number; limit: number; total: number; totalPages: number } } | null>(null);
   const [openingBalancesLoading, setOpeningBalancesLoading] = useState(false);
   const [openingBalancesError, setOpeningBalancesError] = useState<string | null>(null);
@@ -377,6 +375,7 @@ export const AccountingCorePage = () => {
           status: accountStatusFilter || undefined,
           parentId: accountParentFilter || undefined,
           hierarchy: accountsHierarchy,
+          excludeSystem: true,
         });
         setAccountsData(response.data);
       } catch (error) {
@@ -980,23 +979,6 @@ export const AccountingCorePage = () => {
                   </Button>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
-                  {canManageChart ? (
-                    <Button type="button" variant="secondary" loading={seedingDefaults} onClick={async () => {
-                      try {
-                        setSeedingDefaults(true);
-                        const response = await accountingApi.seedDefaultAccounts();
-                        toast.success(`Defaults processed: ${response.data.createdIds.length} created, ${response.data.existingIds.length} existing`);
-                        await refreshAccounts();
-                      } catch (error) {
-                        toast.error(getErrorMessage(error, "Failed to seed default accounts"));
-                      } finally {
-                        setSeedingDefaults(false);
-                      }
-                    }}>
-                      <RefreshCcw className="mr-2 size-4" />
-                      Seed Defaults
-                    </Button>
-                  ) : null}
                   {canManageChart ? (
                     <Button type="button" onClick={() => void openAccountDrawer("create")}>
                       <Plus className="mr-2 size-4" />

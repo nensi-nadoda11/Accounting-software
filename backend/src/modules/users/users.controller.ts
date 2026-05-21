@@ -63,6 +63,14 @@ export class UsersController {
     response.json(successResponse("Invite revoked successfully", {}));
   };
 
+  public listInvites = async (request: Request, response: Response): Promise<void> => {
+    const data = await usersService.listInvites({
+      companyId: request.currentUser!.companyId!
+    });
+
+    response.json(successResponse("Invites fetched successfully", data));
+  };
+
   public listUsers = async (request: Request, response: Response): Promise<void> => {
     const data = await usersService.listUsers(
       {

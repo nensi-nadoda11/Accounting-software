@@ -7,6 +7,8 @@ import {
 } from "react";
 import { AxiosError } from "axios";
 
+import { authBootstrap } from "../lib/auth-bootstrap";
+import { SESSION_EXPIRED_EVENT, SESSION_UPDATED_EVENT, type SessionUpdatedDetail } from "../lib/auth-events";
 import { authApi } from "../services/authApi";
 import { tokenStore } from "../lib/token-store";
 import type { Company, PermissionKey, User } from "../types/auth";
@@ -63,13 +65,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   }, [clearSession, setSession]);
 
   useEffect(() => {
-    void (async () => {
+    const bootstrapPromise = (async () => {
       try {
         await refreshSession();
       } finally {
         setIsInitializing(false);
       }
     })();
+
+    authBootstrap.set(bootstrapPromise);
+    void bootstrapPromise.finally(() => {
+      authBootstrap.clear(bootstrapPromise);
+    });
   }, [refreshSession]);
 
   useEffect(() => {
@@ -78,9 +85,22 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       toast.error("Session expired. Please login again.");
     };
 
-    window.addEventListener("session-expired", handleSessionExpired);
-    return () => window.removeEventListener("session-expired", handleSessionExpired);
-  }, [clearSession, toast]);
+    const handleSessionUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<SessionUpdatedDetail>).detail;
+      if (!detail?.accessToken) {
+        return;
+      }
+
+      setSession(detail);
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    window.addEventListener(SESSION_UPDATED_EVENT, handleSessionUpdated);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+      window.removeEventListener(SESSION_UPDATED_EVENT, handleSessionUpdated);
+    };
+  }, [clearSession, setSession, toast]);
 
   const login = useCallback<AuthContextValue["login"]>(
     async (payload) => {

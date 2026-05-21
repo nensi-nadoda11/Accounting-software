@@ -15,6 +15,17 @@ type RequestContext = {
 };
 
 class UsersService {
+  private normalizeInviteStatus(invite: {
+    status: "pending" | "accepted" | "expired" | "revoked";
+    expiresAt: Date;
+  }) {
+    if (invite.status === "pending" && invite.expiresAt <= new Date()) {
+      return "expired" as const;
+    }
+
+    return invite.status;
+  }
+
   public async inviteUser(
     actor: { id: string; companyId: string; role: "admin" | "accountant" | "staff" | "auditor" },
     input: {
@@ -209,6 +220,42 @@ class UsersService {
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
+  }
+
+  public async listInvites(actor: { companyId: string }) {
+    const invites = await usersRepository.listInvitesByCompany({
+      companyId: actor.companyId
+    });
+
+    const now = new Date();
+    const pendingExpiredInviteIds = invites
+      .filter((invite) => invite.status === "pending" && invite.expiresAt <= now)
+      .map((invite) => invite.id);
+
+    if (pendingExpiredInviteIds.length > 0) {
+      await Promise.all(
+        pendingExpiredInviteIds.map((inviteId) =>
+          usersRepository.updateInvite(inviteId, {
+            status: "expired"
+          })
+        )
+      );
+    }
+
+    return invites.map((invite) => ({
+      id: invite.id,
+      fullName: invite.fullName,
+      email: invite.email,
+      role: invite.role,
+      status: this.normalizeInviteStatus({
+        status: pendingExpiredInviteIds.includes(invite.id) ? "expired" : invite.status,
+        expiresAt: invite.expiresAt
+      }),
+      expiresAt: invite.expiresAt,
+      mobileNumber: invite.mobileNumber,
+      permissions: invite.permissions,
+      createdAt: invite.createdAt
+    }));
   }
 
   public async listUsers(

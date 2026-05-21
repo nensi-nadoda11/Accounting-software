@@ -1,6 +1,9 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
+import { authBootstrap } from "../auth-bootstrap";
+import { dispatchSessionExpired, dispatchSessionUpdated } from "../auth-events";
 import { tokenStore } from "../token-store";
+import type { LoginResponse } from "../../types/api";
 import { getApiBaseUrl } from "./resolve-api-base";
 
 const API_BASE_URL = getApiBaseUrl({
@@ -26,16 +29,35 @@ const refreshClient = axios.create({
 
 let refreshPromise: Promise<string | null> | null = null;
 
-const dispatchSessionExpired = () => {
-  window.dispatchEvent(new CustomEvent("session-expired"));
-};
-
 const shouldInvalidateSession = (error: AxiosError) => {
   const status = error.response?.status;
   return status === 401 || status === 403;
 };
 
-client.interceptors.request.use((config) => {
+const isAuthRefreshRequest = (url: string) => url.includes("/auth/refresh");
+
+const isAuthBootstrapSafeRequest = (url: string) =>
+  url.includes("/auth/login") ||
+  url.includes("/auth/register") ||
+  url.includes("/auth/verify-otp") ||
+  url.includes("/auth/resend-otp") ||
+  url.includes("/auth/forgot-password") ||
+  url.includes("/auth/reset-password") ||
+  url.includes("/users/accept-invite") ||
+  isAuthRefreshRequest(url);
+
+client.interceptors.request.use(async (config) => {
+  const requestUrl = config.url ?? "";
+  const bootstrapPromise = authBootstrap.get();
+
+  if (!tokenStore.get() && bootstrapPromise && !isAuthBootstrapSafeRequest(requestUrl)) {
+    try {
+      await bootstrapPromise;
+    } catch {
+      // Let the request continue and fail naturally if bootstrap could not restore the session.
+    }
+  }
+
   const token = tokenStore.get();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -50,7 +72,7 @@ client.interceptors.response.use(
     const status = error.response?.status;
     const requestUrl = originalRequest?.url ?? "";
 
-    if (status !== 401 || !originalRequest || originalRequest._retry || requestUrl.includes("/auth/login")) {
+    if (status !== 401 || !originalRequest || originalRequest._retry || requestUrl.includes("/auth/login") || isAuthRefreshRequest(requestUrl)) {
       return Promise.reject(error);
     }
 
@@ -61,11 +83,20 @@ client.interceptors.response.use(
         refreshPromise = refreshClient
           .post("/auth/refresh")
           .then((response) => {
-            const token = response.data.data.accessToken as string | undefined;
+            const session = response.data.data as LoginResponse | undefined;
+            const token = session?.accessToken;
             if (!token) {
               throw new Error("Missing access token");
             }
             tokenStore.set(token);
+            if (session?.user) {
+              dispatchSessionUpdated({
+                accessToken: token,
+                user: session.user,
+                company: session.company ?? null,
+                permissions: session.permissions,
+              });
+            }
             return token;
           })
           .catch((refreshError) => {

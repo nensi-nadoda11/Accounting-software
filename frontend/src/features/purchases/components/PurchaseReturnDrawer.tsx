@@ -7,7 +7,6 @@ import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
 import { LoadingState } from "../../../components/ui/LoadingState";
-import { Select } from "../../../components/ui/Select";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { Textarea } from "../../../components/ui/Textarea";
 import { formatDate } from "../../customers/customerUtils";
@@ -16,6 +15,7 @@ import type { PurchaseInvoice, PurchaseReturn, PurchaseReturnInput } from "../..
 import { purchaseReturnSchema, type PurchaseReturnValues } from "../purchaseSchemas";
 import { calculateReturnPreview, getRemainingReturnableQty } from "../purchaseUtils";
 import { AsyncLookupSelect, type LookupOption } from "./AsyncLookupSelect";
+import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
 export const PurchaseReturnDrawer = ({
   open,
@@ -182,14 +182,12 @@ export const PurchaseReturnDrawer = ({
                 }}
               />
               <Input type="date" label="Return Date" {...form.register("returnDate")} error={form.formState.errors.returnDate?.message} />
-              <Select label="Warehouse" {...form.register("warehouseId")} error={form.formState.errors.warehouseId?.message}>
-                <option value="">Select Warehouse</option>
-                {warehouses.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name}
-                  </option>
-                ))}
-              </Select>
+              <WarehouseLookupSelect
+                value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
+                warehouses={warehouses}
+                error={form.formState.errors.warehouseId?.message}
+                onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
+              />
               <Textarea label="Reason / Notes" rows={3} {...form.register("notes")} error={form.formState.errors.notes?.message} />
             </CardContent>
           </Card>

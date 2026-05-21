@@ -124,6 +124,30 @@ export class AuthRepository {
       })
       .where(eq(sessions.id, sessionId));
   }
+
+  public async rotateSessionIfRefreshHashMatches(
+    sessionId: string,
+    currentRefreshTokenHash: string,
+    nextRefreshTokenHash: string,
+    expiresAt: Date
+  ): Promise<boolean> {
+    const updated = await db
+      .update(sessions)
+      .set({
+        refreshTokenHash: nextRefreshTokenHash,
+        expiresAt
+      })
+      .where(
+        and(
+          eq(sessions.id, sessionId),
+          eq(sessions.refreshTokenHash, currentRefreshTokenHash),
+          isNull(sessions.revokedAt)
+        )
+      )
+      .returning({ id: sessions.id });
+
+    return updated.length > 0;
+  }
 }
 
 export const authRepository = new AuthRepository();

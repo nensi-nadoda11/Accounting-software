@@ -3,6 +3,7 @@ import { RotateCcw } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { Select } from "../../../components/ui/Select";
 import type { CustomerListItem } from "../../../types/customer";
 import type { Warehouse } from "../../../types/inventory";
@@ -84,14 +85,14 @@ export const SalesFilters = ({
           </option>
         ))}
       </Select>
-      <Select value={values.warehouseId} onChange={(event) => onChange({ warehouseId: event.target.value })}>
-        <option value="">All Warehouses</option>
-        {warehouses.map((warehouse) => (
-          <option key={warehouse.id} value={warehouse.id}>
-            {warehouse.name}
-          </option>
-        ))}
-      </Select>
+      <SearchableSelect
+        value={values.warehouseId}
+        options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name, description: warehouse.warehouseCode ?? null }))}
+        placeholder="All Warehouses"
+        searchPlaceholder="Search warehouse"
+        onChange={(value) => onChange({ warehouseId: value })}
+        allowClear
+      />
       <Input type="date" value={values.dateFrom} onChange={(event) => onChange({ dateFrom: event.target.value })} />
       <Input type="date" value={values.dateTo} onChange={(event) => onChange({ dateTo: event.target.value })} />
       <Button type="button" variant="secondary" onClick={onReset} aria-label="Reset filters" title="Reset filters">

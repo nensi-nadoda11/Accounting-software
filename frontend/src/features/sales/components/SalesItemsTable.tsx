@@ -4,6 +4,7 @@ import type { FieldArrayWithId, UseFieldArrayAppend, UseFieldArrayRemove, UseFor
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { Select } from "../../../components/ui/Select";
 import type { Warehouse } from "../../../types/inventory";
 import type { SalesFormInput } from "../../../types/sales";
@@ -96,6 +97,7 @@ export const SalesItemsTable = ({
             <div key={field.id} className="rounded-2xl border border-slate-200 p-4">
               <div className={`grid gap-3 ${compact ? "lg:grid-cols-[2fr_repeat(4,minmax(0,1fr))_auto]" : "lg:grid-cols-[2.2fr_repeat(6,minmax(0,1fr))_auto]"}`}>
                 <AsyncLookupSelect
+                  label="Product"
                   value={getLookupValue(index)}
                   loading={productLookupLoading}
                   options={productLookupOptions}
@@ -137,14 +139,19 @@ export const SalesItemsTable = ({
 
               <div className={`mt-3 grid gap-3 ${compact ? "md:grid-cols-4" : "md:grid-cols-6"}`}>
                 {productType === "goods" ? (
-                  <Select label="Warehouse" {...form.register(`items.${index}.warehouseId`)} error={form.formState.errors.items?.[index]?.warehouseId?.message}>
-                    <option value="">Select Warehouse</option>
-                    {warehouses.map((warehouse) => (
-                      <option key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <SearchableSelect
+                    label="Warehouse"
+                    value={(form.watch(`items.${index}.warehouseId`) as string | null | undefined) ?? ""}
+                    options={warehouses.map((warehouse) => ({
+                      value: warehouse.id,
+                      label: warehouse.name,
+                      description: warehouse.warehouseCode ?? null,
+                    }))}
+                    placeholder="Select Warehouse"
+                    searchPlaceholder="Search warehouse"
+                    error={form.formState.errors.items?.[index]?.warehouseId?.message}
+                    onChange={(value) => form.setValue(`items.${index}.warehouseId`, value || null, { shouldDirty: true, shouldValidate: true })}
+                  />
                 ) : (
                   <div />
                 )}

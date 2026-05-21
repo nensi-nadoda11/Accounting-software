@@ -8,6 +8,7 @@ import type { Warehouse } from "../../../types/inventory";
 import type { SupplierListItem } from "../../../types/supplier";
 import { PURCHASE_PAYMENT_STATUS_OPTIONS, PURCHASE_STATUS_OPTIONS } from "../purchaseOptions";
 import type { PaymentStatus, PurchaseStatus } from "../../../types/purchase";
+import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
 export const PurchaseFilters = ({
   search,
@@ -62,14 +63,14 @@ export const PurchaseFilters = ({
           </option>
         ))}
       </Select>
-      <Select value={values.warehouseId} onChange={(event) => onChange({ warehouseId: event.target.value })}>
-        <option value="">All Warehouses</option>
-        {warehouses.map((warehouse) => (
-          <option key={warehouse.id} value={warehouse.id}>
-            {warehouse.name}
-          </option>
-        ))}
-      </Select>
+      <WarehouseLookupSelect
+        label={undefined}
+        value={values.warehouseId}
+        warehouses={warehouses}
+        placeholder="All Warehouses"
+        noResultsLabel="No matching warehouses found"
+        onChange={(value) => onChange({ warehouseId: value ?? "" })}
+      />
       <Input type="date" value={values.dateFrom} onChange={(event) => onChange({ dateFrom: event.target.value })} />
       <Input type="date" value={values.dateTo} onChange={(event) => onChange({ dateTo: event.target.value })} />
       <Button type="button" variant="secondary" onClick={onReset}>

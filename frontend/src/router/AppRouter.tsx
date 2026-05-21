@@ -247,11 +247,7 @@ export const AppRouter = () => (
           />
           <Route
             path="sales/payments"
-            element={
-              <PermissionRoute permissions={["sales.payment.view", "sales.payment.manage"]}>
-                <SalesPage tab="payments" />
-              </PermissionRoute>
-            }
+            element={<Navigate to="/app/sales/invoices" replace />}
           />
           <Route
             path="sales/customers"

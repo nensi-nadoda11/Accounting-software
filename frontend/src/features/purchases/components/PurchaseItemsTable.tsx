@@ -12,6 +12,7 @@ import type { PurchaseFormValues } from "../purchaseSchemas";
 import type { PurchasePreviewTotals } from "../purchaseUtils";
 import type { PurchaseFormInput } from "../../../types/purchase";
 import { AsyncLookupSelect, type LookupOption } from "./AsyncLookupSelect";
+import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
 export const PurchaseItemsTable = ({
   form,
@@ -87,6 +88,7 @@ export const PurchaseItemsTable = ({
             <div key={field.id} className="rounded-2xl border border-slate-200 p-4">
               <div className="grid gap-3 lg:grid-cols-[2fr_repeat(6,minmax(0,1fr))_auto]">
                 <AsyncLookupSelect
+                  label="Product"
                   value={getLookupValue(index)}
                   loading={productLookupLoading}
                   options={productLookupOptions}
@@ -163,14 +165,12 @@ export const PurchaseItemsTable = ({
 
               <div className="mt-3 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
                 {product?.productType === "goods" ? (
-                  <Select label="Warehouse" {...form.register(`items.${index}.warehouseId`)} error={form.formState.errors.items?.[index]?.warehouseId?.message}>
-                    <option value="">Select Warehouse</option>
-                    {warehouses.map((warehouse) => (
-                      <option key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <WarehouseLookupSelect
+                    value={(form.watch(`items.${index}.warehouseId`) as string | null | undefined) ?? ""}
+                    warehouses={warehouses}
+                    error={form.formState.errors.items?.[index]?.warehouseId?.message}
+                    onChange={(value) => form.setValue(`items.${index}.warehouseId`, value, { shouldDirty: true, shouldValidate: true })}
+                  />
                 ) : (
                   <div />
                 )}

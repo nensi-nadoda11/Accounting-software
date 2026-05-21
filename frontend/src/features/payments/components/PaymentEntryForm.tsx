@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { AmountText } from "../../../components/ui/AmountText";
@@ -17,6 +17,8 @@ import { paymentsApi } from "../../../services/paymentsApi";
 import { suppliersApi } from "../../../services/suppliersApi";
 import type { CompanyBankAccount } from "../../../types/company";
 import type { DueItem, PartyType, Payment, PaymentFormInput, PaymentType } from "../../../types/payment";
+import type { CustomerListItem } from "../../../types/customer";
+import type { SupplierListItem } from "../../../types/supplier";
 import { applyFriendlyFieldErrors } from "../../customers/customerUtils";
 import { AsyncLookupSelect, type LookupOption } from "../../sales/components/AsyncLookupSelect";
 import { AllocationTable } from "./AllocationTable";
@@ -60,6 +62,43 @@ const buildLookupOption = (payment: Payment): LookupOption | null =>
       }
     : null;
 
+const DIRECTORY_LIMIT = 100;
+
+const buildCustomerLookupOption = (customer: Pick<CustomerListItem, "id" | "name" | "customerCode" | "mobile">): LookupOption => ({
+  id: customer.id,
+  label: customer.name,
+  description: customer.customerCode,
+  meta: customer.mobile,
+});
+
+const buildSupplierLookupOption = (supplier: Pick<SupplierListItem, "id" | "name" | "supplierCode" | "mobile">): LookupOption => ({
+  id: supplier.id,
+  label: supplier.name,
+  description: supplier.supplierCode,
+  meta: supplier.mobile,
+});
+
+const matchesPartySearch = (
+  option: Pick<CustomerListItem, "name" | "customerCode" | "mobile" | "businessName" | "email"> | Pick<SupplierListItem, "name" | "supplierCode" | "mobile" | "businessName" | "email">,
+  search: string,
+) => {
+  const normalizedSearch = search.trim().toLowerCase();
+
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  return [
+    option.name,
+    "customerCode" in option ? option.customerCode : option.supplierCode,
+    option.mobile,
+    option.businessName,
+    option.email,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.toLowerCase().includes(normalizedSearch));
+};
+
 export const PaymentEntryForm = ({
   mode,
   title,
@@ -91,12 +130,15 @@ export const PaymentEntryForm = ({
 }) => {
   const toast = useToast();
   const [lookupOptions, setLookupOptions] = useState<LookupOption[]>([]);
+  const [partyDirectory, setPartyDirectory] = useState<Array<CustomerListItem | SupplierListItem>>([]);
+  const [partyDirectoryLoaded, setPartyDirectoryLoaded] = useState(false);
   const [lookupValue, setLookupValue] = useState<LookupOption | null>(null);
   const [loadingLookup, setLoadingLookup] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [loadingDueItems, setLoadingDueItems] = useState(false);
   const [dueItems, setDueItems] = useState<DueItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const lookupRequestRef = useRef(0);
 
   const form = useForm<PaymentFormInputValues, undefined, PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
@@ -111,37 +153,111 @@ export const PaymentEntryForm = ({
 
   const remainingAmount = useMemo(() => getRemainingAmount(amount, allocations), [allocations, amount]);
 
-  const loadLookupOptions = async (searchValue: string) => {
+  useEffect(() => {
+    let cancelled = false;
+    setPartyDirectory([]);
+    setPartyDirectoryLoaded(false);
+    setLookupOptions([]);
+    setLoadingLookup(false);
+
+    void (async () => {
+      try {
+        const response =
+          partyType === "customer"
+            ? await customersApi.list({ page: 1, limit: DIRECTORY_LIMIT, status: "active", sortBy: "name", sortOrder: "asc" })
+            : await suppliersApi.list({ page: 1, limit: DIRECTORY_LIMIT, status: "active", sortBy: "name", sortOrder: "asc" });
+
+        if (cancelled) {
+          return;
+        }
+
+        setPartyDirectory(response.data.items);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setPartyDirectory([]);
+      } finally {
+        if (!cancelled) {
+          setPartyDirectoryLoaded(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [partyType]);
+
+  const loadLookupOptions = useCallback(async (searchValue: string) => {
+    const normalizedSearch = searchValue.trim();
+    const requestId = lookupRequestRef.current + 1;
+    lookupRequestRef.current = requestId;
+
+    const cachedMatches = partyDirectory
+      .filter((option) => matchesPartySearch(option, normalizedSearch))
+      .slice(0, 20)
+      .map((option) => ("customerCode" in option ? buildCustomerLookupOption(option) : buildSupplierLookupOption(option)));
+
+    setLookupOptions(cachedMatches);
+
+    if (!normalizedSearch || (partyDirectoryLoaded && (cachedMatches.length > 0 || partyDirectory.length < DIRECTORY_LIMIT))) {
+      setLoadingLookup(false);
+      return;
+    }
+
     try {
       setLoadingLookup(true);
+      let remoteOptions: LookupOption[] = [];
+
       if (partyType === "customer") {
-        const response = await customersApi.list({ page: 1, limit: 20, search: searchValue || undefined, status: "active" });
-        setLookupOptions(
-          response.data.items.map((customer) => ({
-            id: customer.id,
-            label: customer.name,
-            description: customer.customerCode,
-            meta: customer.mobile,
-          })),
-        );
-        return;
+        const response = await customersApi.list({ page: 1, limit: 20, search: normalizedSearch, status: "active" });
+        if (lookupRequestRef.current !== requestId) {
+          return;
+        }
+
+        setPartyDirectory((current) => {
+          const next = new Map(current.map((item) => [item.id, item]));
+          response.data.items.forEach((item) => {
+            next.set(item.id, item);
+          });
+          return Array.from(next.values());
+        });
+
+        remoteOptions = response.data.items.map(buildCustomerLookupOption);
+      } else {
+        const response = await suppliersApi.list({ page: 1, limit: 20, search: normalizedSearch, status: "active" });
+        if (lookupRequestRef.current !== requestId) {
+          return;
+        }
+
+        setPartyDirectory((current) => {
+          const next = new Map(current.map((item) => [item.id, item]));
+          response.data.items.forEach((item) => {
+            next.set(item.id, item);
+          });
+          return Array.from(next.values());
+        });
+
+        remoteOptions = response.data.items.map(buildSupplierLookupOption);
       }
 
-      const response = await suppliersApi.list({ page: 1, limit: 20, search: searchValue || undefined, status: "active" });
-      setLookupOptions(
-        response.data.items.map((supplier) => ({
-          id: supplier.id,
-          label: supplier.name,
-          description: supplier.supplierCode,
-          meta: supplier.mobile,
-        })),
-      );
+      const merged = new Map<string, LookupOption>();
+      [...cachedMatches, ...remoteOptions].forEach((option) => {
+        merged.set(option.id, option);
+      });
+      setLookupOptions(Array.from(merged.values()));
     } catch {
-      setLookupOptions([]);
+      if (lookupRequestRef.current === requestId) {
+        setLookupOptions(cachedMatches);
+      }
     } finally {
-      setLoadingLookup(false);
+      if (lookupRequestRef.current === requestId) {
+        setLoadingLookup(false);
+      }
     }
-  };
+  }, [partyDirectory, partyDirectoryLoaded, partyType]);
 
   const syncDueItems = async (nextPartyId: string, nextPaymentDate: string, applyAutoAllocate: boolean, initialAllocations?: PaymentFormInput["allocations"]) => {
     try {

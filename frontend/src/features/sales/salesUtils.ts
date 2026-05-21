@@ -590,7 +590,7 @@ export const canAddPayment = (invoice: Pick<SalesInvoice, "invoiceStatus" | "due
   (invoice.invoiceStatus === "posted" || invoice.invoiceStatus === "returned" || invoice.invoiceStatus === "partially_returned") &&
   compareScaled(invoice.dueAmount, "0.00", 2) > 0;
 export const canCreateReturn = (invoice: Pick<SalesInvoice, "invoiceStatus">) =>
-  invoice.invoiceStatus === "posted" || invoice.invoiceStatus === "returned" || invoice.invoiceStatus === "partially_returned";
+  invoice.invoiceStatus === "posted" || invoice.invoiceStatus === "partially_returned";
 
 export const resolveInterState = (
   company: CompanyProfile | null,

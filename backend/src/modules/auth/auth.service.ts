@@ -301,29 +301,18 @@ class AuthService {
 
     await loginAttemptService.clear(attemptKey);
 
+    const sessionId = randomUUID();
     const sessionExpiresAt = new Date(Date.now() + this.refreshTtlMs);
-    const sessionSeedToken = signRefreshToken({
-      sub: user.id,
-      sessionId: randomUUID(),
-      companyId: user.companyId,
-      role: user.role
-    });
-
-    const decodedSeed = verifyRefreshToken(sessionSeedToken);
+    const tokens = this.buildTokens(user.id, user.companyId, user.role, sessionId);
     const session = await authRepository.createSession({
-      id: decodedSeed.sessionId,
+      id: sessionId,
       userId: user.id,
-      refreshTokenHash: hashToken(sessionSeedToken),
+      refreshTokenHash: hashToken(tokens.refreshToken),
       rememberMe: input.rememberMe ?? false,
       userAgent: context.userAgent,
       ipAddress: context.ipAddress,
       expiresAt: sessionExpiresAt
     });
-
-    const tokens = await this.buildTokens(user.id, user.companyId, user.role, session.id);
-    if (tokens.refreshToken !== sessionSeedToken) {
-      await authRepository.rotateSession(session.id, hashToken(tokens.refreshToken), sessionExpiresAt);
-    }
 
     await usersRepository.updateLastLogin(user.id);
     await auditLogService.log({
@@ -421,7 +410,8 @@ class AuthService {
 
   public async refresh(refreshToken: string) {
     const payload = verifyRefreshToken(refreshToken);
-    const session = await authRepository.findActiveSessionByHash(hashToken(refreshToken));
+    const currentRefreshTokenHash = hashToken(refreshToken);
+    const session = await authRepository.findActiveSessionByHash(currentRefreshTokenHash);
 
     if (!session || session.id !== payload.sessionId || session.userId !== payload.sub) {
       throw new AppError("Invalid session", 401);
@@ -437,9 +427,18 @@ class AuthService {
       throw new AppError("Company is not active", 403);
     }
 
-    const tokens = await this.buildTokens(user.id, user.companyId, user.role, session.id);
+    const tokens = this.buildTokens(user.id, user.companyId, user.role, session.id);
     const expiresAt = new Date(Date.now() + this.refreshTtlMs);
-    await authRepository.rotateSession(session.id, hashToken(tokens.refreshToken), expiresAt);
+    const rotated = await authRepository.rotateSessionIfRefreshHashMatches(
+      session.id,
+      currentRefreshTokenHash,
+      hashToken(tokens.refreshToken),
+      expiresAt
+    );
+
+    if (!rotated) {
+      throw new AppError("Invalid session", 401);
+    }
 
     const permissions = await permissionService.getEffectivePermissions(user.id, user.role, user.companyId);
 
@@ -583,7 +582,7 @@ class AuthService {
     });
   }
 
-  private async buildTokens(userId: string, companyId: string | null, role: string, sessionId: string) {
+  private buildTokens(userId: string, companyId: string | null, role: string, sessionId: string) {
     const accessToken = signAccessToken({
       sub: userId,
       sessionId,

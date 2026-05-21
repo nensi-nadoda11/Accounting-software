@@ -35,6 +35,7 @@ import {
 import { AsyncLookupSelect, type LookupOption } from "./AsyncLookupSelect";
 import { PurchaseItemsTable } from "./PurchaseItemsTable";
 import { PurchaseTotalsPanel } from "./PurchaseTotalsPanel";
+import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
 type SupplierLookupValue = LookupOption | null;
 const SUPPLIER_DIRECTORY_LIMIT = 100;
@@ -51,7 +52,7 @@ const doesSupplierMatch = (supplier: Pick<SupplierListItem, "name" | "supplierCo
   const normalizedSearch = search.trim().toLowerCase();
 
   if (!normalizedSearch) {
-    return false;
+    return true;
   }
 
   return [supplier.name, supplier.supplierCode, supplier.mobile, supplier.businessName, supplier.email]
@@ -82,7 +83,7 @@ const doesProductMatch = (
   const normalizedSearch = search.trim().toLowerCase();
 
   if (!normalizedSearch) {
-    return false;
+    return true;
   }
 
   return [product.name, product.productCode, product.sku, product.barcode, product.brand, product.hsnSacCode]
@@ -294,12 +295,6 @@ export const PurchaseForm = ({
     supplierLookupRequestRef.current = requestId;
     setSupplierLookupMessage(null);
 
-    if (!normalizedSearch) {
-      setSupplierLoading(false);
-      setSupplierLookup([]);
-      return;
-    }
-
     const cachedMatches = supplierDirectory
       .filter((supplier) => doesSupplierMatch(supplier, normalizedSearch))
       .slice(0, 20)
@@ -309,13 +304,8 @@ export const PurchaseForm = ({
       setSupplierLookup(cachedMatches);
     }
 
-    if (supplierDirectoryLoaded && (cachedMatches.length > 0 || supplierDirectory.length < SUPPLIER_DIRECTORY_LIMIT)) {
+    if (!normalizedSearch || (supplierDirectoryLoaded && (cachedMatches.length > 0 || supplierDirectory.length < SUPPLIER_DIRECTORY_LIMIT))) {
       setSupplierLoading(false);
-
-      if (cachedMatches.length === 0) {
-        setSupplierLookup([]);
-      }
-
       return;
     }
 
@@ -410,19 +400,15 @@ export const PurchaseForm = ({
     productLookupRequestRef.current = requestId;
     setProductLookupMessage(null);
 
-    if (!normalizedSearch) {
-      setProductLookupLoading(false);
-      setProductLookup([]);
-      return;
-    }
-
-    const cachedMatches = productDirectory
-      .filter((product) => doesProductMatch(product, normalizedSearch))
+    const cachedMatches = (normalizedSearch ? productDirectory.filter((product) => doesProductMatch(product, normalizedSearch)) : productDirectory)
       .slice(0, 20)
       .map(buildProductLookupOptionFromListItem);
 
-    if (cachedMatches.length > 0) {
-      setProductLookup(cachedMatches);
+    setProductLookup(cachedMatches);
+
+    if (!normalizedSearch) {
+      setProductLookupLoading(false);
+      return;
     }
 
     if (productDirectoryLoaded && (cachedMatches.length > 0 || productDirectory.length < PRODUCT_DIRECTORY_LIMIT)) {
@@ -659,14 +645,12 @@ export const PurchaseForm = ({
           <Input label="Supplier Invoice No" {...form.register("supplierInvoiceNumber")} error={form.formState.errors.supplierInvoiceNumber?.message} />
           <Input type="date" label="Invoice Date" {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
           <Input type="date" label="Due Date" {...form.register("dueDate")} error={form.formState.errors.dueDate?.message} />
-          <Select label="Warehouse" {...form.register("warehouseId")} error={form.formState.errors.warehouseId?.message}>
-            <option value="">Select Warehouse</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.name}
-              </option>
-            ))}
-          </Select>
+          <WarehouseLookupSelect
+            value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
+            warehouses={warehouses}
+            error={form.formState.errors.warehouseId?.message}
+            onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
+          />
           <Textarea label="Notes" rows={3} {...form.register("notes")} error={form.formState.errors.notes?.message} />
           <Textarea label="Terms" rows={3} {...form.register("termsConditions")} error={form.formState.errors.termsConditions?.message} />
         </CardContent>

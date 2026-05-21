@@ -9,7 +9,7 @@ const applyTestEnv = () => {
   process.env.JWT_ACCESS_SECRET = "access-secret-access-secret-access";
   process.env.JWT_REFRESH_SECRET = "refresh-secret-refresh-secret-123";
   process.env.ACCESS_TOKEN_EXPIRES_IN = "15m";
-  process.env.REFRESH_TOKEN_EXPIRES_IN = "7d";
+  process.env.REFRESH_TOKEN_EXPIRES_IN = "1d";
   process.env.COOKIE_NAME = "refresh_token";
   process.env.COOKIE_SECURE = "false";
   process.env.COOKIE_SAME_SITE = "lax";

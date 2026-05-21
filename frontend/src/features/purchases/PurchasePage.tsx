@@ -290,6 +290,10 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   };
 
   const loadReturnInvoices = async (searchValue: string) => {
+    if (!searchValue.trim() && returnInvoiceOptions.length > 0) {
+      return;
+    }
+
     try {
       setLoadingReturnInvoice(true);
       const response = await purchasesApi.list({

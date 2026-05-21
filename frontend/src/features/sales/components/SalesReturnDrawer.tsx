@@ -7,7 +7,7 @@ import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
 import { LoadingState } from "../../../components/ui/LoadingState";
-import { Select } from "../../../components/ui/Select";
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { Textarea } from "../../../components/ui/Textarea";
 import { formatDate } from "../../customers/customerUtils";
@@ -181,14 +181,15 @@ export const SalesReturnDrawer = ({
                 }}
               />
               <Input type="date" label="Return Date" {...form.register("returnDate")} error={form.formState.errors.returnDate?.message} />
-              <Select label="Warehouse" {...form.register("warehouseId")} error={form.formState.errors.warehouseId?.message}>
-                <option value="">Select Warehouse</option>
-                {warehouses.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name}
-                  </option>
-                ))}
-              </Select>
+              <SearchableSelect
+                label="Warehouse"
+                value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
+                options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name, description: warehouse.warehouseCode ?? null }))}
+                placeholder="Select Warehouse"
+                searchPlaceholder="Search warehouse"
+                error={form.formState.errors.warehouseId?.message}
+                onChange={(value) => form.setValue("warehouseId", value || null, { shouldDirty: true, shouldValidate: true })}
+              />
               <Textarea label="Reason" rows={3} {...form.register("reason")} error={form.formState.errors.reason?.message} />
               <div className="md:col-span-2">
                 <Textarea label="Notes" rows={3} {...form.register("notes")} error={form.formState.errors.notes?.message} />

@@ -577,7 +577,7 @@ export const canAddPayment = (invoice: Pick<PurchaseInvoice, "purchaseStatus" | 
   (invoice.purchaseStatus === "posted" || invoice.purchaseStatus === "returned") &&
   compareScaled(invoice.dueAmount, "0.00", 2) > 0;
 export const canCreateReturn = (invoice: Pick<PurchaseInvoice, "purchaseStatus">) =>
-  invoice.purchaseStatus === "posted" || invoice.purchaseStatus === "returned";
+  invoice.purchaseStatus === "posted";
 
 export const resolveInterState = (company: CompanyProfile | null, supplier: Supplier | null) => {
   const companyState = company?.state?.trim().toUpperCase();

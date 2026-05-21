@@ -21,6 +21,7 @@ export const AsyncLookupSelect = ({
   disabled,
   noResultsLabel = "No results found",
   idleLabel = "Type to search",
+  loadOnFocus = true,
   onSearch,
   onSelect,
   onClear,
@@ -34,6 +35,7 @@ export const AsyncLookupSelect = ({
   disabled?: boolean;
   noResultsLabel?: string;
   idleLabel?: string;
+  loadOnFocus?: boolean;
   onSearch: (value: string) => void;
   onSelect: (option: LookupOption) => void;
   onClear?: () => void;
@@ -48,12 +50,16 @@ export const AsyncLookupSelect = ({
   });
 
   useEffect(() => {
-    if (!open || disabled || !normalizedQuery) {
+    if (!open || disabled) {
+      return;
+    }
+
+    if (!normalizedQuery && !loadOnFocus) {
       return;
     }
 
     triggerSearch(normalizedQuery);
-  }, [disabled, normalizedQuery, open, triggerSearch]);
+  }, [disabled, loadOnFocus, normalizedQuery, open, triggerSearch]);
 
   useEffect(() => {
     if (!open) {
@@ -91,7 +97,7 @@ export const AsyncLookupSelect = ({
           className="h-11 w-full rounded-xl bg-transparent pl-9 pr-10 text-sm text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
           onFocus={() => {
             setOpen(true);
-            setQuery(value?.label ?? query);
+            setQuery("");
           }}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -117,9 +123,7 @@ export const AsyncLookupSelect = ({
         {open ? (
           <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div className="max-h-64 overflow-y-auto py-2">
-              {!normalizedQuery ? (
-                <div className="px-3 py-3 text-sm text-slate-500">{idleLabel}</div>
-              ) : loading ? (
+              {loading ? (
                 <div className="px-3 py-3 text-sm text-slate-500">Loading...</div>
               ) : options.length ? (
                 options.map((option) => (
@@ -138,6 +142,8 @@ export const AsyncLookupSelect = ({
                     {option.meta ? <span className="text-[11px] uppercase tracking-wide text-slate-400">{option.meta}</span> : null}
                   </button>
                 ))
+              ) : !normalizedQuery ? (
+                <div className="px-3 py-3 text-sm text-slate-500">{idleLabel}</div>
               ) : (
                 <div className="px-3 py-3 text-sm text-slate-500">{noResultsLabel}</div>
               )}

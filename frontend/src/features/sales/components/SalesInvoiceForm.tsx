@@ -6,6 +6,7 @@ import { ArrowLeft, FileText, Plus, Save } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { ToggleSwitch } from "../../../components/ui/ToggleSwitch";
@@ -16,7 +17,7 @@ import { customersApi } from "../../../services/customersApi";
 import { inventoryApi } from "../../../services/inventoryApi";
 import { productsApi } from "../../../services/productsApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../../types/company";
-import type { Customer, CustomerFormInput } from "../../../types/customer";
+import type { Customer, CustomerFormInput, CustomerListItem } from "../../../types/customer";
 import type { Warehouse } from "../../../types/inventory";
 import type { Product, ProductListItem, ProductLookupItem } from "../../../types/product";
 import type { SalesFormInput, SalesInvoice, SalesPaymentMode } from "../../../types/sales";
@@ -46,6 +47,29 @@ type BatchOption = {
 };
 
 const PRODUCT_DIRECTORY_LIMIT = 100;
+const CUSTOMER_DIRECTORY_LIMIT = 100;
+
+const buildCustomerLookupOption = (customer: Pick<CustomerListItem, "id" | "name" | "customerCode" | "mobile">): LookupOption => ({
+  id: customer.id,
+  label: customer.name,
+  description: customer.customerCode,
+  meta: customer.mobile,
+});
+
+const doesCustomerMatch = (
+  customer: Pick<CustomerListItem, "name" | "customerCode" | "mobile" | "businessName" | "email">,
+  search: string,
+) => {
+  const normalizedSearch = search.trim().toLowerCase();
+
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  return [customer.name, customer.customerCode, customer.mobile, customer.businessName, customer.email]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.toLowerCase().includes(normalizedSearch));
+};
 
 const buildProductLookupOptionFromListItem = (
   product: Pick<ProductListItem, "id" | "name" | "productCode" | "sku" | "barcode" | "salePrice" | "unit">,
@@ -70,7 +94,7 @@ const doesProductMatch = (
   const normalizedSearch = search.trim().toLowerCase();
 
   if (!normalizedSearch) {
-    return false;
+    return true;
   }
 
   return [product.name, product.productCode, product.sku, product.barcode, product.brand, product.hsnSacCode]
@@ -109,6 +133,8 @@ export const SalesInvoiceForm = ({
   const toast = useToast();
   const [submitMode, setSubmitMode] = useState<"draft" | "posted">("draft");
   const [customerLookup, setCustomerLookup] = useState<LookupOption[]>([]);
+  const [customerDirectory, setCustomerDirectory] = useState<CustomerListItem[]>([]);
+  const [customerDirectoryLoaded, setCustomerDirectoryLoaded] = useState(false);
   const [productLookup, setProductLookup] = useState<LookupOption[]>([]);
   const [productDirectory, setProductDirectory] = useState<ProductListItem[]>([]);
   const [productDirectoryLoaded, setProductDirectoryLoaded] = useState(false);
@@ -122,6 +148,7 @@ export const SalesInvoiceForm = ({
   const [productDetails, setProductDetails] = useState<Record<string, Product>>({});
   const [batchOptions, setBatchOptions] = useState<Record<number, BatchOption[]>>({});
   const [loadingBatchIndex, setLoadingBatchIndex] = useState<number | null>(null);
+  const customerLookupRequestRef = useRef(0);
   const productLookupRequestRef = useRef(0);
   const canCreateCustomer = auth.hasPermission("customer.create");
 
@@ -160,6 +187,42 @@ export const SalesInvoiceForm = ({
   useEffect(() => {
     form.setValue("grandTotalPreview", Number(preview.grandTotal), { shouldDirty: false, shouldValidate: true });
   }, [form, preview.grandTotal]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await customersApi.list({
+          page: 1,
+          limit: CUSTOMER_DIRECTORY_LIMIT,
+          status: "active",
+          sortBy: "name",
+          sortOrder: "asc",
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setCustomerDirectory(response.data.items);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setCustomerDirectory([]);
+      } finally {
+        if (!cancelled) {
+          setCustomerDirectoryLoaded(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -252,27 +315,54 @@ export const SalesInvoiceForm = ({
     });
   }, [form, values.items, values.warehouseId]);
 
-  const loadCustomers = async (search: string) => {
+  const loadCustomers = useCallback(async (search: string) => {
+    const normalizedSearch = search.trim();
+    const requestId = customerLookupRequestRef.current + 1;
+    customerLookupRequestRef.current = requestId;
+
+    const cachedMatches = customerDirectory
+      .filter((customer) => doesCustomerMatch(customer, normalizedSearch))
+      .slice(0, 20)
+      .map(buildCustomerLookupOption);
+
+    setCustomerLookup(cachedMatches);
+
+    if (!normalizedSearch || (customerDirectoryLoaded && (cachedMatches.length > 0 || customerDirectory.length < CUSTOMER_DIRECTORY_LIMIT))) {
+      setCustomerLoading(false);
+      return;
+    }
+
     try {
       setCustomerLoading(true);
       const response = await customersApi.list({
         page: 1,
         limit: 20,
-        search,
+        search: normalizedSearch,
         status: "active",
       });
-      setCustomerLookup(
-        response.data.items.map((customer) => ({
-          id: customer.id,
-          label: customer.name,
-          description: customer.customerCode,
-          meta: customer.mobile,
-        })),
-      );
+      if (customerLookupRequestRef.current !== requestId) {
+        return;
+      }
+
+      setCustomerDirectory((current) => {
+        const next = new Map(current.map((customer) => [customer.id, customer]));
+        response.data.items.forEach((customer) => {
+          next.set(customer.id, customer);
+        });
+        return Array.from(next.values());
+      });
+
+      const merged = new Map<string, LookupOption>();
+      [...cachedMatches, ...response.data.items.map(buildCustomerLookupOption)].forEach((option) => {
+        merged.set(option.id, option);
+      });
+      setCustomerLookup(Array.from(merged.values()));
     } finally {
-      setCustomerLoading(false);
+      if (customerLookupRequestRef.current === requestId) {
+        setCustomerLoading(false);
+      }
     }
-  };
+  }, [customerDirectory, customerDirectoryLoaded]);
 
   const loadProductsWithFallback = useCallback(async (search: string) => {
     const normalizedSearch = search.trim();
@@ -280,19 +370,15 @@ export const SalesInvoiceForm = ({
     productLookupRequestRef.current = requestId;
     setProductLookupMessage(null);
 
-    if (!normalizedSearch) {
-      setProductLookupLoading(false);
-      setProductLookup([]);
-      return;
-    }
-
-    const cachedMatches = productDirectory
-      .filter((product) => doesProductMatch(product, normalizedSearch))
+    const cachedMatches = (normalizedSearch ? productDirectory.filter((product) => doesProductMatch(product, normalizedSearch)) : productDirectory)
       .slice(0, 20)
       .map(buildProductLookupOptionFromListItem);
 
-    if (cachedMatches.length > 0) {
-      setProductLookup(cachedMatches);
+    setProductLookup(cachedMatches);
+
+    if (!normalizedSearch) {
+      setProductLookupLoading(false);
+      return;
     }
 
     if (productDirectoryLoaded && (cachedMatches.length > 0 || productDirectory.length < PRODUCT_DIRECTORY_LIMIT)) {
@@ -584,7 +670,7 @@ export const SalesInvoiceForm = ({
                 options={customerLookup}
                 placeholder="Search customer"
                 error={form.formState.errors.customerId?.message}
-                onSearch={loadCustomers}
+                onSearch={(value) => void loadCustomers(value)}
                 onSelect={(option) => void handleCustomerSelect(option)}
                 onClear={() => {
                   setCustomerLookupValue(null);
@@ -631,14 +717,15 @@ export const SalesInvoiceForm = ({
             <Input type="date" label="Due Date" {...form.register("dueDate")} error={form.formState.errors.dueDate?.message} />
           ) : null}
           <Input label="Place of Supply" {...form.register("placeOfSupply")} error={form.formState.errors.placeOfSupply?.message} />
-          <Select label="Warehouse" {...form.register("warehouseId")} error={form.formState.errors.warehouseId?.message}>
-            <option value="">Select Warehouse</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.name}
-              </option>
-            ))}
-          </Select>
+          <SearchableSelect
+            label="Warehouse"
+            value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
+            options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name, description: warehouse.warehouseCode ?? null }))}
+            placeholder="Select Warehouse"
+            searchPlaceholder="Search warehouse"
+            error={form.formState.errors.warehouseId?.message}
+            onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
+          />
           <Select label="Price Tax Type" {...form.register("priceTaxType")} error={form.formState.errors.priceTaxType?.message}>
             {SALES_PRICE_TAX_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>

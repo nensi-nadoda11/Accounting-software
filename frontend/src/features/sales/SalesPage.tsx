@@ -47,7 +47,7 @@ import { SendInvoiceModal } from "./components/SendInvoiceModal";
 import { createPaymentPayload, createReturnPayload, createSalesUpdatePayload } from "./salesUtils";
 import type { LookupOption } from "./components/AsyncLookupSelect";
 
-export type SalesPageTab = "invoices" | "pos" | "returns" | "payments";
+export type SalesPageTab = "invoices" | "pos" | "returns";
 
 type ConfirmState =
   | { type: "delete"; invoice: SalesInvoiceListItem | SalesInvoice }
@@ -273,7 +273,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
         page,
         limit: 20,
         search: searchParams.get("search") || undefined,
-        invoiceStatus: tab === "payments" ? undefined : invoiceStatusFilter || undefined,
+        invoiceStatus: invoiceStatusFilter || undefined,
         paymentStatus: paymentStatusFilter || undefined,
         customerId: customerId || undefined,
         warehouseId: warehouseId || undefined,
@@ -365,6 +365,10 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   };
 
   const loadReturnInvoices = async (searchValue: string) => {
+    if (!searchValue.trim() && returnInvoiceOptions.length > 0) {
+      return;
+    }
+
     try {
       setLoadingReturnInvoice(true);
       const response = await salesApi.list({
@@ -393,7 +397,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   }, [canManageSettings]);
 
   useEffect(() => {
-    if (tab === "invoices" || tab === "payments") {
+    if (tab === "invoices") {
       void loadInvoices();
     }
     if (tab === "returns") {
@@ -591,7 +595,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
       ) : (
         <div className="space-y-5">
           <PageHeader
-            title={tab === "payments" ? "Sales Payments" : "Sales Invoices"}
+            title="Sales Invoices"
             actions={
               <div className="flex flex-wrap gap-2">
                 {canExport ? (

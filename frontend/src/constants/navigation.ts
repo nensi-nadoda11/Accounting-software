@@ -114,7 +114,6 @@ export const SALES_TABS = [
   { label: "Sales Invoices", href: "/app/sales/invoices", permissions: ["sales.view"] },
   { label: "POS Billing", href: "/app/sales/pos", permissions: ["sales.create", "sales.pos.access"] },
   { label: "Returns", href: "/app/sales/returns", permissions: ["sales.view", "sales.return"] },
-  { label: "Payments", href: "/app/sales/payments", permissions: ["sales.payment.view", "sales.payment.manage"] },
 ] as const;
 
 export const INVENTORY_TABS = [

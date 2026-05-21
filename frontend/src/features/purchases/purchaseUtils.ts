@@ -13,6 +13,7 @@ import type {
   PurchasePaymentMode,
   PurchasePriceTaxType,
   PurchaseReturnInput,
+  PurchaseReturnRefundInput,
 } from "../../types/purchase";
 
 type ApiErrorShape = {
@@ -558,6 +559,9 @@ export const createPaymentPayload = (values: PurchasePaymentInput): PurchasePaym
 export const createReturnPayload = (values: PurchaseReturnInput): PurchaseReturnInput => ({
   ...values,
   warehouseId: values.warehouseId ?? null,
+  refundBankAccountId: values.refundBankAccountId ?? null,
+  refundReferenceNumber: trimToNull(values.refundReferenceNumber),
+  refundNotes: trimToNull(values.refundNotes),
   notes: values.notes.trim(),
   items: values.items
     .filter((item) => item.quantity > 0)
@@ -566,6 +570,13 @@ export const createReturnPayload = (values: PurchaseReturnInput): PurchaseReturn
       quantity: item.quantity,
       remarks: trimToNull(item.remarks),
     })),
+});
+
+export const createReturnRefundPayload = (values: PurchaseReturnRefundInput): PurchaseReturnRefundInput => ({
+  ...values,
+  bankAccountId: values.bankAccountId ?? null,
+  referenceNumber: trimToNull(values.referenceNumber),
+  notes: trimToNull(values.notes),
 });
 
 export const canEditPurchase = (invoice: Pick<PurchaseInvoice, "purchaseStatus">) => invoice.purchaseStatus === "draft";

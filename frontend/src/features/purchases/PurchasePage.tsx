@@ -40,7 +40,8 @@ import { PurchaseListTable } from "./components/PurchaseListTable";
 import { PurchasePaymentDrawer } from "./components/PurchasePaymentDrawer";
 import { PurchaseReturnDrawer } from "./components/PurchaseReturnDrawer";
 import { PurchaseReturnList } from "./components/PurchaseReturnList";
-import { createPaymentPayload, createPurchaseUpdatePayload, createReturnPayload } from "./purchaseUtils";
+import { PurchaseReturnRefundDrawer } from "./components/PurchaseReturnRefundDrawer";
+import { createPaymentPayload, createPurchaseUpdatePayload, createReturnPayload, createReturnRefundPayload } from "./purchaseUtils";
 import type { LookupOption } from "./components/AsyncLookupSelect";
 
 export type PurchasePageTab = "invoices" | "new" | "returns";
@@ -97,6 +98,9 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   const [returnInvoiceOptions, setReturnInvoiceOptions] = useState<LookupOption[]>([]);
   const [returnLookupValue, setReturnLookupValue] = useState<LookupOption | null>(null);
   const [loadingReturnInvoice, setLoadingReturnInvoice] = useState(false);
+  const [refundDrawerOpen, setRefundDrawerOpen] = useState(false);
+  const [refundReturn, setRefundReturn] = useState<PurchaseReturn | null>(null);
+  const [submittingReturnRefund, setSubmittingReturnRefund] = useState(false);
 
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
@@ -654,9 +658,14 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
           loading={loadingReturns}
           canCreate={canReturn}
           canExport={canExport}
+          canManageRefund={canReturn}
           onCreate={() => void openReturnCreate()}
           onPageChange={(nextPage) => updateQuery({ page: String(nextPage) })}
           onView={(purchaseReturn) => void loadReturnDetail(purchaseReturn.id)}
+          onRefund={(purchaseReturn) => {
+            setRefundReturn(purchaseReturn);
+            setRefundDrawerOpen(true);
+          }}
           onPdf={async (purchaseReturn) => {
             try {
               const file = await purchasesApi.downloadReturnPdf(purchaseReturn.id);
@@ -747,6 +756,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         invoiceLookupValue={returnLookupValue}
         loadingInvoice={loadingReturnInvoice}
         warehouses={warehouses}
+        bankAccounts={bankAccounts}
         submitting={submittingReturn}
         onClose={() => {
           setReturnDrawerOpen(false);
@@ -787,6 +797,35 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
             saveDownloadedFile(file.blob, file.fileName);
           } catch (error) {
             toast.error(getErrorMessage(error, "Failed to download return PDF"));
+          }
+        }}
+      />
+
+      <PurchaseReturnRefundDrawer
+        open={refundDrawerOpen}
+        purchaseReturn={refundReturn}
+        bankAccounts={bankAccounts}
+        submitting={submittingReturnRefund}
+        onClose={() => {
+          setRefundDrawerOpen(false);
+          setRefundReturn(null);
+        }}
+        onSubmit={async (values) => {
+          if (!refundReturn) {
+            return;
+          }
+
+          try {
+            setSubmittingReturnRefund(true);
+            const response = await purchasesApi.recordReturnRefund(refundReturn.id, createReturnRefundPayload(values));
+            setRefundReturn(response.data.purchaseReturn);
+            setRefundDrawerOpen(false);
+            toast.success("Refund entry recorded");
+            await loadReturns();
+          } catch (error) {
+            toast.error(getErrorMessage(error, "Failed to record refund entry"));
+          } finally {
+            setSubmittingReturnRefund(false);
           }
         }}
       />

@@ -14,6 +14,7 @@ import type {
   PurchasePaymentsResponse,
   PurchaseReturnDetailResponse,
   PurchaseReturnInput,
+  PurchaseReturnRefundInput,
   PurchaseReturnsListQuery,
   PurchaseReturnsResponse,
 } from "../types/purchase";
@@ -142,6 +143,9 @@ export const purchasesApi = {
 
   getReturn: async (purchaseReturnId: string) =>
     (await client.get<ApiResponse<PurchaseReturnDetailResponse>>(`/purchases/returns/${purchaseReturnId}`)).data,
+
+  recordReturnRefund: async (purchaseReturnId: string, payload: PurchaseReturnRefundInput) =>
+    (await client.post<ApiResponse<PurchaseReturnDetailResponse>>(`/purchases/returns/${purchaseReturnId}/refunds`, payload)).data,
 
   exportReturns: async (query: PurchaseReturnsListQuery & { format?: PurchaseExportFormat }) =>
     extractDownload(

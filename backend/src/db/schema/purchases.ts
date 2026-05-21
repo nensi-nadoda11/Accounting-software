@@ -244,6 +244,37 @@ export const purchaseReturns = pgTable(
   })
 );
 
+export const purchaseReturnRefunds = pgTable(
+  "purchase_return_refunds",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    purchaseReturnId: uuid("purchase_return_id")
+      .notNull()
+      .references(() => purchaseReturns.id, { onDelete: "cascade" }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => suppliers.id, { onDelete: "restrict" }),
+    refundDate: date("refund_date", { mode: "date" }).notNull(),
+    amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    paymentMode: purchasePaymentModeEnum("payment_mode").notNull(),
+    bankAccountId: uuid("bank_account_id").references(() => companyBankAccounts.id, { onDelete: "restrict" }),
+    referenceNumber: text("reference_number"),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    companyIdx: index("purchase_return_refunds_company_id_idx").on(table.companyId),
+    returnIdx: index("purchase_return_refunds_purchase_return_id_idx").on(table.purchaseReturnId),
+    supplierIdx: index("purchase_return_refunds_supplier_id_idx").on(table.supplierId),
+    refundDateIdx: index("purchase_return_refunds_refund_date_idx").on(table.refundDate),
+    amountCheck: check("purchase_return_refunds_amount_check", sql`${table.amount} > 0`)
+  })
+);
+
 export const purchaseReturnItems = pgTable(
   "purchase_return_items",
   {

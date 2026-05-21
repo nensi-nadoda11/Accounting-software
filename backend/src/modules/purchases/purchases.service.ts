@@ -29,6 +29,7 @@ import type {
   ListPurchaseReturnsQuery,
   ListPurchasesQuery,
   RecordPurchasePaymentInput,
+  RecordPurchaseReturnRefundInput,
   UpdatePurchaseInput
 } from "./purchases.validator";
 import type { PurchaseActor, PurchaseExportPayload, PurchaseRequestContext } from "./purchases.types";
@@ -275,6 +276,20 @@ class PurchasesService {
     };
   }
 
+  private mapReturnRefundRow(row: typeof import("../../db/schema").purchaseReturnRefunds.$inferSelect) {
+    return {
+      id: row.id,
+      refundDate: row.refundDate,
+      amount: normalizeMoney(row.amount),
+      paymentMode: row.paymentMode,
+      bankAccountId: row.bankAccountId,
+      referenceNumber: row.referenceNumber,
+      notes: row.notes,
+      createdBy: row.createdBy,
+      createdAt: row.createdAt
+    };
+  }
+
   private mapReturnItemRow(
     row: Awaited<ReturnType<typeof purchasesRepository.listPurchaseReturnItems>>[number]
   ) {
@@ -299,8 +314,22 @@ class PurchasesService {
       | NonNullable<Awaited<ReturnType<typeof purchasesRepository.findPurchaseReturnDetail>>>,
     extras?: {
       items?: Array<ReturnType<PurchasesService["mapReturnItemRow"]>>;
+      refunds?: Array<ReturnType<PurchasesService["mapReturnRefundRow"]>>;
     }
   ) {
+    const refundedAmount = "refundedAmount" in row ? row.refundedAmount : "0.00";
+    const remainingAmount = subtractDecimals(
+      normalizeMoney("purchaseReturn" in row ? row.purchaseReturn.grandTotal : 0),
+      refundedAmount,
+      2
+    );
+    const settlementStatus =
+      compareDecimals(refundedAmount, "0.00", 2) <= 0
+        ? "pending"
+        : compareDecimals(remainingAmount, "0.00", 2) <= 0
+          ? "settled"
+          : "partial";
+
     if ("purchaseReturn" in row && "supplierName" in row) {
       return {
         id: row.purchaseReturn.id,
@@ -312,6 +341,9 @@ class PurchasesService {
         supplierCode: row.supplierCode,
         returnDate: row.purchaseReturn.returnDate,
         grandTotal: normalizeMoney(row.purchaseReturn.grandTotal),
+        refundedAmount: normalizeMoney(refundedAmount),
+        remainingRefundAmount: compareDecimals(remainingAmount, "0.00", 2) < 0 ? "0.00" : normalizeMoney(remainingAmount),
+        settlementStatus,
         gstTotal: normalizeMoney(row.purchaseReturn.gstTotal),
         subtotal: normalizeMoney(row.purchaseReturn.subtotal),
         roundOffAmount: normalizeMoney(row.purchaseReturn.roundOffAmount),
@@ -325,7 +357,8 @@ class PurchasesService {
         notes: row.purchaseReturn.notes,
         createdAt: row.purchaseReturn.createdAt,
         updatedAt: row.purchaseReturn.updatedAt,
-        ...(extras?.items ? { items: extras.items } : {})
+        ...(extras?.items ? { items: extras.items } : {}),
+        ...(extras?.refunds ? { refunds: extras.refunds } : {})
       };
     }
 
@@ -339,6 +372,9 @@ class PurchasesService {
       supplierCode: row.supplier.supplierCode,
       returnDate: row.purchaseReturn.returnDate,
       grandTotal: normalizeMoney(row.purchaseReturn.grandTotal),
+      refundedAmount: normalizeMoney(refundedAmount),
+      remainingRefundAmount: compareDecimals(remainingAmount, "0.00", 2) < 0 ? "0.00" : normalizeMoney(remainingAmount),
+      settlementStatus,
       gstTotal: normalizeMoney(row.purchaseReturn.gstTotal),
       subtotal: normalizeMoney(row.purchaseReturn.subtotal),
       roundOffAmount: normalizeMoney(row.purchaseReturn.roundOffAmount),
@@ -352,7 +388,8 @@ class PurchasesService {
       notes: row.purchaseReturn.notes,
       createdAt: row.purchaseReturn.createdAt,
       updatedAt: row.purchaseReturn.updatedAt,
-      ...(extras?.items ? { items: extras.items } : {})
+      ...(extras?.items ? { items: extras.items } : {}),
+      ...(extras?.refunds ? { refunds: extras.refunds } : {})
     };
   }
 
@@ -1528,6 +1565,81 @@ class PurchasesService {
     };
   }
 
+  public async recordReturnRefund(
+    actor: PurchaseActor,
+    purchaseReturnId: string,
+    input: RecordPurchaseReturnRefundInput,
+    context: PurchaseRequestContext
+  ) {
+    const mutation = await db.transaction(async (transaction) => {
+      const purchaseReturn = await purchasesRepository.findPurchaseReturnById(actor.companyId, purchaseReturnId, transaction);
+      if (!purchaseReturn) {
+        throw new AppError("Purchase return not found", 404);
+      }
+
+      const refundTotals = await purchasesRepository.getPurchaseReturnRefundTotals(actor.companyId, purchaseReturnId, transaction);
+      const remainingAmount = subtractDecimals(purchaseReturn.grandTotal, refundTotals.refundedAmount, 2);
+      if (compareDecimals(normalizeMoney(input.amount), remainingAmount, 2) > 0) {
+        throw new AppError("Refund amount cannot exceed pending refund balance", 400);
+      }
+
+      if (input.bankAccountId) {
+        await this.getBankAccountOrThrow(actor.companyId, input.bankAccountId);
+      }
+
+      const refund = await purchasesRepository.createPurchaseReturnRefund(
+        {
+          companyId: actor.companyId,
+          purchaseReturnId: purchaseReturn.id,
+          supplierId: purchaseReturn.supplierId,
+          refundDate: input.refundDate,
+          amount: normalizeMoney(input.amount),
+          paymentMode: input.paymentMode,
+          bankAccountId: input.bankAccountId ?? null,
+          referenceNumber: input.referenceNumber ?? null,
+          notes: input.notes ?? null,
+          createdBy: actor.id
+        },
+        transaction
+      );
+
+      if (!refund) {
+        throw new AppError("Failed to record purchase return refund", 500);
+      }
+
+      return { refund, purchaseReturn };
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_return_refund_recorded",
+      entityType: "purchase_return_refund",
+      entityId: mutation.refund.id,
+      metadata: {
+        purchaseReturnId,
+        amount: normalizeMoney(mutation.refund.amount)
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "purchase_payable_updated",
+      entityType: "purchase_return",
+      entityId: purchaseReturnId,
+      metadata: {
+        refundAmount: normalizeMoney(mutation.refund.amount)
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return this.getReturn(actor, purchaseReturnId);
+  }
+
   public async listReturns(actor: Pick<PurchaseActor, "companyId">, query: ListPurchaseReturnsQuery) {
     const pagination = getPagination(query.page, query.limit);
     const result = await purchasesRepository.listPurchaseReturns({
@@ -1545,7 +1657,8 @@ class PurchasesService {
     return {
       items: result.rows.map((row) => this.mapReturnRow(row)),
       summary: {
-        grandTotal: normalizeMoney(result.summary.grandTotal)
+        grandTotal: normalizeMoney(result.summary.grandTotal),
+        refundedAmount: normalizeMoney(result.summary.refundedAmount)
       },
       pagination: {
         page: pagination.page,
@@ -1563,10 +1676,12 @@ class PurchasesService {
     }
 
     const items = await purchasesRepository.listPurchaseReturnItems(actor.companyId, purchaseReturnId);
+    const refunds = await purchasesRepository.listPurchaseReturnRefunds(actor.companyId, purchaseReturnId);
     return {
       purchaseReturn: {
         ...this.mapReturnRow(detail, {
-          items: items.map((row) => this.mapReturnItemRow(row))
+          items: items.map((row) => this.mapReturnItemRow(row)),
+          refunds: refunds.map((row) => this.mapReturnRefundRow(row))
         })
       }
     };
@@ -1644,6 +1759,15 @@ class PurchasesService {
         grandTotal = addDecimals(grandTotal, line.lineTotal, 2);
       }
 
+      const initialRefundAmount = normalizeMoney(input.refundAmountReceived ?? 0);
+      if (compareDecimals(initialRefundAmount, grandTotal, 2) > 0) {
+        throw new AppError("Refund amount cannot exceed purchase return total", 400);
+      }
+
+      if (input.refundBankAccountId) {
+        await this.getBankAccountOrThrow(actor.companyId, input.refundBankAccountId);
+      }
+
       const returnNumber = await this.getNextReturnNumber(actor.companyId, transaction);
       const purchaseReturn = await purchasesRepository.createPurchaseReturn(
         {
@@ -1665,6 +1789,29 @@ class PurchasesService {
 
       if (!purchaseReturn) {
         throw new AppError("Failed to create purchase return", 500);
+      }
+
+      let refund: Awaited<ReturnType<typeof purchasesRepository.createPurchaseReturnRefund>> | null = null;
+      if (compareDecimals(initialRefundAmount, "0.00", 2) > 0) {
+        refund = await purchasesRepository.createPurchaseReturnRefund(
+          {
+            companyId: actor.companyId,
+            purchaseReturnId: purchaseReturn.id,
+            supplierId: invoice.supplierId,
+            refundDate: input.returnDate,
+            amount: initialRefundAmount,
+            paymentMode: input.refundPaymentMode!,
+            bankAccountId: input.refundBankAccountId ?? null,
+            referenceNumber: input.refundReferenceNumber ?? null,
+            notes: input.refundNotes ?? input.notes,
+            createdBy: actor.id
+          },
+          transaction
+        );
+
+        if (!refund) {
+          throw new AppError("Failed to record initial purchase return refund", 500);
+        }
       }
 
       await purchasesRepository.createPurchaseReturnItems(
@@ -1746,6 +1893,7 @@ class PurchasesService {
 
       return {
         purchaseReturn,
+        refund,
         stockTouch
       };
     });
@@ -1762,6 +1910,22 @@ class PurchasesService {
       ipAddress: context.ipAddress,
       userAgent: context.userAgent
     });
+
+    if (mutation.refund) {
+      await auditLogService.log({
+        companyId: actor.companyId,
+        userId: actor.id,
+        action: "purchase_return_refund_recorded",
+        entityType: "purchase_return_refund",
+        entityId: mutation.refund.id,
+        metadata: {
+          purchaseReturnId: mutation.purchaseReturn.id,
+          amount: normalizeMoney(mutation.refund.amount)
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent
+      });
+    }
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1942,14 +2106,21 @@ class PurchasesService {
         { key: "purchaseNumber", label: "Purchase No" },
         { key: "supplierName", label: "Supplier" },
         { key: "returnDate", label: "Return Date" },
-        { key: "grandTotal", label: "Grand Total", type: "number" }
+        { key: "grandTotal", label: "Grand Total", type: "number" },
+        { key: "refundedAmount", label: "Refund Received", type: "number" },
+        { key: "remainingRefundAmount", label: "Refund Pending", type: "number" }
       ],
       rows: rows.map((row) => ({
         returnNumber: row.purchaseReturn.returnNumber,
         purchaseNumber: row.purchaseNumber ?? "",
         supplierName: row.supplierName,
         returnDate: formatDateValue(row.purchaseReturn.returnDate),
-        grandTotal: Number(normalizeMoney(row.purchaseReturn.grandTotal))
+        grandTotal: Number(normalizeMoney(row.purchaseReturn.grandTotal)),
+        refundedAmount: Number(normalizeMoney(row.refundedAmount)),
+        remainingRefundAmount: Math.max(
+          Number(subtractDecimals(row.purchaseReturn.grandTotal, row.refundedAmount, 2)),
+          0
+        )
       }))
     };
     const file = buildReportFile(dataset, query.format, `purchase-returns-${new Date().toISOString().slice(0, 10)}`);
@@ -1985,6 +2156,12 @@ class PurchasesService {
       gstAmount: string;
       lineTotal: string;
     }>;
+    const refunds = (purchaseReturn.refunds ?? []) as Array<{
+      refundDate: Date | string;
+      amount: string;
+      paymentMode: string;
+      referenceNumber: string | null;
+    }>;
 
     const company = await companyRepository.findCompanyById(actor.companyId);
     const lines = [
@@ -2017,7 +2194,17 @@ class PurchasesService {
       `GST Total      : ${purchaseReturn.gstTotal}`,
       `Round Off      : ${purchaseReturn.roundOffAmount}`,
       `Grand Total    : ${purchaseReturn.grandTotal}`,
+      `Refund Got     : ${purchaseReturn.refundedAmount}`,
+      `Refund Pending : ${purchaseReturn.remainingRefundAmount}`,
       `Notes          : ${purchaseReturn.notes || "-"}`,
+      "",
+      "Refund Entries",
+      ...(refunds.length
+        ? refunds.map(
+            (refund) =>
+              `${formatDateValue(refund.refundDate)} | ${refund.paymentMode} | ${refund.amount} | Ref ${refund.referenceNumber ?? "-"}`
+          )
+        : ["No refund entries available"]),
       "",
       `Generated At   : ${formatDateTimeValue(new Date())}`
     ];

@@ -185,6 +185,24 @@ export class PurchasesController {
     response.json(successResponse("Purchase return fetched successfully", data));
   };
 
+  public recordReturnRefund = async (request: Request, response: Response): Promise<void> => {
+    const data = await purchasesService.recordReturnRefund(
+      {
+        id: request.currentUser!.id,
+        companyId: request.currentUser!.companyId!,
+        role: request.currentUser!.role
+      },
+      String(request.params.id),
+      request.body,
+      {
+        ipAddress: getRequestIp(request),
+        userAgent: getUserAgent(request)
+      }
+    );
+
+    response.status(201).json(successResponse("Purchase return refund recorded successfully", data));
+  };
+
   public exportPurchases = async (request: Request, response: Response): Promise<void> => {
     const file = await purchasesService.exportPurchases(
       {

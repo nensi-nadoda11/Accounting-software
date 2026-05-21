@@ -7,13 +7,16 @@ import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
 import { LoadingState } from "../../../components/ui/LoadingState";
+import { Select } from "../../../components/ui/Select";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { Textarea } from "../../../components/ui/Textarea";
 import { formatDate } from "../../customers/customerUtils";
+import type { CompanyBankAccount } from "../../../types/company";
 import type { Warehouse } from "../../../types/inventory";
 import type { PurchaseInvoice, PurchaseReturn, PurchaseReturnInput } from "../../../types/purchase";
+import { PURCHASE_PAYMENT_MODE_OPTIONS } from "../purchaseOptions";
 import { purchaseReturnSchema, type PurchaseReturnValues } from "../purchaseSchemas";
-import { calculateReturnPreview, getRemainingReturnableQty } from "../purchaseUtils";
+import { calculateReturnPreview, getRemainingReturnableQty, isBankPaymentMode } from "../purchaseUtils";
 import { AsyncLookupSelect, type LookupOption } from "./AsyncLookupSelect";
 import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
@@ -26,6 +29,7 @@ export const PurchaseReturnDrawer = ({
   invoiceLookupValue,
   loadingInvoice,
   warehouses,
+  bankAccounts,
   submitting,
   onClose,
   onInvoiceSearch,
@@ -41,6 +45,7 @@ export const PurchaseReturnDrawer = ({
   invoiceLookupValue: LookupOption | null;
   loadingInvoice?: boolean;
   warehouses: Warehouse[];
+  bankAccounts: CompanyBankAccount[];
   submitting?: boolean;
   onClose: () => void;
   onInvoiceSearch: (value: string) => void;
@@ -54,6 +59,11 @@ export const PurchaseReturnDrawer = ({
       purchaseInvoiceId: "",
       returnDate: new Date().toISOString().slice(0, 10),
       warehouseId: null,
+      refundAmountReceived: 0,
+      refundPaymentMode: null,
+      refundBankAccountId: null,
+      refundReferenceNumber: null,
+      refundNotes: null,
       notes: "",
       items: [],
     },
@@ -68,6 +78,11 @@ export const PurchaseReturnDrawer = ({
       purchaseInvoiceId: selectedInvoice?.id ?? "",
       returnDate: new Date().toISOString().slice(0, 10),
       warehouseId: selectedInvoice?.warehouse?.id ?? null,
+      refundAmountReceived: 0,
+      refundPaymentMode: null,
+      refundBankAccountId: null,
+      refundReferenceNumber: null,
+      refundNotes: null,
       notes: "",
       items:
         selectedInvoice?.items?.map((item) => ({
@@ -80,6 +95,7 @@ export const PurchaseReturnDrawer = ({
   }, [form, mode, open, selectedInvoice]);
 
   const returnItems = form.watch("items");
+  const refundPaymentMode = form.watch("refundPaymentMode") as PurchaseInvoice["paymentMode"];
   const preview =
     mode === "create" && selectedInvoice
       ? calculateReturnPreview(
@@ -142,6 +158,14 @@ export const PurchaseReturnDrawer = ({
                   <p className="text-xs uppercase tracking-wide text-slate-400">Grand Total</p>
                   <div className="mt-1"><AmountText value={purchaseReturn.grandTotal} /></div>
                 </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Refund Received</p>
+                  <div className="mt-1"><AmountText value={purchaseReturn.refundedAmount} tone="success" /></div>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Refund Pending</p>
+                  <div className="mt-1"><AmountText value={purchaseReturn.remainingRefundAmount} tone="danger" /></div>
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -158,6 +182,25 @@ export const PurchaseReturnDrawer = ({
                     <div><AmountText value={item.lineTotal} /></div>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader title="Refund Entries" />
+              <CardContent className="space-y-3">
+                {purchaseReturn.refunds?.length ? purchaseReturn.refunds.map((refund) => (
+                  <div key={refund.id} className="rounded-2xl border border-slate-200 px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{formatDate(refund.refundDate)}</p>
+                        <p className="text-xs text-slate-500">{refund.paymentMode.toUpperCase()} · Ref {refund.referenceNumber || "-"}</p>
+                      </div>
+                      <AmountText value={refund.amount} tone="success" />
+                    </div>
+                    {refund.notes ? <p className="mt-2 text-sm text-slate-600">{refund.notes}</p> : null}
+                  </div>
+                )) : (
+                  <p className="text-sm text-slate-500">No refund entries recorded yet.</p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -247,6 +290,35 @@ export const PurchaseReturnDrawer = ({
                   </CardContent>
                 </Card>
               ) : null}
+
+              <Card>
+                <CardHeader title="Refund Received From Supplier" />
+                <CardContent className="grid gap-4 md:grid-cols-2">
+                  <Input type="number" min="0" step="0.01" label="Amount Received" {...form.register("refundAmountReceived")} error={form.formState.errors.refundAmountReceived?.message} />
+                  <Select label="Refund Mode" {...form.register("refundPaymentMode")} error={form.formState.errors.refundPaymentMode?.message}>
+                    <option value="">Select Refund Mode</option>
+                    {PURCHASE_PAYMENT_MODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  {isBankPaymentMode(refundPaymentMode) ? (
+                    <Select label="Bank Account" {...form.register("refundBankAccountId")} error={form.formState.errors.refundBankAccountId?.message}>
+                      <option value="">Select Bank Account</option>
+                      {bankAccounts.map((bankAccount) => (
+                        <option key={bankAccount.id} value={bankAccount.id}>
+                          {bankAccount.bankName} · {bankAccount.accountNumber.slice(-4)}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <div />
+                  )}
+                  <Input label="Reference No" {...form.register("refundReferenceNumber")} error={form.formState.errors.refundReferenceNumber?.message} />
+                  <Textarea label="Refund Notes" rows={3} {...form.register("refundNotes")} error={form.formState.errors.refundNotes?.message} />
+                </CardContent>
+              </Card>
             </>
           ) : (
             <Card>

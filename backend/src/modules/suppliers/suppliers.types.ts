@@ -14,6 +14,7 @@ export const SUPPLIER_LEDGER_TRANSACTION_TYPES = [
   "opening_balance",
   "purchase",
   "purchase_return",
+  "purchase_return_refund",
   "payment",
   "debit_adjustment",
   "credit_adjustment"

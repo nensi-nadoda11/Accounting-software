@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../db";
-import { purchaseInvoices, purchasePayments, purchaseReturns, suppliers } from "../../db/schema";
+import { purchaseInvoices, purchasePayments, purchaseReturnRefunds, purchaseReturns, suppliers } from "../../db/schema";
 
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbExecutor = typeof db | TransactionClient;
@@ -39,6 +39,7 @@ type SupplierTransactionTotals = {
   totalPurchases: string;
   totalPurchaseReturns: string;
   totalPaymentsMade: string;
+  totalRefundsReceived: string;
   debitAdjustments: string;
   creditAdjustments: string;
   overduePayable: string;
@@ -331,10 +332,18 @@ class SuppliersRepository {
       .from(purchasePayments)
       .where(and(eq(purchasePayments.companyId, companyId), eq(purchasePayments.supplierId, supplierId)));
 
+    const [refundRow] = await db
+      .select({
+        totalRefundsReceived: sql<string>`coalesce(sum(${purchaseReturnRefunds.amount}), 0)`
+      })
+      .from(purchaseReturnRefunds)
+      .where(and(eq(purchaseReturnRefunds.companyId, companyId), eq(purchaseReturnRefunds.supplierId, supplierId)));
+
     return {
       totalPurchases: purchaseRow?.totalPurchases ?? "0.00",
       totalPurchaseReturns: returnRow?.totalPurchaseReturns ?? "0.00",
       totalPaymentsMade: paymentRow?.totalPaymentsMade ?? "0.00",
+      totalRefundsReceived: refundRow?.totalRefundsReceived ?? "0.00",
       debitAdjustments: "0.00",
       creditAdjustments: "0.00",
       overduePayable: purchaseRow?.overduePayable ?? "0.00",
@@ -343,7 +352,7 @@ class SuppliersRepository {
   }
 
   public async hasLinkedTransactions(companyId: string, supplierId: string): Promise<boolean> {
-    const [invoiceRow, returnRow, paymentRow] = await Promise.all([
+    const [invoiceRow, returnRow, paymentRow, refundRow] = await Promise.all([
       db
         .select({ id: purchaseInvoices.id })
         .from(purchaseInvoices)
@@ -358,10 +367,15 @@ class SuppliersRepository {
         .select({ id: purchasePayments.id })
         .from(purchasePayments)
         .where(and(eq(purchasePayments.companyId, companyId), eq(purchasePayments.supplierId, supplierId)))
+        .limit(1),
+      db
+        .select({ id: purchaseReturnRefunds.id })
+        .from(purchaseReturnRefunds)
+        .where(and(eq(purchaseReturnRefunds.companyId, companyId), eq(purchaseReturnRefunds.supplierId, supplierId)))
         .limit(1)
     ]);
 
-    return Boolean(invoiceRow[0] || returnRow[0] || paymentRow[0]);
+    return Boolean(invoiceRow[0] || returnRow[0] || paymentRow[0] || refundRow[0]);
   }
 
   public async listLedgerTransactions(
@@ -406,7 +420,19 @@ class SuppliersRepository {
       paymentConditions.push(sql`${purchasePayments.paymentDate} <= ${filters.dateTo}`);
     }
 
-    const [purchaseRows, returnRows, paymentRows] = await Promise.all([
+    const refundConditions: SQL[] = [
+      eq(purchaseReturnRefunds.companyId, companyId),
+      eq(purchaseReturnRefunds.supplierId, supplierId)
+    ];
+    if (filters?.dateFrom) {
+      refundConditions.push(sql`${purchaseReturnRefunds.refundDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      refundConditions.push(sql`${purchaseReturnRefunds.refundDate} <= ${filters.dateTo}`);
+    }
+
+    const [purchaseRows, returnRows, paymentRows, refundRows] = await Promise.all([
       !filters?.transactionType || filters.transactionType === "purchase"
         ? db
             .select({
@@ -454,10 +480,26 @@ class SuppliersRepository {
             })
             .from(purchasePayments)
             .where(and(...paymentConditions))
+        : Promise.resolve([]),
+      !filters?.transactionType || filters.transactionType === "purchase_return_refund"
+        ? db
+            .select({
+              date: purchaseReturnRefunds.refundDate,
+              createdAt: purchaseReturnRefunds.createdAt,
+              transactionType: sql<string>`'purchase_return_refund'`,
+              referenceNo: purchaseReturnRefunds.referenceNumber,
+              description: sql<string>`concat('Purchase return refund ', ${purchaseReturnRefunds.paymentMode})`,
+              debit: sql<string>`'0.00'`,
+              credit: purchaseReturnRefunds.amount,
+              paymentMode: sql<string | null>`${purchaseReturnRefunds.paymentMode}`,
+              remarks: purchaseReturnRefunds.notes
+            })
+            .from(purchaseReturnRefunds)
+            .where(and(...refundConditions))
         : Promise.resolve([])
     ]);
 
-    const rows = [...purchaseRows, ...returnRows, ...paymentRows]
+    const rows = [...purchaseRows, ...returnRows, ...paymentRows, ...refundRows]
       .map((row) => ({
         ...row,
         date: new Date(row.date)

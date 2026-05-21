@@ -18,6 +18,7 @@ import {
   purchasePdfParamSchema,
   purchaseReturnIdParamSchema,
   purchaseReturnPdfParamSchema,
+  recordPurchaseReturnRefundSchema,
   recordPurchasePaymentSchema,
   updatePurchaseSchema
 } from "./purchases.validator";
@@ -66,6 +67,13 @@ router.post(
   requirePermission(["purchase.return"]),
   validateRequest({ body: createPurchaseReturnSchema }),
   asyncHandler(purchasesController.createReturn)
+);
+
+router.post(
+  "/returns/:id/refunds",
+  requirePermission(["purchase.return"]),
+  validateRequest({ params: purchaseReturnIdParamSchema, body: recordPurchaseReturnRefundSchema }),
+  asyncHandler(purchasesController.recordReturnRefund)
 );
 
 router.get(

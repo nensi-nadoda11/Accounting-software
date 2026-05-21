@@ -94,6 +94,7 @@ type OutstandingSummary = {
   totalPurchases: string;
   totalPurchaseReturns: string;
   totalPaymentsMade: string;
+  totalRefundsReceived: string;
   outstandingPayable: string;
   overduePayable: string;
   creditLimit: string;
@@ -454,6 +455,7 @@ class SuppliersService {
       totalPurchases: string;
       totalPurchaseReturns: string;
       totalPaymentsMade: string;
+      totalRefundsReceived: string;
       debitAdjustments: string;
       creditAdjustments: string;
       overduePayable: string;
@@ -470,6 +472,7 @@ class SuppliersService {
     const totalPurchases = parseDecimalToCents(totals.totalPurchases);
     const totalPurchaseReturns = parseDecimalToCents(totals.totalPurchaseReturns);
     const totalPaymentsMade = parseDecimalToCents(totals.totalPaymentsMade);
+    const totalRefundsReceived = parseDecimalToCents(totals.totalRefundsReceived);
     const debitAdjustments = parseDecimalToCents(totals.debitAdjustments);
     const creditAdjustments = parseDecimalToCents(totals.creditAdjustments);
     const overduePayable = parseDecimalToCents(totals.overduePayable);
@@ -478,6 +481,7 @@ class SuppliersService {
       totalPurchases -
       totalPurchaseReturns -
       totalPaymentsMade +
+      totalRefundsReceived +
       creditAdjustments -
       debitAdjustments;
     const creditLimit = parseDecimalToCents(supplier.creditLimit);
@@ -489,6 +493,7 @@ class SuppliersService {
       totalPurchases: formatCentsToDecimal(totalPurchases),
       totalPurchaseReturns: formatCentsToDecimal(totalPurchaseReturns),
       totalPaymentsMade: formatCentsToDecimal(totalPaymentsMade),
+      totalRefundsReceived: formatCentsToDecimal(totalRefundsReceived),
       outstandingPayable: formatCentsToDecimal(outstandingPayable),
       overduePayable: formatCentsToDecimal(overduePayable),
       creditLimit: formatCentsToDecimal(creditLimit),
@@ -650,6 +655,7 @@ class SuppliersService {
           totalPurchases: "0.00",
           totalPurchaseReturns: "0.00",
           totalPaymentsMade: "0.00",
+          totalRefundsReceived: "0.00",
           debitAdjustments: "0.00",
           creditAdjustments: "0.00",
           overduePayable: "0.00",
@@ -777,6 +783,7 @@ class SuppliersService {
         totalPurchases: "0.00",
         totalPurchaseReturns: "0.00",
         totalPaymentsMade: "0.00",
+        totalRefundsReceived: "0.00",
         debitAdjustments: "0.00",
         creditAdjustments: "0.00",
         overduePayable: "0.00",
@@ -1328,6 +1335,7 @@ class SuppliersService {
           totalPurchases: "0.00",
           totalPurchaseReturns: "0.00",
           totalPaymentsMade: "0.00",
+          totalRefundsReceived: "0.00",
           debitAdjustments: "0.00",
           creditAdjustments: "0.00",
           overduePayable: "0.00",

@@ -3,6 +3,7 @@ export type PaymentStatus = "unpaid" | "partial" | "paid" | "overdue";
 export type PurchasePaymentMode = "cash" | "bank" | "upi" | "card" | "cheque";
 export type PurchasePriceTaxType = "inclusive" | "exclusive";
 export type PurchaseExportFormat = "csv" | "xlsx" | "pdf";
+export type PurchaseReturnSettlementStatus = "pending" | "partial" | "settled";
 
 export interface PurchasePartyRef {
   id: string;
@@ -87,6 +88,18 @@ export interface PurchaseReturnItem {
   lineTotal: string;
 }
 
+export interface PurchaseReturnRefund {
+  id: string;
+  refundDate: string;
+  amount: string;
+  paymentMode: PurchasePaymentMode;
+  bankAccountId: string | null;
+  referenceNumber: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
 export interface PurchaseReturn {
   id: string;
   returnNumber: string;
@@ -97,6 +110,9 @@ export interface PurchaseReturn {
   supplierCode: string | null;
   returnDate: string;
   grandTotal: string;
+  refundedAmount: string;
+  remainingRefundAmount: string;
+  settlementStatus: PurchaseReturnSettlementStatus;
   gstTotal: string;
   subtotal: string;
   roundOffAmount: string;
@@ -105,6 +121,7 @@ export interface PurchaseReturn {
   createdAt: string;
   updatedAt: string;
   items?: PurchaseReturnItem[];
+  refunds?: PurchaseReturnRefund[];
 }
 
 export interface PurchaseTotals {
@@ -258,8 +275,22 @@ export interface PurchaseReturnInput {
   purchaseInvoiceId: string;
   returnDate: string;
   warehouseId: string | null;
+  refundAmountReceived: number;
+  refundPaymentMode: PurchasePaymentMode | null;
+  refundBankAccountId: string | null;
+  refundReferenceNumber: string | null;
+  refundNotes: string | null;
   notes: string;
   items: PurchaseReturnInputItem[];
+}
+
+export interface PurchaseReturnRefundInput {
+  refundDate: string;
+  amount: number;
+  paymentMode: PurchasePaymentMode;
+  bankAccountId: string | null;
+  referenceNumber: string | null;
+  notes: string | null;
 }
 
 export interface PurchaseListResponse {
@@ -308,6 +339,7 @@ export interface PurchaseReturnsResponse {
   items: PurchaseReturn[];
   summary: {
     grandTotal: string;
+    refundedAmount: string;
   };
   pagination: {
     page: number;

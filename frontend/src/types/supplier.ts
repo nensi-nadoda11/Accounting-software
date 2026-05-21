@@ -10,6 +10,7 @@ export type SupplierLedgerTransactionType =
   | "opening_balance"
   | "purchase"
   | "purchase_return"
+  | "purchase_return_refund"
   | "payment"
   | "debit_adjustment"
   | "credit_adjustment";
@@ -141,6 +142,7 @@ export interface SupplierOutstandingSummary {
   totalPurchases: string;
   totalPurchaseReturns: string;
   totalPaymentsMade: string;
+  totalRefundsReceived: string;
   outstandingPayable: string;
   overduePayable: string;
   creditLimit: string;

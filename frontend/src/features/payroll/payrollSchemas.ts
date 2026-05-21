@@ -19,6 +19,18 @@ const enumValues = <TValue extends string>(values: TValue[]) => z.enum(values as
 const numericField = (label: string) =>
   z.coerce.number({ message: `${label} is required` }).min(0, `${label} cannot be negative`);
 
+const nullableTrimmedString = () =>
+  z.preprocess(
+    (value) => {
+      if (value === null || value === undefined) {
+        return "";
+      }
+
+      return value;
+    },
+    z.string().trim().optional().transform((value) => value || null),
+  );
+
 const paymentModesRequiringBank = new Set(["bank", "upi", "cheque"]);
 
 export const employeeFormSchema = z.object({
@@ -142,7 +154,7 @@ export const attendanceFormSchema = z
     unpaidLeaveDays: numericField("Unpaid leave"),
     halfDays: numericField("Half days"),
     overtimeHours: numericField("Overtime"),
-    remarks: z.string().trim().optional().transform((value) => value || null),
+    remarks: nullableTrimmedString(),
   })
   .superRefine((value, ctx) => {
     const total =

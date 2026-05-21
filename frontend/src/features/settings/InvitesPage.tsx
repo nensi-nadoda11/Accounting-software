@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 
 import { getErrorMessage } from "../../lib/errors";
-import { upsertStoredInvite, getStoredInvites, saveStoredInvites } from "../../lib/invite-storage";
 import { usersApi } from "../../services/usersApi";
 import type { InviteRecord } from "../../types/api";
 import { useToast } from "../../providers/useToast";
@@ -33,6 +32,8 @@ export const InvitesPage = () => {
   const toast = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [invites, setInvites] = useState<InviteRecord[]>([]);
+  const [loadingInvites, setLoadingInvites] = useState(true);
+  const [activeInviteActionId, setActiveInviteActionId] = useState<string | null>(null);
   const form = useForm<InviteValues>({
     resolver: zodResolver(inviteSchema),
     defaultValues: {
@@ -44,26 +45,29 @@ export const InvitesPage = () => {
     },
   });
 
-  useEffect(() => {
-    setInvites(getStoredInvites());
-  }, []);
+  const loadInvites = async () => {
+    try {
+      setLoadingInvites(true);
+      const response = await usersApi.listInvites();
+      setInvites(response.data);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to load invites"));
+    } finally {
+      setLoadingInvites(false);
+    }
+  };
 
-  const refreshLocalInvites = () => setInvites(getStoredInvites());
+  useEffect(() => {
+    void loadInvites();
+  }, []);
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      const response = await usersApi.invite({
+      await usersApi.invite({
         ...values,
         email: values.email.toLowerCase(),
       });
-      const record: InviteRecord = {
-        ...response.data,
-        mobileNumber: values.mobileNumber || null,
-        permissions: values.permissions,
-        createdAt: new Date().toISOString(),
-      };
-      upsertStoredInvite(record);
-      refreshLocalInvites();
+      await loadInvites();
       setIsModalOpen(false);
       form.reset();
       toast.success("Invite sent successfully");
@@ -83,8 +87,8 @@ export const InvitesPage = () => {
         }
       />
 
-      {!invites.length ? (
-        <EmptyState title="No recent invites in this browser session" action={<Button onClick={() => setIsModalOpen(true)}>Create Invite</Button>} />
+      {!loadingInvites && !invites.length ? (
+        <EmptyState title="No invites found" action={<Button onClick={() => setIsModalOpen(true)}>Create Invite</Button>} />
       ) : (
         <Card>
           <TableWrapper className="border-none">
@@ -99,6 +103,13 @@ export const InvitesPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                {loadingInvites ? (
+                  <tr>
+                    <td className="px-5 py-6 text-center text-slate-500" colSpan={6}>
+                      Loading invites...
+                    </td>
+                  </tr>
+                ) : null}
                 {invites.map((invite) => (
                   <tr key={invite.id}>
                     <td className="px-5 py-4 font-medium text-slate-900">{invite.fullName}</td>
@@ -112,20 +123,17 @@ export const InvitesPage = () => {
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="secondary"
-                          disabled={invite.status !== "pending"}
+                          disabled={invite.status !== "pending" || activeInviteActionId === invite.id}
                           onClick={async () => {
                             try {
+                              setActiveInviteActionId(invite.id);
                               await usersApi.resendInvite(invite.id);
-                              const next: InviteRecord[] = invites.map((item) =>
-                                item.id === invite.id
-                                  ? { ...item, status: "pending", expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() }
-                                  : item,
-                              );
-                              saveStoredInvites(next);
-                              refreshLocalInvites();
+                              await loadInvites();
                               toast.success("Invite resent");
                             } catch (error) {
                               toast.error(getErrorMessage(error, "Resend failed"));
+                            } finally {
+                              setActiveInviteActionId(null);
                             }
                           }}
                         >
@@ -133,18 +141,17 @@ export const InvitesPage = () => {
                         </Button>
                         <Button
                           variant="danger"
-                          disabled={invite.status !== "pending"}
+                          disabled={invite.status !== "pending" || activeInviteActionId === invite.id}
                           onClick={async () => {
                             try {
+                              setActiveInviteActionId(invite.id);
                               await usersApi.revokeInvite(invite.id);
-                              const next: InviteRecord[] = invites.map((item) =>
-                                item.id === invite.id ? { ...item, status: "revoked" } : item,
-                              );
-                              saveStoredInvites(next);
-                              refreshLocalInvites();
+                              await loadInvites();
                               toast.success("Invite revoked");
                             } catch (error) {
                               toast.error(getErrorMessage(error, "Revoke failed"));
+                            } finally {
+                              setActiveInviteActionId(null);
                             }
                           }}
                         >
@@ -201,4 +208,3 @@ export const InvitesPage = () => {
     </div>
   );
 };
-

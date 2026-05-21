@@ -160,7 +160,13 @@ class AccountingService {
 
   private async getFinancialYearForDate(companyId: string, targetDate: Date, executor?: TransactionClient) {
     const years = await accountingRepository.listFinancialYears(companyId, executor);
-    return years.find((year) => this.isDateWithinRange(targetDate, year.startDate, year.endDate)) ?? null;
+    const matchingYears = years.filter((year) => this.isDateWithinRange(targetDate, year.startDate, year.endDate));
+
+    if (matchingYears.length > 1) {
+      throw new AppError("Multiple financial years overlap the selected date. Fix financial year setup first", 409);
+    }
+
+    return matchingYears[0] ?? null;
   }
 
   private async resolveFinancialYear(companyId: string, entryDate: Date, financialYearId?: string | null, executor?: TransactionClient) {
@@ -1318,7 +1324,7 @@ class AccountingService {
 
       return {
         kind: "journal" as const,
-        entryDate: context.run.generatedAt ?? event.createdAt,
+        entryDate: context.run.periodEnd,
         voucherType: "payroll",
         financialYearId: null,
         referenceType: "payroll_run",
@@ -1351,6 +1357,7 @@ class AccountingService {
       const payload = event.payload as {
         paymentBatchAmount?: string | number;
         paymentMode?: "cash" | "bank" | "upi" | "cheque" | "other";
+        paymentDate?: string | Date | null;
         bankAccountId?: string | null;
         referenceNumber?: string | null;
       };
@@ -1358,6 +1365,8 @@ class AccountingService {
       if (compareDecimals(paymentAmount, "0.00", 2) <= 0) {
         return markIgnored("Payroll payment batch total is zero");
       }
+
+      const paymentEntryDate = payload.paymentDate ? new Date(payload.paymentDate) : event.createdAt;
 
       const salaryPayable = await this.getSystemAccount(actor.companyId, "salary_payable", executor);
       const bankOrCash = await this.getSystemAccount(
@@ -1368,7 +1377,7 @@ class AccountingService {
 
       return {
         kind: "journal" as const,
-        entryDate: event.createdAt,
+        entryDate: paymentEntryDate,
         voucherType: "payment",
         financialYearId: null,
         referenceType: "payroll_run",
@@ -1492,10 +1501,11 @@ class AccountingService {
       type: query.type,
       status: query.status,
       parentId: query.parentId,
+      excludeSystem: query.excludeSystem,
       ...(query.hierarchy ? {} : { page: pagination.page, limit: pagination.limit })
     });
 
-    if (result.total === 0) {
+    if (!query.excludeSystem && result.total === 0) {
       await this.seedMissingSystemAccounts(actor.companyId);
       result = await accountingRepository.listAccounts({
         companyId: actor.companyId,
@@ -1503,6 +1513,7 @@ class AccountingService {
         type: query.type,
         status: query.status,
         parentId: query.parentId,
+        excludeSystem: query.excludeSystem,
         ...(query.hierarchy ? {} : { page: pagination.page, limit: pagination.limit })
       });
     }

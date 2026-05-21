@@ -17,6 +17,7 @@ router.use(requireAuth, requireCompanyAccess);
 router.post("/invite", requirePermission(["user.manage"]), validateRequest({ body: inviteUserSchema }), asyncHandler(usersController.inviteUser));
 router.post("/resend-invite", requirePermission(["user.manage"]), validateRequest({ body: resendInviteSchema }), asyncHandler(usersController.resendInvite));
 router.post("/revoke-invite", requirePermission(["user.manage"]), validateRequest({ body: revokeInviteSchema }), asyncHandler(usersController.revokeInvite));
+router.get("/invites", requirePermission(["user.view", "user.manage"]), asyncHandler(usersController.listInvites));
 router.get("/", requirePermission(["user.view", "user.manage"]), validateRequest({ query: usersListQuerySchema }), asyncHandler(usersController.listUsers));
 router.patch("/:id/status", requirePermission(["user.manage"]), validateRequest({ params: userIdParamSchema, body: updateUserStatusSchema }), asyncHandler(usersController.updateStatus));
 router.patch("/:id/role", requirePermission(["user.manage"]), validateRequest({ params: userIdParamSchema, body: updateUserRoleSchema }), asyncHandler(usersController.updateRole));

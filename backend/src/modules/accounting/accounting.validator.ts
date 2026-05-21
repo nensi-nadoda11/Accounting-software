@@ -140,7 +140,8 @@ export const listAccountsQuerySchema = z.object({
   type: z.enum(ACCOUNT_TYPES).optional(),
   status: z.enum(ACCOUNT_STATUSES).optional(),
   parentId: z.preprocess(trimToNull, z.uuid().nullable().optional()),
-  hierarchy: z.preprocess(parseBooleanQuery, z.boolean().optional().default(false))
+  hierarchy: z.preprocess(parseBooleanQuery, z.boolean().optional().default(false)),
+  excludeSystem: z.preprocess(parseBooleanQuery, z.boolean().optional().default(false))
 });
 
 export const createAccountSchema = z

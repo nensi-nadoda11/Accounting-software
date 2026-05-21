@@ -58,6 +58,7 @@ type AccountListFilters = {
   type?: typeof chartOfAccounts.$inferSelect.accountType | undefined;
   status?: typeof chartOfAccounts.$inferSelect.status | undefined;
   parentId?: string | null | undefined;
+  excludeSystem?: boolean | undefined;
 };
 
 type JournalListFilters = {
@@ -197,6 +198,10 @@ export class AccountingRepository {
       } else {
         conditions.push(eq(chartOfAccounts.parentId, filters.parentId));
       }
+    }
+
+    if (filters.excludeSystem) {
+      conditions.push(eq(chartOfAccounts.isSystem, false));
     }
 
     const whereClause = and(...conditions);

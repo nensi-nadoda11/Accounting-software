@@ -15,6 +15,7 @@ export const usersApi = {
         },
       })
     ).data,
+  listInvites: async () => (await client.get<ApiResponse<InviteRecord[]>>("/users/invites")).data,
   invite: async (payload: {
     fullName: string;
     email: string;

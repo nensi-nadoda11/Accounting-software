@@ -473,6 +473,36 @@ class PurchasesRepository {
     };
   }
 
+  public async listPurchaseReturnSettlementRows(
+    companyId: string,
+    purchaseInvoiceIds: string[],
+    executor?: DbExecutor
+  ) {
+    if (!purchaseInvoiceIds.length) {
+      return [];
+    }
+
+    return this.getExecutor(executor)
+      .select({
+        purchaseReturnId: purchaseReturns.id,
+        purchaseInvoiceId: purchaseReturns.purchaseInvoiceId,
+        returnGrandTotal: purchaseReturns.grandTotal,
+        returnDate: purchaseReturns.returnDate,
+        createdAt: purchaseReturns.createdAt,
+        invoiceGrandTotal: purchaseInvoices.grandTotal,
+        invoicePaidAmount: purchaseInvoices.paidAmount
+      })
+      .from(purchaseReturns)
+      .innerJoin(purchaseInvoices, eq(purchaseReturns.purchaseInvoiceId, purchaseInvoices.id))
+      .where(and(eq(purchaseReturns.companyId, companyId), inArray(purchaseReturns.purchaseInvoiceId, purchaseInvoiceIds)))
+      .orderBy(
+        asc(purchaseReturns.purchaseInvoiceId),
+        asc(purchaseReturns.returnDate),
+        asc(purchaseReturns.createdAt),
+        asc(purchaseReturns.id)
+      );
+  }
+
   public async getInvoiceReturnTotals(companyId: string, purchaseInvoiceId: string, executor?: DbExecutor) {
     const [row] = await this
       .getExecutor(executor)

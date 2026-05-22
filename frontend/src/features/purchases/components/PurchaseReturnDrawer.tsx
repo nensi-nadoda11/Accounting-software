@@ -16,7 +16,13 @@ import type { Warehouse } from "../../../types/inventory";
 import type { PurchaseInvoice, PurchaseReturn, PurchaseReturnInput } from "../../../types/purchase";
 import { PURCHASE_PAYMENT_MODE_OPTIONS } from "../purchaseOptions";
 import { purchaseReturnSchema, type PurchaseReturnValues } from "../purchaseSchemas";
-import { calculateAvailablePurchaseReturnRefund, calculateReturnPreview, getRemainingReturnableQty, isBankPaymentMode } from "../purchaseUtils";
+import {
+  calculateAvailablePurchaseReturnRefund,
+  calculatePurchaseReturnAdjustment,
+  calculateReturnPreview,
+  getRemainingReturnableQty,
+  isBankPaymentMode,
+} from "../purchaseUtils";
 import { AsyncLookupSelect, type LookupOption } from "./AsyncLookupSelect";
 import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
@@ -109,6 +115,9 @@ export const PurchaseReturnDrawer = ({
   const maxRefundAmount = selectedInvoice && preview
     ? calculateAvailablePurchaseReturnRefund(selectedInvoice, preview.grandTotal)
     : "0.00";
+  const adjustedAmount = selectedInvoice && preview
+    ? calculatePurchaseReturnAdjustment(selectedInvoice, preview.grandTotal)
+    : "0.00";
 
   return (
     <SideSheet
@@ -160,6 +169,10 @@ export const PurchaseReturnDrawer = ({
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-400">Grand Total</p>
                   <div className="mt-1"><AmountText value={purchaseReturn.grandTotal} /></div>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Adjusted In Pending Payment</p>
+                  <div className="mt-1"><AmountText value={purchaseReturn.adjustedAmount} tone="warning" /></div>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-400">Refund Received</p>
@@ -290,6 +303,14 @@ export const PurchaseReturnDrawer = ({
                       <p className="text-xs uppercase tracking-wide text-emerald-600">Grand Total</p>
                       <div className="mt-1"><AmountText value={preview.grandTotal} /></div>
                     </div>
+                    <div className="rounded-2xl bg-amber-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wide text-amber-700">Will Adjust In Pending Payment</p>
+                      <div className="mt-1"><AmountText value={adjustedAmount} tone="warning" /></div>
+                    </div>
+                    <div className="rounded-2xl bg-sky-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wide text-sky-700">Refund Payable After Adjustment</p>
+                      <div className="mt-1"><AmountText value={maxRefundAmount} tone="success" /></div>
+                    </div>
                   </CardContent>
                 </Card>
               ) : null}
@@ -307,7 +328,11 @@ export const PurchaseReturnDrawer = ({
                       {...form.register("refundAmountReceived")}
                       error={form.formState.errors.refundAmountReceived?.message}
                     />
-                    <p className="text-xs text-slate-500">Max refundable now: {maxRefundAmount}</p>
+                    <p className="text-xs text-slate-500">
+                      {Number(maxRefundAmount) > 0
+                        ? `Max refundable now: ${maxRefundAmount}`
+                        : `No cash refund is due right now. Full return will adjust in pending purchase payment: ${adjustedAmount}`}
+                    </p>
                   </div>
                   <Select label="Refund Mode" {...form.register("refundPaymentMode")} error={form.formState.errors.refundPaymentMode?.message}>
                     <option value="">Select Refund Mode</option>

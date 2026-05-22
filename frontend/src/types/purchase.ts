@@ -110,6 +110,7 @@ export interface PurchaseReturn {
   supplierCode: string | null;
   returnDate: string;
   grandTotal: string;
+  adjustedAmount: string;
   refundedAmount: string;
   remainingRefundAmount: string;
   settlementStatus: PurchaseReturnSettlementStatus;

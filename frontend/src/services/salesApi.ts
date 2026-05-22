@@ -15,6 +15,7 @@ import type {
   SalesPaymentsResponse,
   SalesReturnDetailResponse,
   SalesReturnInput,
+  SalesReturnRefundInput,
   SalesReturnsListQuery,
   SalesReturnsResponse,
 } from "../types/sales";
@@ -163,6 +164,9 @@ export const salesApi = {
 
   getReturn: async (salesReturnId: string) =>
     (await client.get<ApiResponse<SalesReturnDetailResponse>>(`/sales/returns/${salesReturnId}`)).data,
+
+  recordReturnRefund: async (salesReturnId: string, payload: SalesReturnRefundInput) =>
+    (await client.post<ApiResponse<SalesReturnDetailResponse>>(`/sales/returns/${salesReturnId}/refunds`, payload)).data,
 
   exportReturns: async (query: SalesReturnsListQuery & { format?: SalesExportFormat }) =>
     extractDownload(

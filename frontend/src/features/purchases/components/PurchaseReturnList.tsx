@@ -34,7 +34,7 @@ export const PurchaseReturnList = ({
   canManageRefund: boolean;
 }) => {
   const totalPending =
-    data ? Math.max(Number(data.summary.grandTotal) - Number(data.summary.refundedAmount), 0) : 0;
+    data ? data.items.reduce((sum, item) => sum + Number(item.remainingRefundAmount), 0) : 0;
 
   if (!loading && !data?.items.length) {
     return (
@@ -59,7 +59,7 @@ export const PurchaseReturnList = ({
           <Table>
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                {["Return No", "Purchase No", "Supplier", "Date", "Grand Total", "Received", "Pending", "Actions"].map((head) => (
+                {["Return No", "Purchase No", "Supplier", "Date", "Grand Total", "Adjusted", "Received", "Pending", "Actions"].map((head) => (
                   <th key={head} className="px-4 py-3 font-semibold">
                     {head}
                   </th>
@@ -70,7 +70,7 @@ export const PurchaseReturnList = ({
               {loading && !data ? (
                 Array.from({ length: 8 }).map((_, rowIndex) => (
                   <tr key={rowIndex} className="animate-pulse">
-                    {Array.from({ length: 8 }).map((__, cellIndex) => (
+                    {Array.from({ length: 9 }).map((__, cellIndex) => (
                       <td key={cellIndex} className="px-4 py-4">
                         <div className="h-4 rounded bg-slate-100" />
                       </td>
@@ -85,6 +85,7 @@ export const PurchaseReturnList = ({
                     <td className="px-4 py-4">{purchaseReturn.supplierName}</td>
                     <td className="px-4 py-4 whitespace-nowrap">{formatDate(purchaseReturn.returnDate)}</td>
                     <td className="px-4 py-4 whitespace-nowrap"><AmountText value={purchaseReturn.grandTotal} /></td>
+                    <td className="px-4 py-4 whitespace-nowrap"><AmountText value={purchaseReturn.adjustedAmount} tone="warning" /></td>
                     <td className="px-4 py-4 whitespace-nowrap"><AmountText value={purchaseReturn.refundedAmount} tone="success" /></td>
                     <td className="px-4 py-4 whitespace-nowrap"><AmountText value={purchaseReturn.remainingRefundAmount} tone="danger" /></td>
                     <td className="px-4 py-4">

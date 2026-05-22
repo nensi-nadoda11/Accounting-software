@@ -10,27 +10,27 @@ import { Select } from "../../../components/ui/Select";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { Textarea } from "../../../components/ui/Textarea";
 import type { CompanyBankAccount } from "../../../types/company";
-import type { PurchaseReturn, PurchaseReturnRefundInput } from "../../../types/purchase";
-import { PURCHASE_PAYMENT_MODE_OPTIONS } from "../purchaseOptions";
-import { purchaseReturnRefundSchema, type PurchaseReturnRefundValues } from "../purchaseSchemas";
+import type { SalesReturn, SalesReturnRefundInput } from "../../../types/sales";
+import { SALES_PAYMENT_MODE_OPTIONS } from "../salesOptions";
+import { salesReturnRefundSchema, type SalesReturnRefundValues } from "../salesSchemas";
 
-export const PurchaseReturnRefundDrawer = ({
+export const SalesReturnRefundDrawer = ({
   open,
-  purchaseReturn,
+  salesReturn,
   bankAccounts,
   submitting,
   onClose,
   onSubmit,
 }: {
   open: boolean;
-  purchaseReturn: PurchaseReturn | null;
+  salesReturn: SalesReturn | null;
   bankAccounts: CompanyBankAccount[];
   submitting?: boolean;
   onClose: () => void;
-  onSubmit: (values: PurchaseReturnRefundInput) => Promise<void>;
+  onSubmit: (values: SalesReturnRefundInput) => Promise<void>;
 }) => {
-  const form = useForm<PurchaseReturnRefundValues, undefined, PurchaseReturnRefundInput>({
-    resolver: zodResolver(purchaseReturnRefundSchema),
+  const form = useForm<SalesReturnRefundValues, undefined, SalesReturnRefundInput>({
+    resolver: zodResolver(salesReturnRefundSchema),
     defaultValues: {
       refundDate: new Date().toISOString().slice(0, 10),
       amount: 0,
@@ -45,26 +45,26 @@ export const PurchaseReturnRefundDrawer = ({
   const paymentMode = form.watch("paymentMode");
 
   useEffect(() => {
-    if (!open || !purchaseReturn) {
+    if (!open || !salesReturn) {
       return;
     }
 
     form.reset({
       refundDate: new Date().toISOString().slice(0, 10),
-      amount: Number(purchaseReturn.remainingRefundAmount),
+      amount: Number(salesReturn.remainingRefundAmount),
       paymentMode: "cash",
       bankAccountId: null,
       referenceNumber: null,
       notes: null,
-      maxAmount: Number(purchaseReturn.remainingRefundAmount),
+      maxAmount: Number(salesReturn.remainingRefundAmount),
     });
-  }, [form, open, purchaseReturn]);
+  }, [form, open, salesReturn]);
 
   return (
     <SideSheet
       open={open}
       onClose={onClose}
-      title={purchaseReturn ? `Refund Entry · ${purchaseReturn.returnNumber}` : "Refund Entry"}
+      title={salesReturn ? `Refund Entry · ${salesReturn.returnNumber}` : "Refund Entry"}
       className="max-w-3xl"
       footer={
         <>
@@ -77,29 +77,29 @@ export const PurchaseReturnRefundDrawer = ({
         </>
       }
     >
-      {purchaseReturn ? (
+      {salesReturn ? (
         <div className="space-y-5">
           <Card>
             <CardContent className="grid gap-3 sm:grid-cols-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">Supplier</p>
-                <p className="mt-1 text-sm font-medium text-slate-900">{purchaseReturn.supplierName}</p>
+                <p className="text-xs uppercase tracking-wide text-slate-400">Customer</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{salesReturn.customerName || "Walk-in Customer"}</p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-400">Return Total</p>
-                <div className="mt-1"><AmountText value={purchaseReturn.grandTotal} /></div>
+                <div className="mt-1"><AmountText value={salesReturn.grandTotal} /></div>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-400">Adjusted</p>
-                <div className="mt-1"><AmountText value={purchaseReturn.adjustedAmount} tone="warning" /></div>
+                <div className="mt-1"><AmountText value={salesReturn.adjustedAmount} tone="warning" /></div>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">Received</p>
-                <div className="mt-1"><AmountText value={purchaseReturn.refundedAmount} tone="success" /></div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">Refund Paid</p>
+                <div className="mt-1"><AmountText value={salesReturn.refundedAmount} tone="success" /></div>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-400">Pending</p>
-                <div className="mt-1"><AmountText value={purchaseReturn.remainingRefundAmount} tone="danger" /></div>
+                <div className="mt-1"><AmountText value={salesReturn.remainingRefundAmount} tone="danger" /></div>
               </div>
             </CardContent>
           </Card>
@@ -112,16 +112,16 @@ export const PurchaseReturnRefundDrawer = ({
                 <Input
                   type="number"
                   min="0"
-                  max={purchaseReturn.remainingRefundAmount}
+                  max={salesReturn.remainingRefundAmount}
                   step="0.01"
                   label="Amount"
                   {...form.register("amount")}
                   error={form.formState.errors.amount?.message}
                 />
-                <p className="text-xs text-slate-500">Max refundable now: {purchaseReturn.remainingRefundAmount}</p>
+                <p className="text-xs text-slate-500">Max refundable now: {salesReturn.remainingRefundAmount}</p>
               </div>
               <Select label="Refund Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
-                {PURCHASE_PAYMENT_MODE_OPTIONS.map((option) => (
+                {SALES_PAYMENT_MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

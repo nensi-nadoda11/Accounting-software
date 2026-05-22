@@ -781,8 +781,11 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         onSubmit={async (values) => {
           try {
             setSubmittingReturn(true);
-            await purchasesApi.createReturn(createReturnPayload(values));
-            toast.success("Purchase return created");
+            const response = await purchasesApi.createReturn(createReturnPayload(values));
+            const createdReturn = response.data.purchaseReturn;
+            toast.success(
+              `Purchase return created. Adjusted ${createdReturn.adjustedAmount} and refundable ${createdReturn.remainingRefundAmount}.`,
+            );
             setReturnDrawerOpen(false);
             setReturnDetail(null);
             setSelectedReturnInvoice(null);

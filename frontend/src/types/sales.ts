@@ -4,6 +4,7 @@ export type SalesPaymentMode = "cash" | "bank" | "upi" | "card" | "cheque";
 export type InvoiceType = "gst_invoice" | "pos";
 export type SalesPriceTaxType = "inclusive" | "exclusive";
 export type SalesExportFormat = "csv" | "xlsx" | "pdf";
+export type SalesReturnSettlementStatus = "pending" | "partial" | "settled";
 
 export interface SalesCustomerRef {
   id: string;
@@ -87,6 +88,18 @@ export interface SalesReturnItem {
   lineTotal: string;
 }
 
+export interface SalesReturnRefund {
+  id: string;
+  refundDate: string;
+  amount: string;
+  paymentMode: SalesPaymentMode;
+  bankAccountId: string | null;
+  referenceNumber: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
 export interface SalesReturn {
   id: string;
   returnNumber: string;
@@ -96,6 +109,10 @@ export interface SalesReturn {
   customerName?: string | null;
   returnDate: string;
   grandTotal: string;
+  adjustedAmount: string;
+  refundedAmount: string;
+  remainingRefundAmount: string;
+  settlementStatus: SalesReturnSettlementStatus;
   gstTotal: string;
   subtotal: string;
   roundOffAmount: string;
@@ -105,6 +122,7 @@ export interface SalesReturn {
   createdAt: string;
   updatedAt: string;
   items?: SalesReturnItem[];
+  refunds?: SalesReturnRefund[];
 }
 
 export interface SalesSendLog {
@@ -280,9 +298,23 @@ export interface SalesReturnInput {
   salesInvoiceId: string;
   returnDate: string;
   warehouseId?: string | null;
+  refundAmountPaid: number;
+  refundPaymentMode: SalesPaymentMode | null;
+  refundBankAccountId: string | null;
+  refundReferenceNumber: string | null;
+  refundNotes: string | null;
   reason: string;
   notes: string | null;
   items: SalesReturnInputItem[];
+}
+
+export interface SalesReturnRefundInput {
+  refundDate: string;
+  amount: number;
+  paymentMode: SalesPaymentMode;
+  bankAccountId: string | null;
+  referenceNumber: string | null;
+  notes: string | null;
 }
 
 export interface SalesListResponse {
@@ -329,6 +361,7 @@ export interface SalesReturnsResponse {
   items: SalesReturn[];
   summary: {
     grandTotal: string;
+    refundedAmount: string;
   };
   pagination: {
     page: number;

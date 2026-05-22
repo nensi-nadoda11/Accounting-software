@@ -24,6 +24,7 @@ import {
   salesInvoices,
   salesPayments,
   salesReturnItems,
+  salesReturnRefunds,
   salesReturns,
   stockBalances,
   warehouses
@@ -61,6 +62,45 @@ type SalesReturnListFilters = {
 class SalesRepository {
   private getExecutor(executor?: DbExecutor) {
     return executor ?? db;
+  }
+
+  private isMissingReturnRefundTableError(error: unknown) {
+    const visited = new Set<unknown>();
+    const queue: unknown[] = [error];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || visited.has(current)) {
+        continue;
+      }
+
+      visited.add(current);
+
+      const message =
+        typeof current === "string"
+          ? current
+          : current instanceof Error
+            ? current.message
+            : typeof current === "object" && "toString" in current
+              ? String(current)
+              : "";
+
+      if (message.includes("sales_return_refunds") && (message.includes("does not exist") || message.includes("relation"))) {
+        return true;
+      }
+
+      if (typeof current === "object") {
+        if ("cause" in current) {
+          queue.push((current as { cause?: unknown }).cause);
+        }
+
+        if ("message" in current) {
+          queue.push((current as { message?: unknown }).message);
+        }
+      }
+    }
+
+    return false;
   }
 
   private buildInvoiceConditions(filters: Omit<SalesListFilters, "page" | "limit">) {
@@ -388,6 +428,91 @@ class SalesRepository {
       .where(and(eq(salesReturnItems.companyId, companyId), eq(salesReturnItems.salesReturnId, returnId)));
   }
 
+  public async createReturnRefund(data: typeof salesReturnRefunds.$inferInsert, executor?: DbExecutor) {
+    try {
+      const [row] = await this.getExecutor(executor).insert(salesReturnRefunds).values(data).returning();
+      return row ?? null;
+    } catch (error) {
+      if (this.isMissingReturnRefundTableError(error)) {
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
+  public async listReturnRefunds(companyId: string, returnId: string, executor?: DbExecutor) {
+    try {
+      return await this
+        .getExecutor(executor)
+        .select()
+        .from(salesReturnRefunds)
+        .where(and(eq(salesReturnRefunds.companyId, companyId), eq(salesReturnRefunds.salesReturnId, returnId)))
+        .orderBy(desc(salesReturnRefunds.refundDate), desc(salesReturnRefunds.createdAt));
+    } catch (error) {
+      if (this.isMissingReturnRefundTableError(error)) {
+        return [];
+      }
+
+      throw error;
+    }
+  }
+
+  public async getReturnRefundTotals(companyId: string, returnId: string, executor?: DbExecutor) {
+    try {
+      const [row] = await this
+        .getExecutor(executor)
+        .select({
+          refundedAmount: sql<string>`coalesce(sum(${salesReturnRefunds.amount}), 0)`,
+          refundCount: count()
+        })
+        .from(salesReturnRefunds)
+        .where(and(eq(salesReturnRefunds.companyId, companyId), eq(salesReturnRefunds.salesReturnId, returnId)));
+
+      return {
+        refundedAmount: row?.refundedAmount ?? "0.00",
+        refundCount: row?.refundCount ?? 0
+      };
+    } catch (error) {
+      if (this.isMissingReturnRefundTableError(error)) {
+        return {
+          refundedAmount: "0.00",
+          refundCount: 0
+        };
+      }
+
+      throw error;
+    }
+  }
+
+  public async getInvoiceReturnRefundTotals(companyId: string, invoiceId: string, executor?: DbExecutor) {
+    try {
+      const [row] = await this
+        .getExecutor(executor)
+        .select({
+          refundedAmount: sql<string>`coalesce(sum(${salesReturnRefunds.amount}), 0)`,
+          refundCount: count()
+        })
+        .from(salesReturnRefunds)
+        .innerJoin(salesReturns, eq(salesReturnRefunds.salesReturnId, salesReturns.id))
+        .where(and(eq(salesReturnRefunds.companyId, companyId), eq(salesReturns.salesInvoiceId, invoiceId)));
+
+      return {
+        refundedAmount: row?.refundedAmount ?? "0.00",
+        refundCount: row?.refundCount ?? 0
+      };
+    } catch (error) {
+      if (this.isMissingReturnRefundTableError(error)) {
+        return {
+          refundedAmount: "0.00",
+          refundCount: 0
+        };
+      }
+
+      throw error;
+    }
+  }
+
   public async getReturnedQuantityByInvoiceItem(companyId: string, invoiceItemId: string, executor?: DbExecutor) {
     const [row] = await this
       .getExecutor(executor)
@@ -408,6 +533,28 @@ class SalesRepository {
       .where(and(eq(salesReturns.companyId, companyId), eq(salesReturns.salesInvoiceId, invoiceId)));
 
     return row?.value ?? 0;
+  }
+
+  public async listReturnSettlementRows(companyId: string, invoiceIds: string[], executor?: DbExecutor) {
+    if (invoiceIds.length === 0) {
+      return [];
+    }
+
+    return this
+      .getExecutor(executor)
+      .select({
+        salesReturnId: salesReturns.id,
+        salesInvoiceId: salesReturns.salesInvoiceId,
+        invoiceGrandTotal: salesInvoices.grandTotal,
+        invoicePaidAmount: salesInvoices.paidAmount,
+        returnGrandTotal: salesReturns.grandTotal,
+        returnDate: salesReturns.returnDate,
+        createdAt: salesReturns.createdAt
+      })
+      .from(salesReturns)
+      .innerJoin(salesInvoices, eq(salesReturns.salesInvoiceId, salesInvoices.id))
+      .where(and(eq(salesReturns.companyId, companyId), inArray(salesReturns.salesInvoiceId, invoiceIds)))
+      .orderBy(asc(salesReturns.salesInvoiceId), asc(salesReturns.returnDate), asc(salesReturns.createdAt));
   }
 
   public async getReturnTotals(companyId: string, invoiceId: string, executor?: DbExecutor) {
@@ -542,6 +689,7 @@ class SalesRepository {
     const rows = await db
       .select({
         salesReturn: salesReturns,
+        invoicePaidAmount: salesInvoices.paidAmount,
         invoiceNumber: salesInvoices.invoiceNumber,
         customerNameSnapshot: salesInvoices.customerNameSnapshot,
         walkInName: salesInvoices.walkInName,
@@ -576,7 +724,8 @@ class SalesRepository {
       rows,
       total: totalRow?.value ?? 0,
       summary: {
-        grandTotal: summaryRow?.grandTotal ?? "0.00"
+        grandTotal: summaryRow?.grandTotal ?? "0.00",
+        refundedAmount: "0.00"
       }
     };
   }
@@ -586,6 +735,7 @@ class SalesRepository {
     return db
       .select({
         salesReturn: salesReturns,
+        invoicePaidAmount: salesInvoices.paidAmount,
         invoiceNumber: salesInvoices.invoiceNumber,
         customerNameSnapshot: salesInvoices.customerNameSnapshot,
         walkInName: salesInvoices.walkInName,

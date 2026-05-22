@@ -33,7 +33,7 @@ export const NestedRouteSidebar = ({
 
   return (
     <aside className="w-full lg:w-64 lg:flex-none">
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:min-h-[calc(100vh-7.5rem)]">
         <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <p className="text-base font-semibold text-slate-900">{title}</p>
           <Button
@@ -55,7 +55,7 @@ export const NestedRouteSidebar = ({
                 key={tab.href}
                 to={tab.href}
                 className={cn(
-                  "flex items-center rounded-2xl border px-4 py-3 text-sm font-medium transition",
+                  "flex min-h-11 items-center rounded-2xl border px-4 py-3 text-sm font-medium transition",
                   active
                     ? "app-accent-text border-transparent bg-[var(--app-accent-soft)]"
                     : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900",

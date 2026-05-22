@@ -210,22 +210,32 @@ const SIDEBAR_ROUTE_CONFIGS: ReadonlyArray<{
   {
     title: "Settings",
     tabs: SETTINGS_TABS,
-    matches: ["/app/settings/final"],
+    matches: ["/app/settings"],
   },
   {
     title: "Accounting",
     tabs: ACCOUNTING_TABS,
-    matches: ["/app/accounting/core", "/app/accounting/expenses", "/app/accounting/payments", "/app/accounting/gst"],
+    matches: ["/app/accounting"],
+  },
+  {
+    title: "Sales",
+    tabs: SALES_TABS,
+    matches: ["/app/sales"],
+  },
+  {
+    title: "Purchases",
+    tabs: PURCHASES_TABS,
+    matches: ["/app/purchases"],
   },
   {
     title: "Inventory",
     tabs: INVENTORY_TABS,
-    matches: ["/app/inventory/stock", "/app/inventory/products"],
+    matches: ["/app/inventory"],
   },
   {
     title: "HR & Payroll",
     tabs: HR_PAYROLL_TABS,
-    matches: ["/app/hr-payroll/payroll"],
+    matches: ["/app/hr-payroll"],
   },
 ] as const;
 

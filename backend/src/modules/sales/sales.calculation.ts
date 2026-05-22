@@ -261,6 +261,8 @@ export const calculateDueAmount = (grandTotal: string | number, paidAmount: stri
   return compareDecimals(dueAmount, "0.00", 2) < 0 ? "0.00" : dueAmount;
 };
 
+const toDateOnlyKey = (value: Date) => value.toISOString().slice(0, 10);
+
 export const calculatePaymentStatus = (input: {
   grandTotal: string | number;
   paidAmount: string | number;
@@ -280,7 +282,7 @@ export const calculatePaymentStatus = (input: {
   }
 
   const asOfDate = input.asOf ?? new Date();
-  if (input.dueDate && input.dueDate.getTime() < asOfDate.getTime()) {
+  if (input.dueDate && toDateOnlyKey(input.dueDate) < toDateOnlyKey(asOfDate)) {
     return "overdue";
   }
 

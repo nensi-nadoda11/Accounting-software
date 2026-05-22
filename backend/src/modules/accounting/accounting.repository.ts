@@ -326,6 +326,27 @@ export class AccountingRepository {
     };
   }
 
+  public async listOpeningBalanceJournals(companyId: string, openingBalanceIds: string[], executor?: DbExecutor) {
+    if (openingBalanceIds.length === 0) {
+      return [];
+    }
+
+    return this
+      .getExecutor(executor)
+      .select()
+      .from(journalEntries)
+      .where(
+        and(
+          eq(journalEntries.companyId, companyId),
+          eq(journalEntries.referenceType, "account_opening_balance"),
+          inArray(journalEntries.referenceId, openingBalanceIds),
+          eq(journalEntries.voucherType, "opening"),
+          eq(journalEntries.status, "posted")
+        )
+      )
+      .orderBy(desc(journalEntries.createdAt));
+  }
+
   public async findOpeningBalanceById(companyId: string, openingBalanceId: string, executor?: DbExecutor) {
     const [row] = await this
       .getExecutor(executor)
@@ -600,6 +621,42 @@ export class AccountingRepository {
     };
   }
 
+  public async getBookTotalsBeforeDate(
+    companyId: string,
+    systemKey: string,
+    dateFrom: Date,
+    bankAccountId?: string,
+    executor?: DbExecutor
+  ) {
+    const conditions: SQL[] = [
+      eq(journalEntryLines.companyId, companyId),
+      eq(chartOfAccounts.systemKey, systemKey),
+      inArray(journalEntries.status, ["posted", "reversed"]),
+      sql`${journalEntries.entryDate} < ${dateFrom}`
+    ];
+
+    if (systemKey === "bank" && bankAccountId) {
+      conditions.push(eq(journalEntryLines.referenceType, "company_bank_account"));
+      conditions.push(eq(journalEntryLines.referenceId, bankAccountId));
+    }
+
+    const [row] = await this
+      .getExecutor(executor)
+      .select({
+        debit: sql<string>`coalesce(sum(${journalEntryLines.debit}), 0)`,
+        credit: sql<string>`coalesce(sum(${journalEntryLines.credit}), 0)`
+      })
+      .from(journalEntryLines)
+      .innerJoin(journalEntries, eq(journalEntryLines.journalEntryId, journalEntries.id))
+      .innerJoin(chartOfAccounts, eq(journalEntryLines.accountId, chartOfAccounts.id))
+      .where(and(...conditions));
+
+    return {
+      debit: row?.debit ?? "0.00",
+      credit: row?.credit ?? "0.00"
+    };
+  }
+
   public async listPartyLedgerRows(companyId: string, partyType: JournalPartyType, partyId: string, dateFrom: Date, dateTo: Date, executor?: DbExecutor) {
     return this
       .getExecutor(executor)
@@ -843,6 +900,36 @@ export class AccountingRepository {
       .limit(1);
 
     return row ?? null;
+  }
+
+  public async findOverlappingPeriodLocks(
+    companyId: string,
+    periodStart: Date,
+    periodEnd: Date,
+    financialYearId?: string | null,
+    executor?: DbExecutor
+  ) {
+    const conditions: SQL[] = [
+      eq(financialPeriodLocks.companyId, companyId),
+      eq(financialPeriodLocks.isLocked, true),
+      lte(financialPeriodLocks.periodStart, periodEnd),
+      gte(financialPeriodLocks.periodEnd, periodStart)
+    ];
+
+    if (financialYearId !== undefined) {
+      if (financialYearId === null) {
+        conditions.push(sql`${financialPeriodLocks.financialYearId} IS NULL`);
+      } else {
+        conditions.push(eq(financialPeriodLocks.financialYearId, financialYearId));
+      }
+    }
+
+    return this
+      .getExecutor(executor)
+      .select()
+      .from(financialPeriodLocks)
+      .where(and(...conditions))
+      .orderBy(desc(financialPeriodLocks.periodStart), desc(financialPeriodLocks.createdAt));
   }
 
   public async createPeriodLock(data: typeof financialPeriodLocks.$inferInsert, executor?: DbExecutor) {

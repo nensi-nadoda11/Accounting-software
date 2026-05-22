@@ -47,6 +47,9 @@ const sumComponents = (components: TaxComponentTotals) =>
 
 export const normalizeMoney = (value: string | number | null | undefined) => normalizeMoneyValue(value);
 
+const clampMoneyToZero = (value: string) =>
+  compareDecimals(value, "0.00", 2) >= 0 ? normalizeMoney(value) : "0.00";
+
 export const calculateOutputTax = (input: {
   salesGst: string;
   salesReturnGst: string;
@@ -89,7 +92,7 @@ export const calculateInputTax = (input: {
     2
   );
   const total = addDecimals(
-    claimedItc,
+    clampMoneyToZero(claimedItc),
     addDecimals(normalizeMoney(-Number(input.itcReversals)), input.itcClaims, 2),
     2
   );
@@ -101,11 +104,11 @@ export const calculateInputTax = (input: {
     eligibleExpenseGst: normalizeMoney(input.eligibleExpenseGst),
     claimedExpenseGst: normalizeMoney(input.claimedExpenseGst),
     purchaseReturnGst: normalizeMoney(input.purchaseReturnGst),
-    eligibleItc: normalizeMoney(eligibleItc),
-    claimedItc: normalizeMoney(claimedItc),
+    eligibleItc: clampMoneyToZero(eligibleItc),
+    claimedItc: clampMoneyToZero(claimedItc),
     itcReversals: normalizeMoney(input.itcReversals),
     itcClaims: normalizeMoney(input.itcClaims),
-    inputGst: normalizeMoney(total)
+    inputGst: clampMoneyToZero(total)
   };
 };
 

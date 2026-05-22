@@ -20,6 +20,7 @@ import {
   customerLedgerParamSchema,
   emptyBodySchema,
   exportBalanceSheetQuerySchema,
+  exportBookQuerySchema,
   exportLedgerQuerySchema,
   exportProfitLossQuerySchema,
   exportTrialBalanceQuerySchema,
@@ -154,10 +155,22 @@ router.get(
   asyncHandler(accountingController.getCustomerLedger)
 );
 router.get(
+  "/ledger/customer/:customerId/export",
+  requirePermission(["accounting.export"]),
+  validateRequest({ params: customerLedgerParamSchema, query: exportLedgerQuerySchema }),
+  asyncHandler(accountingController.exportCustomerLedger)
+);
+router.get(
   "/ledger/supplier/:supplierId",
   requirePermission(["ledger.view"]),
   validateRequest({ params: supplierLedgerParamSchema, query: ledgerQuerySchema }),
   asyncHandler(accountingController.getSupplierLedger)
+);
+router.get(
+  "/ledger/supplier/:supplierId/export",
+  requirePermission(["accounting.export"]),
+  validateRequest({ params: supplierLedgerParamSchema, query: exportLedgerQuerySchema }),
+  asyncHandler(accountingController.exportSupplierLedger)
 );
 router.get(
   "/ledger/:accountId",
@@ -179,10 +192,22 @@ router.get(
   asyncHandler(accountingController.getCashBook)
 );
 router.get(
+  "/cash-book/export",
+  requirePermission(["accounting.export"]),
+  validateRequest({ query: exportBookQuerySchema }),
+  asyncHandler(accountingController.exportCashBook)
+);
+router.get(
   "/bank-book",
   requirePermission(["bankbook.view"]),
   validateRequest({ query: bookQuerySchema }),
   asyncHandler(accountingController.getBankBook)
+);
+router.get(
+  "/bank-book/export",
+  requirePermission(["accounting.export"]),
+  validateRequest({ query: exportBookQuerySchema }),
+  asyncHandler(accountingController.exportBankBook)
 );
 
 router.get(

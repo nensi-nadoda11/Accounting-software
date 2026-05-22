@@ -1,5 +1,6 @@
 import { db } from "../../db";
 import { auditLogService } from "../audit-logs/audit-log.service";
+import { accountingService } from "../accounting/accounting.service";
 import { companyRepository } from "../company/company.repository";
 import { customersRepository } from "../customers/customers.repository";
 import { inventoryRepository } from "../inventory/inventory.repository";
@@ -943,6 +944,10 @@ class SalesService {
       },
       executor
     );
+
+    if (accountingEvent) {
+      await accountingService.postEventInTransaction(actor, accountingEvent.id, executor);
+    }
 
     const updated = await salesRepository.updateInvoice(
       actor.companyId,

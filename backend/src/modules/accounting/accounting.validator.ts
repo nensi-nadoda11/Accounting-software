@@ -465,6 +465,10 @@ export const exportLedgerQuerySchema = ledgerQuerySchema.safeExtend({
   format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("csv")
 });
 
+export const exportBookQuerySchema = bookQuerySchema.safeExtend({
+  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("csv")
+});
+
 export const exportTrialBalanceQuerySchema = trialBalanceQuerySchema.safeExtend({
   format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("csv")
 });
@@ -501,6 +505,7 @@ export type PostPendingAccountingEventsInput = z.infer<typeof postPendingAccount
 export type ListFinancialPeriodLocksQuery = z.infer<typeof listFinancialPeriodLocksQuerySchema>;
 export type CreateFinancialPeriodLockInput = z.infer<typeof createFinancialPeriodLockSchema>;
 export type ExportLedgerQuery = z.infer<typeof exportLedgerQuerySchema>;
+export type ExportBookQuery = z.infer<typeof exportBookQuerySchema>;
 export type ExportTrialBalanceQuery = z.infer<typeof exportTrialBalanceQuerySchema>;
 export type ExportProfitLossQuery = z.infer<typeof exportProfitLossQuerySchema>;
 export type ExportBalanceSheetQuery = z.infer<typeof exportBalanceSheetQuerySchema>;

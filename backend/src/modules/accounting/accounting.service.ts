@@ -39,6 +39,7 @@ import type {
   CreateJournalInput,
   CreateOpeningBalancesInput,
   ExportBalanceSheetQuery,
+  ExportBookQuery,
   ExportLedgerQuery,
   ExportProfitLossQuery,
   ExportTrialBalanceQuery,
@@ -160,6 +161,20 @@ class AccountingService {
     const date = new Date(value);
     date.setUTCDate(date.getUTCDate() - 1);
     return date;
+  }
+
+  private buildOpeningBalanceDescriptionMap(
+    journals: Awaited<ReturnType<typeof accountingRepository.listOpeningBalanceJournals>>
+  ) {
+    const descriptions = new Map<string, string | null>();
+
+    for (const journal of journals) {
+      if (journal.referenceId && !descriptions.has(journal.referenceId)) {
+        descriptions.set(journal.referenceId, journal.description);
+      }
+    }
+
+    return descriptions;
   }
 
   private isDateWithinRange(target: Date, startDate: Date, endDate: Date) {
@@ -1825,6 +1840,12 @@ class AccountingService {
       dateTo: query.dateTo ?? null,
       isLocked: query.isLocked
     });
+    const descriptions = this.buildOpeningBalanceDescriptionMap(
+      await accountingRepository.listOpeningBalanceJournals(
+        actor.companyId,
+        result.rows.map((row) => row.openingBalance.id)
+      )
+    );
 
     return {
       items: result.rows.map((row) => ({
@@ -1836,6 +1857,7 @@ class AccountingService {
         openingDate: row.openingBalance.openingDate,
         debit: normalizeMoney(row.openingBalance.debit),
         credit: normalizeMoney(row.openingBalance.credit),
+        description: descriptions.get(row.openingBalance.id) ?? null,
         isLocked: row.openingBalance.isLocked,
         createdAt: row.openingBalance.createdAt,
         updatedAt: row.openingBalance.updatedAt
@@ -1954,12 +1976,18 @@ class AccountingService {
         throw new AppError("Failed to update opening balance", 500);
       }
 
-      const journal = await this.createOpeningBalanceJournal(actor, openingBalance, input.description, transaction);
+      const journal = await this.createOpeningBalanceJournal(
+        actor,
+        openingBalance,
+        input.description ?? currentOpeningJournal?.description ?? null,
+        transaction
+      );
       await this.syncAccountOpeningMetadata(actor.companyId, openingBalance.accountId, actor.id, transaction);
 
       return {
         openingBalance,
-        journal
+        journal,
+        description: journal.description
       };
     });
 
@@ -1985,6 +2013,7 @@ class AccountingService {
         openingDate: updated.openingBalance.openingDate,
         debit: normalizeMoney(updated.openingBalance.debit),
         credit: normalizeMoney(updated.openingBalance.credit),
+        description: updated.description ?? null,
         isLocked: updated.openingBalance.isLocked
       },
       journalId: updated.journal.id
@@ -2444,7 +2473,7 @@ class AccountingService {
     const dateTo = this.toDate(query.dateTo, "dateTo");
     const cashAccount = await this.getSystemAccount(actor.companyId, "cash");
     const rows = await accountingRepository.listBookRows(actor.companyId, "cash", dateFrom, dateTo);
-    const openingTotals = await accountingRepository.getLedgerTotalsBeforeDate(actor.companyId, cashAccount.id, dateFrom);
+    const openingTotals = await accountingRepository.getBookTotalsBeforeDate(actor.companyId, "cash", dateFrom);
 
     return this.buildLedgerPayload(
       actor,
@@ -2463,7 +2492,12 @@ class AccountingService {
     const dateTo = this.toDate(query.dateTo, "dateTo");
     const bankAccount = await this.getSystemAccount(actor.companyId, "bank");
     const rows = await accountingRepository.listBookRows(actor.companyId, "bank", dateFrom, dateTo, query.bankAccountId);
-    const openingTotals = await accountingRepository.getLedgerTotalsBeforeDate(actor.companyId, bankAccount.id, dateFrom);
+    const openingTotals = await accountingRepository.getBookTotalsBeforeDate(
+      actor.companyId,
+      "bank",
+      dateFrom,
+      query.bankAccountId
+    );
 
     return this.buildLedgerPayload(
       actor,
@@ -2580,10 +2614,26 @@ class AccountingService {
   }
 
   public async getBalanceSheet(actor: AccountingActor, query: BalanceSheetQuery, context: AccountingRequestContext) {
-    const asOfDate = query.asOfDate ? this.toDate(query.asOfDate, "asOfDate") : new Date();
-    const year = query.financialYearId
-      ? await accountingRepository.findFinancialYearById(actor.companyId, query.financialYearId)
-      : await this.getFinancialYearForDate(actor.companyId, asOfDate);
+    let asOfDate = query.asOfDate ? this.toDate(query.asOfDate, "asOfDate") : new Date();
+    let year = null;
+
+    if (query.financialYearId) {
+      year = await accountingRepository.findFinancialYearById(actor.companyId, query.financialYearId);
+      if (!year) {
+        throw new AppError("Financial year not found", 404);
+      }
+
+      if (query.asOfDate) {
+        if (!this.isDateWithinRange(asOfDate, year.startDate, year.endDate)) {
+          throw new AppError("asOfDate must be inside the selected financial year", 400);
+        }
+      } else {
+        asOfDate = year.endDate;
+      }
+    } else {
+      year = await this.getFinancialYearForDate(actor.companyId, asOfDate);
+    }
+
     const rows = await accountingRepository.getGroupedAccountLineTotals(actor.companyId, {
       dateTo: asOfDate,
       accountTypes: ["asset", "liability", "equity"]
@@ -2621,9 +2671,19 @@ class AccountingService {
       }
     }
 
-    const currentProfitLoss = year
-      ? (await this.getProfitLoss(actor, { financialYearId: year.id }, context)).totals.netProfitLoss
-      : "0.00";
+    const currentProfitLoss =
+      year && this.isDateWithinRange(asOfDate, year.startDate, year.endDate)
+        ? (
+            await this.getProfitLoss(
+              actor,
+              {
+                dateFrom: year.startDate,
+                dateTo: asOfDate
+              },
+              context
+            )
+          ).totals.netProfitLoss
+        : "0.00";
     const sheet = calculateBalanceSheet({
       assetTotal,
       liabilityTotal,
@@ -2842,9 +2902,34 @@ class AccountingService {
   }
 
   public async createPeriodLock(actor: AccountingActor, input: CreateFinancialPeriodLockInput, context: AccountingRequestContext) {
+    const financialYearId = input.financialYearId ?? null;
+
+    if (financialYearId) {
+      const year = await accountingRepository.findFinancialYearById(actor.companyId, financialYearId);
+      if (!year) {
+        throw new AppError("Financial year not found", 404);
+      }
+
+      if (
+        !this.isDateWithinRange(input.periodStart, year.startDate, year.endDate) ||
+        !this.isDateWithinRange(input.periodEnd, year.startDate, year.endDate)
+      ) {
+        throw new AppError("Period lock must stay inside the selected financial year", 400);
+      }
+    }
+
+    const overlappingLocks = await accountingRepository.findOverlappingPeriodLocks(
+      actor.companyId,
+      input.periodStart,
+      input.periodEnd
+    );
+    if (overlappingLocks.length > 0) {
+      throw new AppError("An overlapping financial period lock already exists", 409);
+    }
+
     const created = await accountingRepository.createPeriodLock({
       companyId: actor.companyId,
-      financialYearId: input.financialYearId ?? null,
+      financialYearId,
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
       lockType: input.lockType,
@@ -2931,6 +3016,122 @@ class AccountingService {
 
     return {
       fileName: `ledger-${accountId}-${new Date().toISOString().slice(0, 10)}.csv`,
+      contentType: "text/csv; charset=utf-8",
+      content
+    };
+  }
+
+  public async exportPartyLedger(
+    actor: AccountingActor,
+    partyType: JournalPartyType,
+    partyId: string,
+    query: ExportLedgerQuery,
+    context: AccountingRequestContext
+  ): Promise<ExportPayload> {
+    this.ensureCsvFormat(query.format);
+    const ledger = await this.getPartyLedger(actor, partyType, partyId, query, context);
+    const content = buildCsvBuffer(
+      ["Date", "Journal No", "Voucher", "Description", "Debit", "Credit", "Running Balance", "Balance Side"],
+      ledger.rows.map((row) => [
+        row.entryDate.toISOString().slice(0, 10),
+        row.journalNumber,
+        row.voucherType,
+        row.description ?? "",
+        row.debit,
+        row.credit,
+        row.runningBalance.amount,
+        row.runningBalance.side
+      ])
+    );
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "ledger_exported",
+      entityType: "ledger",
+      metadata: {
+        partyType,
+        partyId
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return {
+      fileName: `${partyType}-ledger-${partyId}-${new Date().toISOString().slice(0, 10)}.csv`,
+      contentType: "text/csv; charset=utf-8",
+      content
+    };
+  }
+
+  public async exportCashBook(actor: AccountingActor, query: ExportBookQuery, context: AccountingRequestContext): Promise<ExportPayload> {
+    this.ensureCsvFormat(query.format);
+    const ledger = await this.getCashBook(actor, query, context);
+    const content = buildCsvBuffer(
+      ["Date", "Journal No", "Voucher", "Description", "Debit", "Credit", "Running Balance", "Balance Side"],
+      ledger.rows.map((row) => [
+        row.entryDate.toISOString().slice(0, 10),
+        row.journalNumber,
+        row.voucherType,
+        row.description ?? "",
+        row.debit,
+        row.credit,
+        row.runningBalance.amount,
+        row.runningBalance.side
+      ])
+    );
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "ledger_exported",
+      entityType: "ledger",
+      metadata: {
+        label: "cash_book"
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return {
+      fileName: `cash-book-${new Date().toISOString().slice(0, 10)}.csv`,
+      contentType: "text/csv; charset=utf-8",
+      content
+    };
+  }
+
+  public async exportBankBook(actor: AccountingActor, query: ExportBookQuery, context: AccountingRequestContext): Promise<ExportPayload> {
+    this.ensureCsvFormat(query.format);
+    const ledger = await this.getBankBook(actor, query, context);
+    const content = buildCsvBuffer(
+      ["Date", "Journal No", "Voucher", "Description", "Debit", "Credit", "Running Balance", "Balance Side"],
+      ledger.rows.map((row) => [
+        row.entryDate.toISOString().slice(0, 10),
+        row.journalNumber,
+        row.voucherType,
+        row.description ?? "",
+        row.debit,
+        row.credit,
+        row.runningBalance.amount,
+        row.runningBalance.side
+      ])
+    );
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "ledger_exported",
+      entityType: "ledger",
+      metadata: {
+        label: "bank_book",
+        bankAccountId: query.bankAccountId ?? null
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return {
+      fileName: `bank-book-${query.bankAccountId ?? "all"}-${new Date().toISOString().slice(0, 10)}.csv`,
       contentType: "text/csv; charset=utf-8",
       content
     };

@@ -275,6 +275,27 @@ export class AccountingController {
     response.json(successResponse("Customer ledger fetched successfully", data));
   };
 
+  public exportCustomerLedger = async (request: Request, response: Response): Promise<void> => {
+    const file = await accountingService.exportPartyLedger(
+      {
+        id: request.currentUser!.id,
+        companyId: request.currentUser!.companyId!,
+        role: request.currentUser!.role
+      },
+      "customer",
+      String(request.params.customerId),
+      request.query as never,
+      {
+        ipAddress: getRequestIp(request),
+        userAgent: getUserAgent(request)
+      }
+    );
+
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `attachment; filename="${file.fileName}"`);
+    response.send(file.content);
+  };
+
   public getSupplierLedger = async (request: Request, response: Response): Promise<void> => {
     const data = await accountingService.getPartyLedger(
       {
@@ -294,6 +315,27 @@ export class AccountingController {
     response.json(successResponse("Supplier ledger fetched successfully", data));
   };
 
+  public exportSupplierLedger = async (request: Request, response: Response): Promise<void> => {
+    const file = await accountingService.exportPartyLedger(
+      {
+        id: request.currentUser!.id,
+        companyId: request.currentUser!.companyId!,
+        role: request.currentUser!.role
+      },
+      "supplier",
+      String(request.params.supplierId),
+      request.query as never,
+      {
+        ipAddress: getRequestIp(request),
+        userAgent: getUserAgent(request)
+      }
+    );
+
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `attachment; filename="${file.fileName}"`);
+    response.send(file.content);
+  };
+
   public getCashBook = async (request: Request, response: Response): Promise<void> => {
     const data = await accountingService.getCashBook(
       {
@@ -311,6 +353,25 @@ export class AccountingController {
     response.json(successResponse("Cash book fetched successfully", data));
   };
 
+  public exportCashBook = async (request: Request, response: Response): Promise<void> => {
+    const file = await accountingService.exportCashBook(
+      {
+        id: request.currentUser!.id,
+        companyId: request.currentUser!.companyId!,
+        role: request.currentUser!.role
+      },
+      request.query as never,
+      {
+        ipAddress: getRequestIp(request),
+        userAgent: getUserAgent(request)
+      }
+    );
+
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `attachment; filename="${file.fileName}"`);
+    response.send(file.content);
+  };
+
   public getBankBook = async (request: Request, response: Response): Promise<void> => {
     const data = await accountingService.getBankBook(
       {
@@ -326,6 +387,25 @@ export class AccountingController {
     );
 
     response.json(successResponse("Bank book fetched successfully", data));
+  };
+
+  public exportBankBook = async (request: Request, response: Response): Promise<void> => {
+    const file = await accountingService.exportBankBook(
+      {
+        id: request.currentUser!.id,
+        companyId: request.currentUser!.companyId!,
+        role: request.currentUser!.role
+      },
+      request.query as never,
+      {
+        ipAddress: getRequestIp(request),
+        userAgent: getUserAgent(request)
+      }
+    );
+
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", `attachment; filename="${file.fileName}"`);
+    response.send(file.content);
   };
 
   public getTrialBalance = async (request: Request, response: Response): Promise<void> => {

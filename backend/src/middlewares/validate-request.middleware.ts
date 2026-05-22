@@ -12,7 +12,7 @@ type ValidationSchemas = {
 
 type MutableRecord = Record<string, unknown>;
 
-const setRequestValue = (request: Request, key: "body" | "query" | "params", value: unknown) => {
+const setRequestValue = (request: Request, key: "body" | "params", value: unknown) => {
   Object.defineProperty(request, key, {
     configurable: true,
     enumerable: true,
@@ -45,8 +45,6 @@ export const validateRequest = (schemas: ValidationSchemas) => {
 
         if (isMutableRecord(request.query) && isMutableRecord(parsedQuery)) {
           syncObjectValues(request.query as MutableRecord, parsedQuery);
-        } else {
-          setRequestValue(request, "query", parsedQuery);
         }
       }
 

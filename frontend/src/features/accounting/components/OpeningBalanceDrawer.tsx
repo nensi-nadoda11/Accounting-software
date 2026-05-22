@@ -57,7 +57,7 @@ export const OpeningBalanceDrawer = ({
       openingDate: item?.openingDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       debit: Number(item?.debit ?? 0),
       credit: Number(item?.credit ?? 0),
-      description: null,
+      description: item?.description ?? null,
     });
   }, [form, item, open]);
 

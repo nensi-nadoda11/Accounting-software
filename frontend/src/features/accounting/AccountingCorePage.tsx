@@ -330,6 +330,25 @@ export const AccountingCorePage = () => {
     setBalanceSheetFinancialYearId((current) => current ?? activeFinancialYearId);
   }, [activeFinancialYearId]);
 
+  useEffect(() => {
+    if (!balanceSheetFinancialYearId) {
+      return;
+    }
+
+    const selectedYear = financialYears.find((year) => year.id === balanceSheetFinancialYearId);
+    if (!selectedYear) {
+      return;
+    }
+
+    const asOfDateValue = balanceSheetAsOfDate ? new Date(balanceSheetAsOfDate) : null;
+    const yearStart = new Date(selectedYear.startDate);
+    const yearEnd = new Date(selectedYear.endDate);
+
+    if (!asOfDateValue || Number.isNaN(asOfDateValue.getTime()) || asOfDateValue < yearStart || asOfDateValue > yearEnd) {
+      setBalanceSheetAsOfDate(selectedYear.endDate.slice(0, 10));
+    }
+  }, [balanceSheetAsOfDate, balanceSheetFinancialYearId, financialYears]);
+
   const loadAccountLookup = async (force = false) => {
     if (accountLookupLoading || (!force && accountLookup.length > 0)) {
       return;
@@ -712,6 +731,7 @@ export const AccountingCorePage = () => {
 
   const flatAccountOptions = flattenAccounts(accountLookup);
   const selectedCashAccount = accountLookup.find((item) => item.systemKey === "cash");
+  const selectedBankBookAccount = bankAccounts.find((item) => item.id === bankBookAccountId) ?? null;
   const filteredLedgerAccounts = flatAccountOptions.filter((item) => {
     const term = ledgerSearch.trim().toLowerCase();
     if (!term) {
@@ -1228,14 +1248,34 @@ export const AccountingCorePage = () => {
                 <Input type="date" value={ledgerDateFrom} onChange={(event) => { setLedgerDateFrom(event.target.value); setLedgerPage(1); }} />
                 <Input type="date" value={ledgerDateTo} onChange={(event) => { setLedgerDateTo(event.target.value); setLedgerPage(1); }} />
                 <div className="flex justify-end">
-                  {canExport && ledgerScope === "account" ? (
+                  {canExport ? (
                     <Button
                       type="button"
                       variant="secondary"
                       disabled={!ledgerTargetId}
                       onClick={() =>
                         void handleExport(
-                          () => accountingApi.exportLedger(ledgerTargetId, { page: ledgerPage, limit: LEDGER_LIMIT, dateFrom: ledgerDateFrom, dateTo: ledgerDateTo }),
+                          () =>
+                            ledgerScope === "account"
+                              ? accountingApi.exportLedger(ledgerTargetId, {
+                                  page: ledgerPage,
+                                  limit: LEDGER_LIMIT,
+                                  dateFrom: ledgerDateFrom,
+                                  dateTo: ledgerDateTo,
+                                })
+                              : ledgerScope === "customer"
+                                ? accountingApi.exportCustomerLedger(ledgerTargetId, {
+                                    page: ledgerPage,
+                                    limit: LEDGER_LIMIT,
+                                    dateFrom: ledgerDateFrom,
+                                    dateTo: ledgerDateTo,
+                                  })
+                                : accountingApi.exportSupplierLedger(ledgerTargetId, {
+                                    page: ledgerPage,
+                                    limit: LEDGER_LIMIT,
+                                    dateFrom: ledgerDateFrom,
+                                    dateTo: ledgerDateTo,
+                                  }),
                           "Ledger exported",
                         )
                       }
@@ -1266,7 +1306,13 @@ export const AccountingCorePage = () => {
                       variant="secondary"
                       onClick={() =>
                         void handleExport(
-                          () => accountingApi.exportLedger(selectedCashAccount.id, { page: cashBookPage, limit: LEDGER_LIMIT, dateFrom: cashBookDateFrom, dateTo: cashBookDateTo }),
+                          () =>
+                            accountingApi.exportCashBook({
+                              page: cashBookPage,
+                              limit: LEDGER_LIMIT,
+                              dateFrom: cashBookDateFrom,
+                              dateTo: cashBookDateTo,
+                            }),
                           "Cash book exported",
                         )
                       }
@@ -1296,6 +1342,30 @@ export const AccountingCorePage = () => {
                 </Select>
                 <Input type="date" value={bankBookDateFrom} onChange={(event) => { setBankBookDateFrom(event.target.value); setBankBookPage(1); }} />
                 <Input type="date" value={bankBookDateTo} onChange={(event) => { setBankBookDateTo(event.target.value); setBankBookPage(1); }} />
+                <div className="flex justify-end md:col-span-2 xl:col-span-1">
+                  {canExport ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() =>
+                        void handleExport(
+                          () =>
+                            accountingApi.exportBankBook({
+                              page: bankBookPage,
+                              limit: LEDGER_LIMIT,
+                              bankAccountId: bankBookAccountId || undefined,
+                              dateFrom: bankBookDateFrom,
+                              dateTo: bankBookDateTo,
+                            }),
+                          selectedBankBookAccount ? "Bank account book exported" : "Bank book exported",
+                        )
+                      }
+                    >
+                      <Download className="mr-2 size-4" />
+                      Export
+                    </Button>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
             <BankBookTable data={bankBookData} loading={bankBookLoading} error={bankBookError} onPageChange={setBankBookPage} />

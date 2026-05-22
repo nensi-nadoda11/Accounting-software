@@ -1,5 +1,6 @@
 import { db } from "../../db";
 import { auditLogService } from "../audit-logs/audit-log.service";
+import { accountingService } from "../accounting/accounting.service";
 import { companyRepository } from "../company/company.repository";
 import { customersRepository } from "../customers/customers.repository";
 import { emailService } from "../../services/email.service";
@@ -973,7 +974,7 @@ class PaymentsService {
       );
     }
 
-    await paymentsRepository.createAccountingEvent(
+    const accountingEvent = await paymentsRepository.createAccountingEvent(
       {
         companyId: actor.companyId,
         eventType: this.getPaymentAccountingEventName(updatedPayment.paymentType),
@@ -984,6 +985,10 @@ class PaymentsService {
       },
       executor
     );
+
+    if (accountingEvent) {
+      await accountingService.postEventInTransaction(actor, accountingEvent.id, executor);
+    }
 
     const receipt = await this.ensureReceipt(actor, updatedPayment, this.toReceiptParty(updatedPayment.partyType, party), executor);
     return {
@@ -1024,7 +1029,7 @@ class PaymentsService {
     }
 
     const party = await this.getPartyOrThrow(actor.companyId, payment.partyType, payment.partyId, executor);
-    await paymentsRepository.createAccountingEvent(
+    const accountingEvent = await paymentsRepository.createAccountingEvent(
       {
         companyId: actor.companyId,
         eventType: this.getPaymentReversalEventName(payment.paymentType),
@@ -1035,6 +1040,10 @@ class PaymentsService {
       },
       executor
     );
+
+    if (accountingEvent) {
+      await accountingService.postEventInTransaction(actor, accountingEvent.id, executor);
+    }
 
     return reversed;
   }

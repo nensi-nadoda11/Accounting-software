@@ -24,6 +24,7 @@ import type {
   ListFinancialPeriodLocksQuery,
   ListJournalsQuery,
   ListOpeningBalancesQuery,
+  OpeningBalance,
   OpeningBalanceListResponse,
   PeriodLock,
   PeriodLocksResponse,
@@ -118,7 +119,7 @@ export const accountingApi = {
       .data,
 
   updateOpeningBalance: async (openingBalanceId: string, payload: UpdateOpeningBalanceInput) =>
-    (await client.patch<ApiResponse<{ openingBalance: unknown; journalId: string }>>(`/accounting/opening-balances/${openingBalanceId}`, payload))
+    (await client.patch<ApiResponse<{ openingBalance: OpeningBalance; journalId: string }>>(`/accounting/opening-balances/${openingBalanceId}`, payload))
       .data,
 
   lockOpeningBalances: async (ids: string[]) =>
@@ -180,6 +181,20 @@ export const accountingApi = {
       })
     ).data,
 
+  exportCustomerLedger: async (customerId: string, query: LedgerQuery & { format?: AccountingExportFormat }) =>
+    extractDownload(
+      client.get(`/accounting/ledger/customer/${customerId}/export`, {
+        params: {
+          page: query.page,
+          limit: query.limit,
+          format: query.format ?? "csv",
+          ...buildDateRangeParams(query),
+        },
+        responseType: "blob",
+      }),
+      `customer-ledger-${customerId}.csv`,
+    ),
+
   getSupplierLedger: async (supplierId: string, query: LedgerQuery) =>
     (
       await client.get<ApiResponse<LedgerResponse>>(`/accounting/ledger/supplier/${supplierId}`, {
@@ -190,6 +205,20 @@ export const accountingApi = {
         },
       })
     ).data,
+
+  exportSupplierLedger: async (supplierId: string, query: LedgerQuery & { format?: AccountingExportFormat }) =>
+    extractDownload(
+      client.get(`/accounting/ledger/supplier/${supplierId}/export`, {
+        params: {
+          page: query.page,
+          limit: query.limit,
+          format: query.format ?? "csv",
+          ...buildDateRangeParams(query),
+        },
+        responseType: "blob",
+      }),
+      `supplier-ledger-${supplierId}.csv`,
+    ),
 
   exportLedger: async (accountId: string, query: LedgerQuery & { format?: AccountingExportFormat }) =>
     extractDownload(
@@ -216,6 +245,20 @@ export const accountingApi = {
       })
     ).data,
 
+  exportCashBook: async (query: BookQuery & { format?: AccountingExportFormat }) =>
+    extractDownload(
+      client.get("/accounting/cash-book/export", {
+        params: {
+          page: query.page,
+          limit: query.limit,
+          format: query.format ?? "csv",
+          ...buildDateRangeParams(query),
+        },
+        responseType: "blob",
+      }),
+      "cash-book.csv",
+    ),
+
   getBankBook: async (query: BookQuery) =>
     (
       await client.get<ApiResponse<LedgerResponse>>("/accounting/bank-book", {
@@ -227,6 +270,21 @@ export const accountingApi = {
         },
       })
     ).data,
+
+  exportBankBook: async (query: BookQuery & { format?: AccountingExportFormat }) =>
+    extractDownload(
+      client.get("/accounting/bank-book/export", {
+        params: {
+          page: query.page,
+          limit: query.limit,
+          bankAccountId: query.bankAccountId || undefined,
+          format: query.format ?? "csv",
+          ...buildDateRangeParams(query),
+        },
+        responseType: "blob",
+      }),
+      `bank-book-${query.bankAccountId || "all"}.csv`,
+    ),
 
   getTrialBalance: async (query: TrialBalanceQuery) =>
     (

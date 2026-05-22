@@ -367,6 +367,10 @@ class PurchasesService {
     };
   }
 
+  private sumRefundRows(refunds: Array<{ amount: string | number }> | undefined) {
+    return normalizeMoney((refunds ?? []).reduce((sum, refund) => addDecimals(sum, refund.amount, 2), "0.00"));
+  }
+
   private mapReturnItemRow(
     row: Awaited<ReturnType<typeof purchasesRepository.listPurchaseReturnItems>>[number]
   ) {
@@ -393,9 +397,10 @@ class PurchasesService {
       items?: Array<ReturnType<PurchasesService["mapReturnItemRow"]>>;
       refunds?: Array<ReturnType<PurchasesService["mapReturnRefundRow"]>>;
     },
-    adjustmentOverride?: string
+    adjustmentOverride?: string,
+    refundedAmountOverride?: string
   ) {
-    const refundedAmount = "refundedAmount" in row ? row.refundedAmount : "0.00";
+    const refundedAmount = normalizeMoney(refundedAmountOverride ?? ("refundedAmount" in row ? row.refundedAmount : "0.00"));
     const returnGrandTotal = normalizeMoney("purchaseReturn" in row ? row.purchaseReturn.grandTotal : 0);
     const adjustedAmount =
       adjustmentOverride ??
@@ -1800,12 +1805,13 @@ class PurchasesService {
     const adjustmentMap = this.buildReturnAdjustmentMap(
       await purchasesRepository.listPurchaseReturnSettlementRows(actor.companyId, [detail.purchaseReturn.purchaseInvoiceId])
     );
+    const mappedRefunds = refunds.map((row) => this.mapReturnRefundRow(row));
     return {
       purchaseReturn: {
         ...this.mapReturnRow(detail, {
           items: items.map((row) => this.mapReturnItemRow(row)),
-          refunds: refunds.map((row) => this.mapReturnRefundRow(row))
-        }, adjustmentMap.get(detail.purchaseReturn.id))
+          refunds: mappedRefunds
+        }, adjustmentMap.get(detail.purchaseReturn.id), this.sumRefundRows(mappedRefunds))
       }
     };
   }

@@ -421,6 +421,10 @@ class SalesService {
     };
   }
 
+  private sumRefundRows(refunds: Array<{ amount: string | number }> | undefined) {
+    return normalizeMoney((refunds ?? []).reduce((sum, refund) => addDecimals(sum, refund.amount, 2), "0.00"));
+  }
+
   private mapReturnRow(
     row:
       | Awaited<ReturnType<typeof salesRepository.listReturns>>["rows"][number]
@@ -1908,6 +1912,7 @@ class SalesService {
       salesRepository.listReturnRefunds(actor.companyId, returnId),
       salesRepository.listReturnSettlementRows(actor.companyId, [detail.salesReturn.salesInvoiceId])
     ]);
+    const mappedRefunds = refunds.map((row) => this.mapReturnRefundRow(row));
     return {
       salesReturn: this.mapReturnRow(
         detail,
@@ -1925,9 +1930,10 @@ class SalesService {
             gstAmount: normalizeMoney(row.item.gstAmount),
             lineTotal: normalizeMoney(row.item.lineTotal)
           })),
-          refunds: refunds.map((row) => this.mapReturnRefundRow(row))
+          refunds: mappedRefunds
         },
-        this.buildReturnAdjustmentMap(adjustmentMap).get(detail.salesReturn.id)
+        this.buildReturnAdjustmentMap(adjustmentMap).get(detail.salesReturn.id),
+        this.sumRefundRows(mappedRefunds)
       )
     };
   }
@@ -2026,6 +2032,10 @@ class SalesService {
       const invoice = await this.getInvoiceOrThrow(actor.companyId, input.salesInvoiceId, transaction);
       if (!["posted", "partially_returned"].includes(invoice.invoiceStatus)) {
         throw new AppError("Sales return can only be created for posted invoices", 400);
+      }
+
+      if (input.returnDate < invoice.invoiceDate) {
+        throw new AppError("Sales return date cannot be earlier than the sales invoice date", 400);
       }
 
       const invoiceItems = await salesRepository.listInvoiceItems(actor.companyId, invoice.id, transaction);

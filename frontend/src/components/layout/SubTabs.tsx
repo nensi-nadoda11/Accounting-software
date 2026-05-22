@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { ACCOUNTING_TABS, HR_PAYROLL_TABS, INVENTORY_TABS, PURCHASES_TABS, SALES_TABS, SETTINGS_TABS } from "../../constants/navigation";
+import { getSubTabsForPathname } from "../../constants/navigation";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../providers/useAuth";
 
@@ -8,22 +8,9 @@ export const SubTabs = () => {
   const location = useLocation();
   const { hasPermission } = useAuth();
   const wrapTabs = location.pathname.startsWith("/app/settings");
+  const sourceTabs = getSubTabsForPathname(location.pathname);
 
-  const sourceTabs = location.pathname.startsWith("/app/sales")
-    ? SALES_TABS
-    : location.pathname.startsWith("/app/purchases")
-    ? PURCHASES_TABS
-    : location.pathname.startsWith("/app/inventory")
-      ? INVENTORY_TABS
-      : location.pathname.startsWith("/app/hr-payroll")
-        ? HR_PAYROLL_TABS
-      : location.pathname.startsWith("/app/accounting")
-        ? ACCOUNTING_TABS
-      : SETTINGS_TABS;
-
-  const tabs = sourceTabs.filter((tab) =>
-    "permissions" in tab ? hasPermission(Array.from(tab.permissions)) : true,
-  );
+  const tabs = sourceTabs.filter((tab) => (tab.permissions ? hasPermission(Array.from(tab.permissions)) : true));
 
   if (!tabs.length) {
     return null;

@@ -7,6 +7,15 @@ type PermissionAwareRoute = {
   href: string;
   permissions?: readonly PermissionKey[];
 };
+export type SectionNavItem = {
+  label: string;
+  href: string;
+  permissions?: readonly PermissionKey[];
+};
+export type NestedSidebarConfig = {
+  title: string;
+  tabs: readonly SectionNavItem[];
+};
 
 export const TOP_NAV_ITEMS: ReadonlyArray<{ label: string; href: string; menu: TopNavMenu }> = [
   { label: "Dashboard", href: "/app/dashboard", menu: "dashboard" },
@@ -46,7 +55,7 @@ export const SETTINGS_TABS = [
   { label: "Roles & Permissions", href: "/app/settings/roles-permissions", permissions: ["user.view", "user.manage"] },
   { label: "Profile", href: "/app/settings/profile" },
   { label: "Security", href: "/app/settings/security" },
-] as const;
+] as const satisfies readonly SectionNavItem[];
 
 export const ACCOUNTING_TABS = [
   {
@@ -99,21 +108,21 @@ export const ACCOUNTING_TABS = [
     href: "/app/accounting/gst",
     permissions: ["gst.view", "gst.manage", "gst.export", "gst.itc.manage", "gst.adjustment.manage"],
   },
-] as const;
+] as const satisfies readonly SectionNavItem[];
 
 export const PURCHASES_TABS = [
   { label: "Suppliers", href: "/app/purchases/suppliers", permissions: ["supplier.view"] },
   { label: "Purchase Invoices", href: "/app/purchases/invoices", permissions: ["purchase.view"] },
   { label: "New Purchase", href: "/app/purchases/new", permissions: ["purchase.create", "purchase.update"] },
   { label: "Returns", href: "/app/purchases/returns", permissions: ["purchase.view", "purchase.return"] },
-] as const;
+] as const satisfies readonly SectionNavItem[];
 
 export const SALES_TABS = [
   { label: "Customers", href: "/app/sales/customers", permissions: ["customer.view"] },
   { label: "Sales Invoices", href: "/app/sales/invoices", permissions: ["sales.view"] },
   { label: "POS Billing", href: "/app/sales/pos", permissions: ["sales.create", "sales.pos.access"] },
   { label: "Returns", href: "/app/sales/returns", permissions: ["sales.view", "sales.return"] },
-] as const;
+] as const satisfies readonly SectionNavItem[];
 
 export const INVENTORY_TABS = [
   {
@@ -126,7 +135,7 @@ export const INVENTORY_TABS = [
     href: "/app/inventory/products",
     permissions: ["product.view", "category.manage", "unit.manage", "product.price.view"],
   },
-] as const;
+] as const satisfies readonly SectionNavItem[];
 
 export const HR_PAYROLL_TABS = [
   {
@@ -143,7 +152,7 @@ export const HR_PAYROLL_TABS = [
       "payroll.manage",
     ],
   },
-] as const;
+] as const satisfies readonly SectionNavItem[];
 
 const DASHBOARD_ROUTES = [{ href: "/app/dashboard", permissions: ["dashboard.view"] }] as const satisfies readonly PermissionAwareRoute[];
 const REPORTS_ROUTES = [{ href: "/app/reports", permissions: ["reports.view", "report.view"] }] as const satisfies readonly PermissionAwareRoute[];
@@ -173,6 +182,57 @@ const getRoutesForMenu = (menu: TopNavMenu): readonly PermissionAwareRoute[] => 
       return [];
   }
 };
+
+export const getSubTabsForPathname = (pathname: string): readonly SectionNavItem[] => {
+  if (pathname.startsWith("/app/sales")) {
+    return SALES_TABS;
+  }
+  if (pathname.startsWith("/app/purchases")) {
+    return PURCHASES_TABS;
+  }
+  if (pathname.startsWith("/app/inventory")) {
+    return INVENTORY_TABS;
+  }
+  if (pathname.startsWith("/app/hr-payroll")) {
+    return HR_PAYROLL_TABS;
+  }
+  if (pathname.startsWith("/app/accounting")) {
+    return ACCOUNTING_TABS;
+  }
+  return SETTINGS_TABS;
+};
+
+const SIDEBAR_ROUTE_CONFIGS: ReadonlyArray<{
+  title: string;
+  tabs: readonly SectionNavItem[];
+  matches: readonly string[];
+}> = [
+  {
+    title: "Settings",
+    tabs: SETTINGS_TABS,
+    matches: ["/app/settings/final"],
+  },
+  {
+    title: "Accounting",
+    tabs: ACCOUNTING_TABS,
+    matches: ["/app/accounting/core", "/app/accounting/expenses", "/app/accounting/payments", "/app/accounting/gst"],
+  },
+  {
+    title: "Inventory",
+    tabs: INVENTORY_TABS,
+    matches: ["/app/inventory/stock", "/app/inventory/products"],
+  },
+  {
+    title: "HR & Payroll",
+    tabs: HR_PAYROLL_TABS,
+    matches: ["/app/hr-payroll/payroll"],
+  },
+] as const;
+
+export const getNestedSidebarConfigForPathname = (pathname: string): NestedSidebarConfig | null =>
+  SIDEBAR_ROUTE_CONFIGS.find((config) =>
+    config.matches.some((route) => pathname === route || pathname.startsWith(`${route}/`)),
+  ) ?? null;
 
 export const getFirstAccessibleTopNavHref = (menu: TopNavMenu, hasPermission: NavPermissionChecker) =>
   getRoutesForMenu(menu).find((route) => isRouteAccessible(route, hasPermission))?.href ?? null;

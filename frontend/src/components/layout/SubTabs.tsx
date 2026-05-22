@@ -7,6 +7,7 @@ import { useAuth } from "../../providers/useAuth";
 export const SubTabs = () => {
   const location = useLocation();
   const { hasPermission } = useAuth();
+  const wrapTabs = location.pathname.startsWith("/app/settings");
 
   const sourceTabs = location.pathname.startsWith("/app/sales")
     ? SALES_TABS
@@ -30,7 +31,12 @@ export const SubTabs = () => {
 
   return (
     <div className="border-b border-slate-200 bg-white/90">
-      <div className="mx-auto flex max-w-7xl gap-5 overflow-x-auto px-4 sm:px-6 lg:px-8">
+      <div
+        className={cn(
+          "mx-auto flex max-w-7xl px-4 sm:px-6 lg:px-8",
+          wrapTabs ? "justify-between gap-3 overflow-hidden" : "gap-5 overflow-x-auto",
+        )}
+      >
         {tabs.map((tab) => {
           const active = location.pathname === tab.href;
           return (
@@ -38,8 +44,14 @@ export const SubTabs = () => {
               key={tab.href}
               to={tab.href}
               className={cn(
-                "relative whitespace-nowrap pb-3 pt-4 text-sm font-medium text-slate-500 transition hover:text-slate-800",
-                active && "text-slate-900",
+                "relative whitespace-nowrap font-medium transition",
+                wrapTabs
+                  ? active
+                    ? "pb-3 pt-4 text-[13px] text-slate-900 lg:text-sm"
+                    : "pb-3 pt-4 text-[13px] text-slate-500 hover:text-slate-800 lg:text-sm"
+                  : active
+                    ? "pb-3 pt-4 text-slate-900"
+                    : "pb-3 pt-4 text-slate-500 hover:text-slate-800",
               )}
             >
               {tab.label}

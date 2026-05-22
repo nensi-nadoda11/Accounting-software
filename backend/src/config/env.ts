@@ -39,6 +39,11 @@ const envSchema = z.object({
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
   DB_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  DB_SSL_MODE: z.enum(["auto", "require", "disable"]).default("auto"),
+  DB_SSL_REJECT_UNAUTHORIZED: z
+    .string()
+    .transform((value) => value === "true")
+    .default(false),
   UPLOAD_DIR: z.string().trim().min(1).default("uploads"),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(2),
   EXPENSE_UPLOAD_DIR: z.string().trim().min(1).default("uploads/expenses"),

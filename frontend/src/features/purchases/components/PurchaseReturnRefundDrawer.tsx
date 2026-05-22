@@ -90,6 +90,10 @@ export const PurchaseReturnRefundDrawer = ({
                 <div className="mt-1"><AmountText value={purchaseReturn.grandTotal} /></div>
               </div>
               <div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">Adjusted</p>
+                <div className="mt-1"><AmountText value={purchaseReturn.adjustedAmount} tone="warning" /></div>
+              </div>
+              <div>
                 <p className="text-xs uppercase tracking-wide text-slate-400">Received</p>
                 <div className="mt-1"><AmountText value={purchaseReturn.refundedAmount} tone="success" /></div>
               </div>

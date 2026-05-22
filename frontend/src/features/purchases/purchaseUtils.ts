@@ -269,6 +269,8 @@ export const calculateDueAmount = (grandTotal: string | number, paidAmount: stri
   return compareScaled(due, "0.00", 2) < 0 ? "0.00" : due;
 };
 
+const toDateOnlyKey = (value: Date) => value.toISOString().slice(0, 10);
+
 export const calculatePaymentStatus = (input: {
   grandTotal: string | number;
   paidAmount: string | number;
@@ -288,7 +290,7 @@ export const calculatePaymentStatus = (input: {
 
   if (input.dueDate) {
     const asOfDate = input.asOf ?? new Date();
-    if (new Date(input.dueDate).getTime() < asOfDate.getTime()) {
+    if (toDateOnlyKey(new Date(input.dueDate)) < toDateOnlyKey(asOfDate)) {
       return "overdue" as const;
     }
   }
@@ -419,22 +421,28 @@ export const calculateReturnPreview = (invoice: PurchaseInvoice, items: ReturnPr
   return { subtotal, gstTotal, grandTotal };
 };
 
-export const calculateAvailablePurchaseReturnRefund = (
-  invoice: Pick<PurchaseInvoice, "paidAmount" | "returns">,
+export const calculatePurchaseReturnAdjustment = (
+  invoice: Pick<PurchaseInvoice, "dueAmount">,
   returnGrandTotal: string | number,
 ) => {
-  const alreadyRefunded = (invoice.returns ?? []).reduce(
-    (sum, entry) => addScaled(sum, entry.refundedAmount, 2),
-    "0.00",
-  );
-  const remainingPaidAmount = subtractScaled(invoice.paidAmount, alreadyRefunded, 2);
-  const normalizedRemainingPaidAmount = compareScaled(remainingPaidAmount, "0.00", 2) < 0 ? "0.00" : remainingPaidAmount;
+  const normalizedDueAmount = normalizeMoney(invoice.dueAmount);
   const normalizedReturnTotal = normalizeMoney(returnGrandTotal);
 
-  return compareScaled(normalizedReturnTotal, normalizedRemainingPaidAmount, 2) <= 0
+  return compareScaled(normalizedReturnTotal, normalizedDueAmount, 2) <= 0
     ? normalizedReturnTotal
-    : normalizedRemainingPaidAmount;
+    : normalizedDueAmount;
 };
+
+export const calculateAvailablePurchaseReturnRefund = (
+  invoice: Pick<PurchaseInvoice, "dueAmount">,
+  returnGrandTotal: string | number,
+) =>
+  (() => {
+    const normalizedReturnTotal = normalizeMoney(returnGrandTotal);
+    const adjustedAmount = calculatePurchaseReturnAdjustment(invoice, normalizedReturnTotal);
+    const refundableAmount = subtractScaled(normalizedReturnTotal, adjustedAmount, 2);
+    return compareScaled(refundableAmount, "0.00", 2) < 0 ? "0.00" : refundableAmount;
+  })();
 
 export const getRemainingReturnableQty = (invoiceItem: PurchaseInvoiceItem, returnedItems: PurchaseInvoice["returns"] = []) => {
   const alreadyReturned = returnedItems.reduce((sum, entry) => {

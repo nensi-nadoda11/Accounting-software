@@ -290,6 +290,35 @@ export const salesReturnItems = pgTable(
   })
 );
 
+export const salesReturnRefunds = pgTable(
+  "sales_return_refunds",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    salesReturnId: uuid("sales_return_id")
+      .notNull()
+      .references(() => salesReturns.id, { onDelete: "cascade" }),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "restrict" }),
+    refundDate: date("refund_date", { mode: "date" }).notNull(),
+    amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    paymentMode: salesPaymentModeEnum("payment_mode").notNull(),
+    bankAccountId: uuid("bank_account_id").references(() => companyBankAccounts.id, { onDelete: "restrict" }),
+    referenceNumber: text("reference_number"),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    companyIdx: index("sales_return_refunds_company_id_idx").on(table.companyId),
+    returnIdx: index("sales_return_refunds_sales_return_id_idx").on(table.salesReturnId),
+    customerIdx: index("sales_return_refunds_customer_id_idx").on(table.customerId),
+    refundDateIdx: index("sales_return_refunds_refund_date_idx").on(table.refundDate),
+    amountCheck: check("sales_return_refunds_amount_check", sql`${table.amount} > 0`)
+  })
+);
+
 export const salesInvoiceSendLogs = pgTable(
   "sales_invoice_send_logs",
   {

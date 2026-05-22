@@ -16,6 +16,7 @@ import {
   listSalesInvoicesQuerySchema,
   listSalesPaymentsQuerySchema,
   listSalesReturnsQuerySchema,
+  recordSalesReturnRefundSchema,
   recordSalesPaymentSchema,
   salesInvoiceIdParamSchema,
   salesReturnIdParamSchema,
@@ -61,6 +62,13 @@ router.post(
   requirePermission(["sales.return"]),
   validateRequest({ body: createSalesReturnSchema }),
   asyncHandler(salesController.createReturn)
+);
+
+router.post(
+  "/returns/:id/refunds",
+  requirePermission(["sales.return"]),
+  validateRequest({ params: salesReturnIdParamSchema, body: recordSalesReturnRefundSchema }),
+  asyncHandler(salesController.recordReturnRefund)
 );
 
 router.post(

@@ -331,7 +331,12 @@ export const createSalesReturnSchema = z
   .object({
     salesInvoiceId: z.uuid(),
     returnDate: z.coerce.date(),
-    warehouseId: z.uuid().optional(),
+    warehouseId: z.uuid().nullable().optional(),
+    refundAmountPaid: decimalNumber({ min: 0 }).optional().default(0),
+    refundPaymentMode: z.enum(SALES_PAYMENT_MODES).nullable().optional(),
+    refundBankAccountId: z.preprocess(trimToNull, z.uuid().nullable().optional()),
+    refundReferenceNumber: optionalNullableString(150),
+    refundNotes: optionalNullableString(1000),
     reason: z
       .string()
       .trim()
@@ -348,6 +353,55 @@ export const createSalesReturnSchema = z
         code: "custom",
         path: ["returnDate"],
         message: "Return date cannot be in the future"
+      });
+    }
+
+    if (value.refundAmountPaid > 0 && !value.refundPaymentMode) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["refundPaymentMode"],
+        message: "Refund mode is required when refund amount is entered"
+      });
+    }
+
+    if (
+      value.refundAmountPaid > 0 &&
+      value.refundPaymentMode &&
+      ["bank", "upi", "card", "cheque"].includes(value.refundPaymentMode) &&
+      !value.refundBankAccountId
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["refundBankAccountId"],
+        message: "Bank account is required for the selected refund mode"
+      });
+    }
+  });
+
+export const recordSalesReturnRefundSchema = z
+  .object({
+    refundDate: z.coerce.date(),
+    amount: decimalNumber({ min: Number.EPSILON }),
+    paymentMode: z.enum(SALES_PAYMENT_MODES),
+    bankAccountId: z.preprocess(trimToNull, z.uuid().nullable().optional()),
+    referenceNumber: optionalNullableString(150),
+    notes: optionalNullableString(1000)
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.refundDate.getTime() > Date.now()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["refundDate"],
+        message: "Refund date cannot be in the future"
+      });
+    }
+
+    if (["bank", "upi", "card", "cheque"].includes(value.paymentMode) && !value.bankAccountId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["bankAccountId"],
+        message: "Bank account is required for the selected refund mode"
       });
     }
   });
@@ -392,6 +446,7 @@ export type UpdateSalesInvoiceInput = z.infer<typeof updateSalesInvoiceSchema>;
 export type ListSalesInvoicesQuery = z.infer<typeof listSalesInvoicesQuerySchema>;
 export type ExportSalesInvoicesQuery = z.infer<typeof exportSalesInvoicesQuerySchema>;
 export type RecordSalesPaymentInput = z.infer<typeof recordSalesPaymentSchema>;
+export type RecordSalesReturnRefundInput = z.infer<typeof recordSalesReturnRefundSchema>;
 export type ListSalesPaymentsQuery = z.infer<typeof listSalesPaymentsQuerySchema>;
 export type CreateSalesReturnInput = z.infer<typeof createSalesReturnSchema>;
 export type ListSalesReturnsQuery = z.infer<typeof listSalesReturnsQuerySchema>;

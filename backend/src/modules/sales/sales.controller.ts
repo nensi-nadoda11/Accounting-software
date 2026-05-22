@@ -222,6 +222,24 @@ export class SalesController {
     response.json(successResponse("Sales return fetched successfully", data));
   };
 
+  public recordReturnRefund = async (request: Request, response: Response): Promise<void> => {
+    const data = await salesService.recordReturnRefund(
+      {
+        id: request.currentUser!.id,
+        companyId: request.currentUser!.companyId!,
+        role: request.currentUser!.role
+      },
+      String(request.params.id),
+      request.body,
+      {
+        ipAddress: getRequestIp(request),
+        userAgent: getUserAgent(request)
+      }
+    );
+
+    response.status(201).json(successResponse("Sales return refund recorded successfully", data));
+  };
+
   public exportInvoices = async (request: Request, response: Response): Promise<void> => {
     const file = await salesService.exportInvoices(
       {

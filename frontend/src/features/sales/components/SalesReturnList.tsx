@@ -1,4 +1,4 @@
-import { Eye, Plus } from "lucide-react";
+import { Eye, Plus, Wallet } from "lucide-react";
 
 import { AmountText } from "../../../components/ui/AmountText";
 import { Button } from "../../../components/ui/Button";
@@ -14,17 +14,24 @@ export const SalesReturnList = ({
   data,
   loading,
   canCreate,
+  canManageRefund,
   onCreate,
+  onRefund,
   onView,
   onPageChange,
 }: {
   data: SalesReturnsResponse | null;
   loading?: boolean;
   canCreate: boolean;
+  canManageRefund: boolean;
   onCreate: () => void;
+  onRefund: (salesReturn: SalesReturn) => void;
   onView: (salesReturn: SalesReturn) => void;
   onPageChange: (page: number) => void;
 }) => {
+  const totalPending =
+    data ? data.items.reduce((sum, item) => sum + Number(item.remainingRefundAmount), 0) : 0;
+
   if (!loading && !data?.items.length) {
     return (
       <EmptyState
@@ -48,7 +55,7 @@ export const SalesReturnList = ({
           <Table>
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                {["Return No", "Invoice No", "Customer", "Date", "Grand Total", "Actions"].map((head) => (
+                {["Return No", "Invoice No", "Customer", "Date", "Grand Total", "Adjusted", "Paid", "Pending", "Actions"].map((head) => (
                   <th key={head} className="px-4 py-3 font-semibold">
                     {head}
                   </th>
@@ -59,7 +66,7 @@ export const SalesReturnList = ({
               {loading && !data
                 ? Array.from({ length: 8 }).map((_, rowIndex) => (
                     <tr key={rowIndex} className="animate-pulse">
-                      {Array.from({ length: 6 }).map((__, cellIndex) => (
+                      {Array.from({ length: 9 }).map((__, cellIndex) => (
                         <td key={cellIndex} className="px-4 py-4">
                           <div className="h-4 rounded bg-slate-100" />
                         </td>
@@ -75,9 +82,15 @@ export const SalesReturnList = ({
                       <td className="px-4 py-4 whitespace-nowrap">
                         <AmountText value={salesReturn.grandTotal} />
                       </td>
+                      <td className="px-4 py-4 whitespace-nowrap"><AmountText value={salesReturn.adjustedAmount} tone="warning" /></td>
+                      <td className="px-4 py-4 whitespace-nowrap"><AmountText value={salesReturn.refundedAmount} tone="success" /></td>
+                      <td className="px-4 py-4 whitespace-nowrap"><AmountText value={salesReturn.remainingRefundAmount} tone="danger" /></td>
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-1">
                           <TableActionIconButton label="View return" icon={<Eye className="size-4" />} onClick={() => onView(salesReturn)} />
+                          {canManageRefund && Number(salesReturn.remainingRefundAmount) > 0 ? (
+                            <TableActionIconButton label="Add refund entry" icon={<Wallet className="size-4" />} onClick={() => onRefund(salesReturn)} />
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -88,9 +101,12 @@ export const SalesReturnList = ({
       </TableWrapper>
       {data?.pagination ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-4">
-          <p className="text-sm text-slate-500">
-            Showing {data.items.length} of {data.pagination.total} returns
-          </p>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
+            <p>Showing {data.items.length} of {data.pagination.total} returns</p>
+            <p>Total Return: {Number(data.summary.grandTotal).toFixed(2)}</p>
+            <p>Refund Paid: {Number(data.summary.refundedAmount).toFixed(2)}</p>
+            <p>Refund Pending: {totalPending.toFixed(2)}</p>
+          </div>
           <Pagination page={data.pagination.page} totalPages={data.pagination.totalPages} onChange={onPageChange} />
         </div>
       ) : null}

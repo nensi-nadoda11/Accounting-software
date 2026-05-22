@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { GST_RATE_OPTIONS } from "../products/productOptions";
-import type { SalesFormInput, SalesPaymentInput, SalesReturnInput } from "../../types/sales";
+import type { SalesFormInput, SalesPaymentInput, SalesReturnInput, SalesReturnRefundInput } from "../../types/sales";
 
 const trim = (value: unknown) => (typeof value === "string" ? value.trim() : value);
 
@@ -327,6 +327,11 @@ export const salesReturnSchema = z
     salesInvoiceId: z.uuid("Select sales invoice"),
     returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Select return date"),
     warehouseId: z.preprocess(trimToNull, z.uuid().nullable()),
+    refundAmountPaid: decimalField(0),
+    refundPaymentMode: z.preprocess(trimToNull, z.enum(["cash", "bank", "upi", "card", "cheque"]).nullable()),
+    refundBankAccountId: z.preprocess(trimToNull, z.uuid().nullable()),
+    refundReferenceNumber: optionalNullableText(150),
+    refundNotes: optionalNullableText(1000),
     reason: z.preprocess(trim, z.string().min(3, "Reason is required").max(500, "Must be 500 characters or fewer")),
     notes: optionalNullableText(2000),
     items: z.array(salesReturnItemSchema).min(1),
@@ -347,12 +352,38 @@ export const salesReturnSchema = z
         message: "Enter at least one return quantity",
       });
     }
+
+    if (value.refundAmountPaid > 0 && !value.refundPaymentMode) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["refundPaymentMode"],
+        message: "Refund mode is required",
+      });
+    }
+
+    if (
+      value.refundAmountPaid > 0 &&
+      value.refundPaymentMode &&
+      ["bank", "upi", "card", "cheque"].includes(value.refundPaymentMode) &&
+      !value.refundBankAccountId
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["refundBankAccountId"],
+        message: "Bank account is required",
+      });
+    }
   })
   .transform(
     (value): SalesReturnInput => ({
       salesInvoiceId: value.salesInvoiceId,
       returnDate: value.returnDate,
       warehouseId: value.warehouseId,
+      refundAmountPaid: value.refundAmountPaid,
+      refundPaymentMode: value.refundPaymentMode,
+      refundBankAccountId: value.refundBankAccountId,
+      refundReferenceNumber: value.refundReferenceNumber,
+      refundNotes: value.refundNotes,
       reason: value.reason,
       notes: value.notes,
       items: value.items
@@ -366,3 +397,51 @@ export const salesReturnSchema = z
   );
 
 export type SalesReturnValues = z.input<typeof salesReturnSchema>;
+
+export const salesReturnRefundSchema = z
+  .object({
+    refundDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Select refund date"),
+    amount: decimalField(Number.EPSILON),
+    paymentMode: z.enum(["cash", "bank", "upi", "card", "cheque"], { message: "Select refund mode" }),
+    bankAccountId: z.preprocess(trimToNull, z.uuid().nullable()),
+    referenceNumber: optionalNullableText(150),
+    notes: optionalNullableText(1000),
+    maxAmount: decimalField(0).optional().default(0),
+  })
+  .superRefine((value, ctx) => {
+    if (new Date(value.refundDate).getTime() > Date.now()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["refundDate"],
+        message: "Refund date cannot be in the future",
+      });
+    }
+
+    if (value.amount > value.maxAmount) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["amount"],
+        message: "Amount cannot exceed pending refund",
+      });
+    }
+
+    if (["bank", "upi", "card", "cheque"].includes(value.paymentMode) && !value.bankAccountId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["bankAccountId"],
+        message: "Bank account is required",
+      });
+    }
+  })
+  .transform(
+    (value): SalesReturnRefundInput => ({
+    refundDate: value.refundDate,
+    amount: value.amount,
+    paymentMode: value.paymentMode,
+    bankAccountId: value.bankAccountId,
+    referenceNumber: value.referenceNumber,
+    notes: value.notes,
+    }),
+  );
+
+export type SalesReturnRefundValues = z.input<typeof salesReturnRefundSchema>;

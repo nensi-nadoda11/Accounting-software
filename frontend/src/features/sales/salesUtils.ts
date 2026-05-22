@@ -14,6 +14,7 @@ import type {
   SalesPaymentMode,
   SalesPriceTaxType,
   SalesReturnInput,
+  SalesReturnRefundInput,
 } from "../../types/sales";
 
 type ApiErrorShape = {
@@ -438,6 +439,29 @@ export const calculateReturnPreview = (invoice: SalesInvoice, items: ReturnPrevi
   return { subtotal, gstTotal, grandTotal };
 };
 
+export const calculateSalesReturnAdjustment = (
+  invoice: Pick<SalesInvoice, "dueAmount">,
+  returnGrandTotal: string | number,
+) => {
+  const normalizedDueAmount = normalizeMoney(invoice.dueAmount);
+  const normalizedReturnTotal = normalizeMoney(returnGrandTotal);
+
+  return compareScaled(normalizedReturnTotal, normalizedDueAmount, 2) <= 0
+    ? normalizedReturnTotal
+    : normalizedDueAmount;
+};
+
+export const calculateAvailableSalesReturnRefund = (
+  invoice: Pick<SalesInvoice, "dueAmount">,
+  returnGrandTotal: string | number,
+) =>
+  (() => {
+    const normalizedReturnTotal = normalizeMoney(returnGrandTotal);
+    const adjustedAmount = calculateSalesReturnAdjustment(invoice, normalizedReturnTotal);
+    const refundableAmount = subtractScaled(normalizedReturnTotal, adjustedAmount, 2);
+    return compareScaled(refundableAmount, "0.00", 2) < 0 ? "0.00" : refundableAmount;
+  })();
+
 export const getRemainingReturnableQty = (invoiceItem: SalesInvoiceItem) => {
   const remaining = subtractScaled(invoiceItem.quantity, invoiceItem.returnedQuantity, 3);
   return compareScaled(remaining, "0.000", 3) < 0 ? "0.000" : remaining;
@@ -570,6 +594,10 @@ export const createPaymentPayload = (values: SalesPaymentInput): SalesPaymentInp
 export const createReturnPayload = (values: SalesReturnInput): SalesReturnInput => ({
   ...values,
   warehouseId: values.warehouseId ?? null,
+  refundPaymentMode: values.refundAmountPaid > 0 ? values.refundPaymentMode : null,
+  refundBankAccountId: values.refundAmountPaid > 0 ? values.refundBankAccountId ?? null : null,
+  refundReferenceNumber: trimToNull(values.refundReferenceNumber),
+  refundNotes: trimToNull(values.refundNotes),
   reason: values.reason.trim(),
   notes: trimToNull(values.notes),
   items: values.items
@@ -579,6 +607,15 @@ export const createReturnPayload = (values: SalesReturnInput): SalesReturnInput 
       quantity: item.quantity,
       remarks: trimToNull(item.remarks),
     })),
+});
+
+export const createReturnRefundPayload = (values: SalesReturnRefundInput): SalesReturnRefundInput => ({
+  refundDate: values.refundDate,
+  amount: values.amount,
+  paymentMode: values.paymentMode,
+  bankAccountId: values.bankAccountId ?? null,
+  referenceNumber: trimToNull(values.referenceNumber),
+  notes: trimToNull(values.notes),
 });
 
 export const canEditSales = (invoice: Pick<SalesInvoice, "invoiceStatus">) => invoice.invoiceStatus === "draft";

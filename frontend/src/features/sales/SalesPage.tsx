@@ -43,8 +43,9 @@ import { SalesListTable } from "./components/SalesListTable";
 import { SalesPaymentDrawer } from "./components/SalesPaymentDrawer";
 import { SalesReturnDrawer } from "./components/SalesReturnDrawer";
 import { SalesReturnList } from "./components/SalesReturnList";
+import { SalesReturnRefundDrawer } from "./components/SalesReturnRefundDrawer";
 import { SendInvoiceModal } from "./components/SendInvoiceModal";
-import { createPaymentPayload, createReturnPayload, createSalesUpdatePayload } from "./salesUtils";
+import { createPaymentPayload, createReturnPayload, createReturnRefundPayload, createSalesUpdatePayload } from "./salesUtils";
 import type { LookupOption } from "./components/AsyncLookupSelect";
 
 export type SalesPageTab = "invoices" | "pos" | "returns";
@@ -163,10 +164,13 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   const [returnMode, setReturnMode] = useState<"create" | "view">("create");
   const [returnDrawerOpen, setReturnDrawerOpen] = useState(false);
   const [returnDetail, setReturnDetail] = useState<SalesReturn | null>(null);
+  const [refundDrawerOpen, setRefundDrawerOpen] = useState(false);
+  const [refundReturn, setRefundReturn] = useState<SalesReturn | null>(null);
   const [selectedReturnInvoice, setSelectedReturnInvoice] = useState<SalesInvoice | null>(null);
   const [returnInvoiceOptions, setReturnInvoiceOptions] = useState<LookupOption[]>([]);
   const [returnLookupValue, setReturnLookupValue] = useState<LookupOption | null>(null);
   const [loadingReturnInvoice, setLoadingReturnInvoice] = useState(false);
+  const [submittingReturnRefund, setSubmittingReturnRefund] = useState(false);
 
   const [sendMode, setSendMode] = useState<"email" | "whatsapp" | null>(null);
   const [sendInvoice, setSendInvoice] = useState<SalesInvoice | null>(null);
@@ -588,7 +592,12 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
               data={returnsData}
               loading={loadingReturns}
               canCreate={canReturn}
+              canManageRefund={canReturn}
               onCreate={() => void openReturnCreate()}
+              onRefund={(salesReturn) => {
+                setRefundReturn(salesReturn);
+                setRefundDrawerOpen(true);
+              }}
               onView={(salesReturn) => void loadReturnDetail(salesReturn.id)}
               onPageChange={(nextPage) => updateQuery({ page: String(nextPage) })}
             />
@@ -846,6 +855,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
         invoiceLookupValue={returnLookupValue}
         loadingInvoice={loadingReturnInvoice}
         warehouses={warehouses}
+        bankAccounts={bankAccounts}
         submitting={submittingReturn}
         onClose={() => {
           setReturnDrawerOpen(false);
@@ -866,8 +876,10 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
         onSubmit={async (values) => {
           try {
             setSubmittingReturn(true);
-            await salesApi.createReturn(createReturnPayload(values));
-            toast.success("Sales return created");
+            const response = await salesApi.createReturn(createReturnPayload(values));
+            toast.success(
+              `Sales return created. Adjusted ${response.data.salesReturn.adjustedAmount} and refundable ${response.data.salesReturn.remainingRefundAmount}.`,
+            );
             setReturnDrawerOpen(false);
             setReturnDetail(null);
             setSelectedReturnInvoice(null);
@@ -878,6 +890,39 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
             toast.error(getErrorMessage(error, "Failed to create sales return"));
           } finally {
             setSubmittingReturn(false);
+          }
+        }}
+      />
+
+      <SalesReturnRefundDrawer
+        open={refundDrawerOpen}
+        salesReturn={refundReturn}
+        bankAccounts={bankAccounts}
+        submitting={submittingReturnRefund}
+        onClose={() => {
+          setRefundDrawerOpen(false);
+          setRefundReturn(null);
+        }}
+        onSubmit={async (values) => {
+          if (!refundReturn) {
+            return;
+          }
+
+          try {
+            setSubmittingReturnRefund(true);
+            const response = await salesApi.recordReturnRefund(refundReturn.id, createReturnRefundPayload(values));
+            setRefundReturn(response.data.salesReturn);
+            setRefundDrawerOpen(false);
+            toast.success("Refund entry recorded");
+            await loadReturns();
+            await loadInvoices();
+            if (returnDetail?.id === refundReturn.id) {
+              setReturnDetail(response.data.salesReturn);
+            }
+          } catch (error) {
+            toast.error(getErrorMessage(error, "Failed to record refund entry"));
+          } finally {
+            setSubmittingReturnRefund(false);
           }
         }}
       />

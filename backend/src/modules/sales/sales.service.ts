@@ -39,6 +39,7 @@ import type {
   ListSalesPaymentsQuery,
   ListSalesReturnsQuery,
   RecordSalesPaymentInput,
+  RecordSalesReturnRefundInput,
   SendInvoiceEmailInput,
   SendInvoiceWhatsappInput,
   UpdateSalesInvoiceInput
@@ -169,6 +170,80 @@ class SalesService {
     }
 
     return scaledBigIntToDecimal(roundHalfUp(totalAmountScaled * partialQuantityScaled, totalQuantityScaled), 2);
+  }
+
+  private clampMoneyToZero(value: string) {
+    return compareDecimals(value, "0.00", 2) < 0 ? "0.00" : normalizeMoney(value);
+  }
+
+  private calculateAvailableRefundBalance(input: {
+    returnGrandTotal: string | number;
+    refundedAmount: string | number;
+    invoicePaidAmount: string | number;
+    invoiceRefundedAmount: string | number;
+  }) {
+    const pendingReturnAmount = this.clampMoneyToZero(
+      subtractDecimals(input.returnGrandTotal, input.refundedAmount, 2)
+    );
+    const remainingInvoiceRefundable = this.clampMoneyToZero(
+      subtractDecimals(input.invoicePaidAmount, input.invoiceRefundedAmount, 2)
+    );
+
+    return compareDecimals(pendingReturnAmount, remainingInvoiceRefundable, 2) <= 0
+      ? pendingReturnAmount
+      : remainingInvoiceRefundable;
+  }
+
+  private calculateReturnAdjustedAmount(input: {
+    invoiceGrandTotal: string | number;
+    invoicePaidAmount: string | number;
+    priorReturnGrandTotal: string | number;
+    returnGrandTotal: string | number;
+  }) {
+    const outstandingBeforeReturn = this.clampMoneyToZero(
+      subtractDecimals(
+        subtractDecimals(input.invoiceGrandTotal, input.priorReturnGrandTotal, 2),
+        input.invoicePaidAmount,
+        2
+      )
+    );
+    const normalizedReturnTotal = normalizeMoney(input.returnGrandTotal);
+
+    return compareDecimals(normalizedReturnTotal, outstandingBeforeReturn, 2) <= 0
+      ? normalizedReturnTotal
+      : outstandingBeforeReturn;
+  }
+
+  private calculateReturnRefundableAmount(input: {
+    returnGrandTotal: string | number;
+    adjustedAmount: string | number;
+  }) {
+    return this.clampMoneyToZero(subtractDecimals(input.returnGrandTotal, input.adjustedAmount, 2));
+  }
+
+  private buildReturnAdjustmentMap(rows: Awaited<ReturnType<typeof salesRepository.listReturnSettlementRows>>) {
+    const adjustments = new Map<string, string>();
+    let activeInvoiceId: string | null = null;
+    let priorReturnGrandTotal = "0.00";
+
+    for (const row of rows) {
+      if (row.salesInvoiceId !== activeInvoiceId) {
+        activeInvoiceId = row.salesInvoiceId;
+        priorReturnGrandTotal = "0.00";
+      }
+
+      const adjustedAmount = this.calculateReturnAdjustedAmount({
+        invoiceGrandTotal: row.invoiceGrandTotal,
+        invoicePaidAmount: row.invoicePaidAmount,
+        priorReturnGrandTotal,
+        returnGrandTotal: row.returnGrandTotal
+      });
+
+      adjustments.set(row.salesReturnId, adjustedAmount);
+      priorReturnGrandTotal = addDecimals(priorReturnGrandTotal, row.returnGrandTotal, 2);
+    }
+
+    return adjustments;
   }
 
   private buildAddressSnapshot(customer: CustomerRecord, type: "billing" | "shipping"): AddressSnapshot {
@@ -331,11 +406,74 @@ class SalesService {
     };
   }
 
+  private mapReturnRefundRow(row: typeof import("../../db/schema").salesReturnRefunds.$inferSelect) {
+    return {
+      id: row.id,
+      refundDate: row.refundDate,
+      amount: normalizeMoney(row.amount),
+      paymentMode: row.paymentMode,
+      bankAccountId: row.bankAccountId,
+      referenceNumber: row.referenceNumber,
+      notes: row.notes,
+      createdBy: row.createdBy,
+      createdAt: row.createdAt
+    };
+  }
+
   private mapReturnRow(
     row:
       | Awaited<ReturnType<typeof salesRepository.listReturns>>["rows"][number]
-      | NonNullable<Awaited<ReturnType<typeof salesRepository.findReturnDetail>>>
+      | NonNullable<Awaited<ReturnType<typeof salesRepository.findReturnDetail>>>,
+    extras?: {
+      items?: Array<{
+        id: string;
+        salesInvoiceItemId: string;
+        productId: string;
+        productName: string;
+        productCode: string;
+        quantity: string;
+        returnRate: string;
+        taxableAmount: string;
+        gstRate: string;
+        gstAmount: string;
+        lineTotal: string;
+      }>;
+      refunds?: Array<ReturnType<SalesService["mapReturnRefundRow"]>>;
+    },
+    adjustmentOverride?: string,
+    refundedAmountOverride?: string
   ) {
+    const refundedAmount = normalizeMoney(
+      refundedAmountOverride ?? ("refundedAmount" in row ? (row.refundedAmount as string) : "0.00")
+    );
+    const returnGrandTotal = normalizeMoney(row.salesReturn.grandTotal);
+    const adjustedAmount =
+      adjustmentOverride ??
+      this.calculateReturnAdjustedAmount({
+        invoiceGrandTotal: "invoice" in row ? row.invoice.grandTotal : returnGrandTotal,
+        invoicePaidAmount:
+          "invoice" in row
+            ? row.invoice.paidAmount
+            : "invoicePaidAmount" in row
+              ? row.invoicePaidAmount
+              : "0.00",
+        priorReturnGrandTotal: "0.00",
+        returnGrandTotal
+      });
+    const refundableAmount = this.calculateReturnRefundableAmount({
+      returnGrandTotal,
+      adjustedAmount
+    });
+    const remainingRefundAmount = this.clampMoneyToZero(subtractDecimals(refundableAmount, refundedAmount, 2));
+    const settlementStatus =
+      compareDecimals(refundableAmount, "0.00", 2) <= 0
+        ? "settled"
+        : compareDecimals(refundedAmount, "0.00", 2) <= 0
+          ? "pending"
+          : compareDecimals(remainingRefundAmount, "0.00", 2) <= 0
+            ? "settled"
+            : "partial";
+
     if ("invoiceNumber" in row) {
       return {
         id: row.salesReturn.id,
@@ -345,7 +483,11 @@ class SalesService {
         customerId: row.salesReturn.customerId,
         customerName: row.customerNameSnapshot ?? row.walkInName ?? null,
         returnDate: row.salesReturn.returnDate,
-        grandTotal: normalizeMoney(row.salesReturn.grandTotal),
+        grandTotal: returnGrandTotal,
+        adjustedAmount: normalizeMoney(adjustedAmount),
+        refundedAmount,
+        remainingRefundAmount,
+        settlementStatus,
         gstTotal: normalizeMoney(row.salesReturn.gstTotal),
         subtotal: normalizeMoney(row.salesReturn.subtotal),
         roundOffAmount: normalizeMoney(row.salesReturn.roundOffAmount),
@@ -357,7 +499,9 @@ class SalesService {
         reason: row.salesReturn.reason,
         notes: row.salesReturn.notes,
         createdAt: row.salesReturn.createdAt,
-        updatedAt: row.salesReturn.updatedAt
+        updatedAt: row.salesReturn.updatedAt,
+        ...(extras?.items ? { items: extras.items } : {}),
+        ...(extras?.refunds ? { refunds: extras.refunds } : {})
       };
     }
 
@@ -369,7 +513,11 @@ class SalesService {
       customerId: row.salesReturn.customerId,
       customerName: row.customer?.name ?? row.invoice.customerNameSnapshot ?? row.invoice.walkInName ?? null,
       returnDate: row.salesReturn.returnDate,
-      grandTotal: normalizeMoney(row.salesReturn.grandTotal),
+      grandTotal: returnGrandTotal,
+      adjustedAmount: normalizeMoney(adjustedAmount),
+      refundedAmount,
+      remainingRefundAmount,
+      settlementStatus,
       gstTotal: normalizeMoney(row.salesReturn.gstTotal),
       subtotal: normalizeMoney(row.salesReturn.subtotal),
       roundOffAmount: normalizeMoney(row.salesReturn.roundOffAmount),
@@ -381,7 +529,9 @@ class SalesService {
       reason: row.salesReturn.reason,
       notes: row.salesReturn.notes,
       createdAt: row.salesReturn.createdAt,
-      updatedAt: row.salesReturn.updatedAt
+      updatedAt: row.salesReturn.updatedAt,
+      ...(extras?.items ? { items: extras.items } : {}),
+      ...(extras?.refunds ? { refunds: extras.refunds } : {})
     };
   }
 
@@ -836,6 +986,16 @@ class SalesService {
         salesInvoiceId: invoiceId
       })
     ]);
+    const adjustmentMap = this.buildReturnAdjustmentMap(
+      await salesRepository.listReturnSettlementRows(companyId, [invoiceId])
+    );
+    const returnRefundTotalsEntries = await Promise.all(
+      returns.rows.map(async (row) => [
+        row.salesReturn.id,
+        await salesRepository.getReturnRefundTotals(companyId, row.salesReturn.id)
+      ] as const)
+    );
+    const returnRefundTotalsMap = new Map(returnRefundTotalsEntries);
 
     return this.mapInvoiceRow(detail, {
       items: items.map((row) => this.mapInvoiceItemRow(row)),
@@ -850,7 +1010,14 @@ class SalesService {
         createdBy: row.createdBy,
         createdAt: row.createdAt
       })),
-      returns: returns.rows.map((row) => this.mapReturnRow(row))
+      returns: returns.rows.map((row) =>
+        this.mapReturnRow(
+          row,
+          undefined,
+          adjustmentMap.get(row.salesReturn.id),
+          returnRefundTotalsMap.get(row.salesReturn.id)?.refundedAmount ?? "0.00"
+        )
+      )
     });
   }
 
@@ -1685,10 +1852,36 @@ class SalesService {
       dateTo: query.dateTo ?? null
     });
 
+    const adjustmentMap = this.buildReturnAdjustmentMap(
+      await salesRepository.listReturnSettlementRows(
+        actor.companyId,
+        Array.from(new Set(result.rows.map((row) => row.salesReturn.salesInvoiceId)))
+      )
+    );
+    const refundTotalsEntries = await Promise.all(
+      result.rows.map(async (row) => [
+        row.salesReturn.id,
+        await salesRepository.getReturnRefundTotals(actor.companyId, row.salesReturn.id)
+      ] as const)
+    );
+    const refundTotalsMap = new Map(refundTotalsEntries);
+    const totalRefundedAmount = refundTotalsEntries.reduce(
+      (sum, [, totals]) => addDecimals(sum, totals.refundedAmount, 2),
+      "0.00"
+    );
+
     return {
-      items: result.rows.map((row) => this.mapReturnRow(row)),
+      items: result.rows.map((row) =>
+        this.mapReturnRow(
+          row,
+          undefined,
+          adjustmentMap.get(row.salesReturn.id),
+          refundTotalsMap.get(row.salesReturn.id)?.refundedAmount ?? "0.00"
+        )
+      ),
       summary: {
-        grandTotal: normalizeMoney(result.summary.grandTotal)
+        grandTotal: normalizeMoney(result.summary.grandTotal),
+        refundedAmount: normalizeMoney(totalRefundedAmount)
       },
       pagination: {
         page: pagination.page,
@@ -1705,25 +1898,115 @@ class SalesService {
       throw new AppError("Sales return not found", 404);
     }
 
-    const items = await salesRepository.listReturnItems(actor.companyId, returnId);
+    const [items, refunds, adjustmentMap] = await Promise.all([
+      salesRepository.listReturnItems(actor.companyId, returnId),
+      salesRepository.listReturnRefunds(actor.companyId, returnId),
+      salesRepository.listReturnSettlementRows(actor.companyId, [detail.salesReturn.salesInvoiceId])
+    ]);
     return {
-      salesReturn: {
-        ...this.mapReturnRow(detail),
-        items: items.map((row) => ({
-          id: row.item.id,
-          salesInvoiceItemId: row.item.salesInvoiceItemId,
-          productId: row.item.productId,
-          productName: row.product.name,
-          productCode: row.product.productCode,
-          quantity: normalizeQuantity(row.item.quantity),
-          returnRate: normalizeMoney(row.item.returnRate),
-          taxableAmount: normalizeMoney(row.item.taxableAmount),
-          gstRate: normalizeMoney(row.item.gstRate),
-          gstAmount: normalizeMoney(row.item.gstAmount),
-          lineTotal: normalizeMoney(row.item.lineTotal)
-        }))
-      }
+      salesReturn: this.mapReturnRow(
+        detail,
+        {
+          items: items.map((row) => ({
+            id: row.item.id,
+            salesInvoiceItemId: row.item.salesInvoiceItemId,
+            productId: row.item.productId,
+            productName: row.product.name,
+            productCode: row.product.productCode,
+            quantity: normalizeQuantity(row.item.quantity),
+            returnRate: normalizeMoney(row.item.returnRate),
+            taxableAmount: normalizeMoney(row.item.taxableAmount),
+            gstRate: normalizeMoney(row.item.gstRate),
+            gstAmount: normalizeMoney(row.item.gstAmount),
+            lineTotal: normalizeMoney(row.item.lineTotal)
+          })),
+          refunds: refunds.map((row) => this.mapReturnRefundRow(row))
+        },
+        this.buildReturnAdjustmentMap(adjustmentMap).get(detail.salesReturn.id)
+      )
     };
+  }
+
+  public async recordReturnRefund(
+    actor: SalesActor,
+    salesReturnId: string,
+    input: RecordSalesReturnRefundInput,
+    context: SalesRequestContext
+  ) {
+    const mutation = await db.transaction(async (transaction) => {
+      const salesReturn = await salesRepository.findReturnDetail(actor.companyId, salesReturnId);
+      if (!salesReturn) {
+        throw new AppError("Sales return not found", 404);
+      }
+
+      const settlementRows = await salesRepository.listReturnSettlementRows(
+        actor.companyId,
+        [salesReturn.salesReturn.salesInvoiceId],
+        transaction
+      );
+      const adjustmentMap = this.buildReturnAdjustmentMap(settlementRows);
+      const refundTotals = await salesRepository.getReturnRefundTotals(actor.companyId, salesReturnId, transaction);
+      const invoiceRefundTotals = await salesRepository.getInvoiceReturnRefundTotals(
+        actor.companyId,
+        salesReturn.salesReturn.salesInvoiceId,
+        transaction
+      );
+      const allowedRefundAmount = this.calculateAvailableRefundBalance({
+        returnGrandTotal: this.calculateReturnRefundableAmount({
+          returnGrandTotal: salesReturn.salesReturn.grandTotal,
+          adjustedAmount: adjustmentMap.get(salesReturn.salesReturn.id) ?? "0.00"
+        }),
+        refundedAmount: refundTotals.refundedAmount,
+        invoicePaidAmount: salesReturn.invoice.paidAmount,
+        invoiceRefundedAmount: invoiceRefundTotals.refundedAmount
+      });
+
+      if (compareDecimals(normalizeMoney(input.amount), allowedRefundAmount, 2) > 0) {
+        throw new AppError("Refund amount cannot exceed pending customer refund balance", 400);
+      }
+
+      if (input.bankAccountId) {
+        await this.getBankAccountOrThrow(actor.companyId, input.bankAccountId);
+      }
+
+      const refund = await salesRepository.createReturnRefund(
+        {
+          companyId: actor.companyId,
+          salesReturnId: salesReturn.salesReturn.id,
+          customerId: salesReturn.salesReturn.customerId,
+          refundDate: input.refundDate,
+          amount: normalizeMoney(input.amount),
+          paymentMode: input.paymentMode,
+          bankAccountId: input.bankAccountId ?? null,
+          referenceNumber: input.referenceNumber ?? null,
+          notes: input.notes ?? null,
+          createdBy: actor.id
+        },
+        transaction
+      );
+
+      if (!refund) {
+        throw new AppError("Failed to record sales return refund", 500);
+      }
+
+      return { refund };
+    });
+
+    await auditLogService.log({
+      companyId: actor.companyId,
+      userId: actor.id,
+      action: "sales_return_refund_recorded",
+      entityType: "sales_return_refund",
+      entityId: mutation.refund.id,
+      metadata: {
+        salesReturnId,
+        amount: normalizeMoney(mutation.refund.amount)
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return this.getReturn(actor, salesReturnId);
   }
 
   public async createReturn(actor: SalesActor, input: CreateSalesReturnInput, context: SalesRequestContext) {
@@ -1782,6 +2065,9 @@ class SalesService {
       }
 
       await this.getWarehouseOrThrow(actor.companyId, input.warehouseId ?? invoice.warehouseId);
+      if (input.refundBankAccountId) {
+        await this.getBankAccountOrThrow(actor.companyId, input.refundBankAccountId);
+      }
       const settings = await this.getInvoiceSettings(actor.companyId);
       const totals = calculateReturnTotals({
         items: returnLines.map((line) => ({
@@ -1791,6 +2077,28 @@ class SalesService {
         })),
         roundOffEnabled: settings?.roundOffEnabled ?? true
       });
+      const existingReturnTotals = await salesRepository.getReturnTotals(actor.companyId, invoice.id, transaction);
+      const invoiceRefundTotals = await salesRepository.getInvoiceReturnRefundTotals(actor.companyId, invoice.id, transaction);
+      const adjustedAmount = this.calculateReturnAdjustedAmount({
+        invoiceGrandTotal: invoice.grandTotal,
+        invoicePaidAmount: invoice.paidAmount,
+        priorReturnGrandTotal: existingReturnTotals.grandTotal,
+        returnGrandTotal: totals.grandTotal
+      });
+      const refundableAmount = this.calculateReturnRefundableAmount({
+        returnGrandTotal: totals.grandTotal,
+        adjustedAmount
+      });
+      const allowedRefundAmount = this.calculateAvailableRefundBalance({
+        returnGrandTotal: refundableAmount,
+        refundedAmount: "0.00",
+        invoicePaidAmount: invoice.paidAmount,
+        invoiceRefundedAmount: invoiceRefundTotals.refundedAmount
+      });
+
+      if (compareDecimals(normalizeMoney(input.refundAmountPaid), allowedRefundAmount, 2) > 0) {
+        throw new AppError("Refund amount cannot exceed pending customer refund balance", 400);
+      }
 
       const returnNumber = await this.getNextReturnNumber(actor.companyId, transaction);
       const salesReturn = await salesRepository.createReturn(
@@ -1874,9 +2182,31 @@ class SalesService {
         transaction
       );
 
+      if (compareDecimals(normalizeMoney(input.refundAmountPaid), "0.00", 2) > 0) {
+        const refund = await salesRepository.createReturnRefund(
+          {
+            companyId: actor.companyId,
+            salesReturnId: salesReturn.id,
+            customerId: salesReturn.customerId,
+            refundDate: input.returnDate,
+            amount: normalizeMoney(input.refundAmountPaid),
+            paymentMode: input.refundPaymentMode!,
+            bankAccountId: input.refundBankAccountId ?? null,
+            referenceNumber: input.refundReferenceNumber ?? null,
+            notes: input.refundNotes ?? null,
+            createdBy: actor.id
+          },
+          transaction
+        );
+
+        if (!refund) {
+          throw new AppError("Failed to record sales return refund", 500);
+        }
+      }
+
       const totalReturned = addDecimals(
-        (await salesRepository.getReturnTotals(actor.companyId, invoice.id, transaction)).grandTotal,
-        "0.00",
+        existingReturnTotals.grandTotal,
+        totals.grandTotal,
         2
       );
       const effectiveGrandTotal = subtractDecimals(invoice.grandTotal, totalReturned, 2);

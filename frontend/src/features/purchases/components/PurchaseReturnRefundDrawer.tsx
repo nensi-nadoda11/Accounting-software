@@ -104,7 +104,18 @@ export const PurchaseReturnRefundDrawer = ({
             <CardHeader title="Add Refund Entry" />
             <CardContent className="grid gap-4 md:grid-cols-2">
               <Input type="date" label="Refund Date" {...form.register("refundDate")} error={form.formState.errors.refundDate?.message} />
-              <Input type="number" min="0" step="0.01" label="Amount" {...form.register("amount")} error={form.formState.errors.amount?.message} />
+              <div className="space-y-1">
+                <Input
+                  type="number"
+                  min="0"
+                  max={purchaseReturn.remainingRefundAmount}
+                  step="0.01"
+                  label="Amount"
+                  {...form.register("amount")}
+                  error={form.formState.errors.amount?.message}
+                />
+                <p className="text-xs text-slate-500">Max refundable now: {purchaseReturn.remainingRefundAmount}</p>
+              </div>
               <Select label="Refund Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
                 {PURCHASE_PAYMENT_MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>

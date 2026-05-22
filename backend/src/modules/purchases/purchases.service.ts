@@ -149,6 +149,28 @@ class PurchasesService {
     return scaledBigIntToDecimal(roundHalfUp(totalAmountScaled * partialQuantityScaled, totalQuantityScaled), 2);
   }
 
+  private clampMoneyToZero(value: string) {
+    return compareDecimals(value, "0.00", 2) < 0 ? "0.00" : normalizeMoney(value);
+  }
+
+  private calculateAvailableRefundBalance(input: {
+    returnGrandTotal: string | number;
+    refundedAmount: string | number;
+    invoicePaidAmount: string | number;
+    invoiceRefundedAmount: string | number;
+  }) {
+    const pendingReturnAmount = this.clampMoneyToZero(
+      subtractDecimals(input.returnGrandTotal, input.refundedAmount, 2)
+    );
+    const remainingInvoiceRefundable = this.clampMoneyToZero(
+      subtractDecimals(input.invoicePaidAmount, input.invoiceRefundedAmount, 2)
+    );
+
+    return compareDecimals(pendingReturnAmount, remainingInvoiceRefundable, 2) <= 0
+      ? pendingReturnAmount
+      : remainingInvoiceRefundable;
+  }
+
   private mapInvoiceRow(
     row: NonNullable<Awaited<ReturnType<typeof purchasesRepository.findPurchaseDetail>>>,
     extras?: {
@@ -318,11 +340,18 @@ class PurchasesService {
     }
   ) {
     const refundedAmount = "refundedAmount" in row ? row.refundedAmount : "0.00";
-    const remainingAmount = subtractDecimals(
-      normalizeMoney("purchaseReturn" in row ? row.purchaseReturn.grandTotal : 0),
+    const returnGrandTotal = normalizeMoney("purchaseReturn" in row ? row.purchaseReturn.grandTotal : 0);
+    const invoicePaidAmount =
+      "invoice" in row
+        ? normalizeMoney(row.invoice.paidAmount)
+        : normalizeMoney("invoicePaidAmount" in row ? row.invoicePaidAmount : 0);
+    const invoiceRefundedAmount = normalizeMoney("invoiceRefundedAmount" in row ? row.invoiceRefundedAmount : refundedAmount);
+    const remainingAmount = this.calculateAvailableRefundBalance({
+      returnGrandTotal,
       refundedAmount,
-      2
-    );
+      invoicePaidAmount,
+      invoiceRefundedAmount
+    });
     const settlementStatus =
       compareDecimals(refundedAmount, "0.00", 2) <= 0
         ? "pending"
@@ -340,9 +369,9 @@ class PurchasesService {
         supplierName: row.supplierName,
         supplierCode: row.supplierCode,
         returnDate: row.purchaseReturn.returnDate,
-        grandTotal: normalizeMoney(row.purchaseReturn.grandTotal),
+        grandTotal: returnGrandTotal,
         refundedAmount: normalizeMoney(refundedAmount),
-        remainingRefundAmount: compareDecimals(remainingAmount, "0.00", 2) < 0 ? "0.00" : normalizeMoney(remainingAmount),
+        remainingRefundAmount: remainingAmount,
         settlementStatus,
         gstTotal: normalizeMoney(row.purchaseReturn.gstTotal),
         subtotal: normalizeMoney(row.purchaseReturn.subtotal),
@@ -371,9 +400,9 @@ class PurchasesService {
       supplierName: row.supplier.name,
       supplierCode: row.supplier.supplierCode,
       returnDate: row.purchaseReturn.returnDate,
-      grandTotal: normalizeMoney(row.purchaseReturn.grandTotal),
+      grandTotal: returnGrandTotal,
       refundedAmount: normalizeMoney(refundedAmount),
-      remainingRefundAmount: compareDecimals(remainingAmount, "0.00", 2) < 0 ? "0.00" : normalizeMoney(remainingAmount),
+      remainingRefundAmount: remainingAmount,
       settlementStatus,
       gstTotal: normalizeMoney(row.purchaseReturn.gstTotal),
       subtotal: normalizeMoney(row.purchaseReturn.subtotal),
@@ -1577,8 +1606,19 @@ class PurchasesService {
         throw new AppError("Purchase return not found", 404);
       }
 
+      const invoice = await this.getPurchaseOrThrow(actor.companyId, purchaseReturn.purchaseInvoiceId, transaction);
       const refundTotals = await purchasesRepository.getPurchaseReturnRefundTotals(actor.companyId, purchaseReturnId, transaction);
-      const remainingAmount = subtractDecimals(purchaseReturn.grandTotal, refundTotals.refundedAmount, 2);
+      const invoiceRefundTotals = await purchasesRepository.getInvoiceReturnRefundTotals(
+        actor.companyId,
+        purchaseReturn.purchaseInvoiceId,
+        transaction
+      );
+      const remainingAmount = this.calculateAvailableRefundBalance({
+        returnGrandTotal: purchaseReturn.grandTotal,
+        refundedAmount: refundTotals.refundedAmount,
+        invoicePaidAmount: invoice.paidAmount,
+        invoiceRefundedAmount: invoiceRefundTotals.refundedAmount
+      });
       if (compareDecimals(normalizeMoney(input.amount), remainingAmount, 2) > 0) {
         throw new AppError("Refund amount cannot exceed pending refund balance", 400);
       }
@@ -1760,8 +1800,19 @@ class PurchasesService {
       }
 
       const initialRefundAmount = normalizeMoney(input.refundAmountReceived ?? 0);
-      if (compareDecimals(initialRefundAmount, grandTotal, 2) > 0) {
-        throw new AppError("Refund amount cannot exceed purchase return total", 400);
+      const invoiceRefundTotals = await purchasesRepository.getInvoiceReturnRefundTotals(
+        actor.companyId,
+        invoice.id,
+        transaction
+      );
+      const availableInitialRefundAmount = this.calculateAvailableRefundBalance({
+        returnGrandTotal: grandTotal,
+        refundedAmount: "0.00",
+        invoicePaidAmount: invoice.paidAmount,
+        invoiceRefundedAmount: invoiceRefundTotals.refundedAmount
+      });
+      if (compareDecimals(initialRefundAmount, availableInitialRefundAmount, 2) > 0) {
+        throw new AppError("Refund amount cannot exceed paid amount available for this purchase return", 400);
       }
 
       if (input.refundBankAccountId) {
@@ -2117,9 +2168,13 @@ class PurchasesService {
         returnDate: formatDateValue(row.purchaseReturn.returnDate),
         grandTotal: Number(normalizeMoney(row.purchaseReturn.grandTotal)),
         refundedAmount: Number(normalizeMoney(row.refundedAmount)),
-        remainingRefundAmount: Math.max(
-          Number(subtractDecimals(row.purchaseReturn.grandTotal, row.refundedAmount, 2)),
-          0
+        remainingRefundAmount: Number(
+          this.calculateAvailableRefundBalance({
+            returnGrandTotal: row.purchaseReturn.grandTotal,
+            refundedAmount: row.refundedAmount,
+            invoicePaidAmount: row.invoicePaidAmount,
+            invoiceRefundedAmount: row.invoiceRefundedAmount
+          })
         )
       }))
     };

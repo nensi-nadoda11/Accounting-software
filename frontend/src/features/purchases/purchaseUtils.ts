@@ -419,6 +419,23 @@ export const calculateReturnPreview = (invoice: PurchaseInvoice, items: ReturnPr
   return { subtotal, gstTotal, grandTotal };
 };
 
+export const calculateAvailablePurchaseReturnRefund = (
+  invoice: Pick<PurchaseInvoice, "paidAmount" | "returns">,
+  returnGrandTotal: string | number,
+) => {
+  const alreadyRefunded = (invoice.returns ?? []).reduce(
+    (sum, entry) => addScaled(sum, entry.refundedAmount, 2),
+    "0.00",
+  );
+  const remainingPaidAmount = subtractScaled(invoice.paidAmount, alreadyRefunded, 2);
+  const normalizedRemainingPaidAmount = compareScaled(remainingPaidAmount, "0.00", 2) < 0 ? "0.00" : remainingPaidAmount;
+  const normalizedReturnTotal = normalizeMoney(returnGrandTotal);
+
+  return compareScaled(normalizedReturnTotal, normalizedRemainingPaidAmount, 2) <= 0
+    ? normalizedReturnTotal
+    : normalizedRemainingPaidAmount;
+};
+
 export const getRemainingReturnableQty = (invoiceItem: PurchaseInvoiceItem, returnedItems: PurchaseInvoice["returns"] = []) => {
   const alreadyReturned = returnedItems.reduce((sum, entry) => {
     const match = entry.items?.find((item) => item.purchaseInvoiceItemId === invoiceItem.id);

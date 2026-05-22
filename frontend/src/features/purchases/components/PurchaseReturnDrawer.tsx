@@ -16,7 +16,7 @@ import type { Warehouse } from "../../../types/inventory";
 import type { PurchaseInvoice, PurchaseReturn, PurchaseReturnInput } from "../../../types/purchase";
 import { PURCHASE_PAYMENT_MODE_OPTIONS } from "../purchaseOptions";
 import { purchaseReturnSchema, type PurchaseReturnValues } from "../purchaseSchemas";
-import { calculateReturnPreview, getRemainingReturnableQty, isBankPaymentMode } from "../purchaseUtils";
+import { calculateAvailablePurchaseReturnRefund, calculateReturnPreview, getRemainingReturnableQty, isBankPaymentMode } from "../purchaseUtils";
 import { AsyncLookupSelect, type LookupOption } from "./AsyncLookupSelect";
 import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
@@ -106,6 +106,9 @@ export const PurchaseReturnDrawer = ({
           })),
         )
       : null;
+  const maxRefundAmount = selectedInvoice && preview
+    ? calculateAvailablePurchaseReturnRefund(selectedInvoice, preview.grandTotal)
+    : "0.00";
 
   return (
     <SideSheet
@@ -294,7 +297,18 @@ export const PurchaseReturnDrawer = ({
               <Card>
                 <CardHeader title="Refund Received From Supplier" />
                 <CardContent className="grid gap-4 md:grid-cols-2">
-                  <Input type="number" min="0" step="0.01" label="Amount Received" {...form.register("refundAmountReceived")} error={form.formState.errors.refundAmountReceived?.message} />
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      min="0"
+                      max={maxRefundAmount}
+                      step="0.01"
+                      label="Amount Received"
+                      {...form.register("refundAmountReceived")}
+                      error={form.formState.errors.refundAmountReceived?.message}
+                    />
+                    <p className="text-xs text-slate-500">Max refundable now: {maxRefundAmount}</p>
+                  </div>
                   <Select label="Refund Mode" {...form.register("refundPaymentMode")} error={form.formState.errors.refundPaymentMode?.message}>
                     <option value="">Select Refund Mode</option>
                     {PURCHASE_PAYMENT_MODE_OPTIONS.map((option) => (

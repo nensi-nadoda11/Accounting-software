@@ -451,6 +451,28 @@ class PurchasesRepository {
     };
   }
 
+  public async getInvoiceReturnRefundTotals(companyId: string, purchaseInvoiceId: string, executor?: DbExecutor) {
+    const [row] = await this
+      .getExecutor(executor)
+      .select({
+        refundedAmount: sql<string>`coalesce(sum(${purchaseReturnRefunds.amount}), 0)`,
+        refundCount: count()
+      })
+      .from(purchaseReturnRefunds)
+      .innerJoin(purchaseReturns, eq(purchaseReturnRefunds.purchaseReturnId, purchaseReturns.id))
+      .where(
+        and(
+          eq(purchaseReturnRefunds.companyId, companyId),
+          eq(purchaseReturns.purchaseInvoiceId, purchaseInvoiceId)
+        )
+      );
+
+    return {
+      refundedAmount: row?.refundedAmount ?? "0.00",
+      refundCount: row?.refundCount ?? 0
+    };
+  }
+
   public async getInvoiceReturnTotals(companyId: string, purchaseInvoiceId: string, executor?: DbExecutor) {
     const [row] = await this
       .getExecutor(executor)
@@ -521,6 +543,14 @@ class PurchasesRepository {
           select sum(${purchaseReturnRefunds.amount})
           from ${purchaseReturnRefunds}
           where ${purchaseReturnRefunds.purchaseReturnId} = ${purchaseReturns.id}
+        ), 0)`,
+        invoiceRefundedAmount: sql<string>`coalesce((
+          select sum(${purchaseReturnRefunds.amount})
+          from ${purchaseReturnRefunds}
+          inner join ${purchaseReturns} as invoice_returns
+            on invoice_returns.id = ${purchaseReturnRefunds.purchaseReturnId}
+          where invoice_returns.purchase_invoice_id = ${purchaseReturns.purchaseInvoiceId}
+            and invoice_returns.company_id = ${purchaseReturns.companyId}
         ), 0)`
       })
       .from(purchaseReturns)
@@ -605,6 +635,7 @@ class PurchasesRepository {
     const rows = await db
       .select({
         purchaseReturn: purchaseReturns,
+        invoicePaidAmount: purchaseInvoices.paidAmount,
         supplierName: suppliers.name,
         supplierCode: suppliers.supplierCode,
         purchaseNumber: purchaseInvoices.purchaseNumber,
@@ -614,6 +645,14 @@ class PurchasesRepository {
           select sum(${purchaseReturnRefunds.amount})
           from ${purchaseReturnRefunds}
           where ${purchaseReturnRefunds.purchaseReturnId} = ${purchaseReturns.id}
+        ), 0)`,
+        invoiceRefundedAmount: sql<string>`coalesce((
+          select sum(${purchaseReturnRefunds.amount})
+          from ${purchaseReturnRefunds}
+          inner join ${purchaseReturns} as invoice_returns
+            on invoice_returns.id = ${purchaseReturnRefunds.purchaseReturnId}
+          where invoice_returns.purchase_invoice_id = ${purchaseReturns.purchaseInvoiceId}
+            and invoice_returns.company_id = ${purchaseReturns.companyId}
         ), 0)`
       })
       .from(purchaseReturns)
@@ -663,6 +702,7 @@ class PurchasesRepository {
     return db
       .select({
         purchaseReturn: purchaseReturns,
+        invoicePaidAmount: purchaseInvoices.paidAmount,
         supplierName: suppliers.name,
         supplierCode: suppliers.supplierCode,
         purchaseNumber: purchaseInvoices.purchaseNumber,
@@ -672,6 +712,14 @@ class PurchasesRepository {
           select sum(${purchaseReturnRefunds.amount})
           from ${purchaseReturnRefunds}
           where ${purchaseReturnRefunds.purchaseReturnId} = ${purchaseReturns.id}
+        ), 0)`,
+        invoiceRefundedAmount: sql<string>`coalesce((
+          select sum(${purchaseReturnRefunds.amount})
+          from ${purchaseReturnRefunds}
+          inner join ${purchaseReturns} as invoice_returns
+            on invoice_returns.id = ${purchaseReturnRefunds.purchaseReturnId}
+          where invoice_returns.purchase_invoice_id = ${purchaseReturns.purchaseInvoiceId}
+            and invoice_returns.company_id = ${purchaseReturns.companyId}
         ), 0)`
       })
       .from(purchaseReturns)

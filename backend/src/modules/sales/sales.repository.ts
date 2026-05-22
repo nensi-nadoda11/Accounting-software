@@ -60,8 +60,34 @@ type SalesReturnListFilters = {
 };
 
 class SalesRepository {
+  private salesReturnRefundTableAvailable: boolean | null = null;
+  private salesReturnRefundTableCheckPromise: Promise<boolean> | null = null;
+
   private getExecutor(executor?: DbExecutor) {
     return executor ?? db;
+  }
+
+  private async hasSalesReturnRefundTable() {
+    if (this.salesReturnRefundTableAvailable !== null) {
+      return this.salesReturnRefundTableAvailable;
+    }
+
+    if (!this.salesReturnRefundTableCheckPromise) {
+      this.salesReturnRefundTableCheckPromise = (async () => {
+        const result = await db.execute(sql`select to_regclass('public.sales_return_refunds') as table_name`);
+        const rows = Array.isArray(result) ? result : "rows" in result ? result.rows : [];
+        const firstRow = rows[0] as { table_name?: string | null } | undefined;
+        const available = Boolean(firstRow?.table_name);
+        this.salesReturnRefundTableAvailable = available;
+        this.salesReturnRefundTableCheckPromise = null;
+        return available;
+      })().catch((error) => {
+        this.salesReturnRefundTableCheckPromise = null;
+        throw error;
+      });
+    }
+
+    return this.salesReturnRefundTableCheckPromise;
   }
 
   private isMissingReturnRefundTableError(error: unknown) {
@@ -429,6 +455,10 @@ class SalesRepository {
   }
 
   public async createReturnRefund(data: typeof salesReturnRefunds.$inferInsert, executor?: DbExecutor) {
+    if (!(await this.hasSalesReturnRefundTable())) {
+      return null;
+    }
+
     try {
       const [row] = await this.getExecutor(executor).insert(salesReturnRefunds).values(data).returning();
       return row ?? null;
@@ -442,6 +472,10 @@ class SalesRepository {
   }
 
   public async listReturnRefunds(companyId: string, returnId: string, executor?: DbExecutor) {
+    if (!(await this.hasSalesReturnRefundTable())) {
+      return [];
+    }
+
     try {
       return await this
         .getExecutor(executor)
@@ -459,6 +493,13 @@ class SalesRepository {
   }
 
   public async getReturnRefundTotals(companyId: string, returnId: string, executor?: DbExecutor) {
+    if (!(await this.hasSalesReturnRefundTable())) {
+      return {
+        refundedAmount: "0.00",
+        refundCount: 0
+      };
+    }
+
     try {
       const [row] = await this
         .getExecutor(executor)
@@ -486,6 +527,13 @@ class SalesRepository {
   }
 
   public async getInvoiceReturnRefundTotals(companyId: string, invoiceId: string, executor?: DbExecutor) {
+    if (!(await this.hasSalesReturnRefundTable())) {
+      return {
+        refundedAmount: "0.00",
+        refundCount: 0
+      };
+    }
+
     try {
       const [row] = await this
         .getExecutor(executor)
@@ -511,6 +559,10 @@ class SalesRepository {
 
       throw error;
     }
+  }
+
+  public async hasReturnRefundFeature() {
+    return this.hasSalesReturnRefundTable();
   }
 
   public async getReturnedQuantityByInvoiceItem(companyId: string, invoiceItemId: string, executor?: DbExecutor) {

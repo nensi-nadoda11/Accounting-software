@@ -1933,6 +1933,13 @@ class SalesService {
     input: RecordSalesReturnRefundInput,
     context: SalesRequestContext
   ) {
+    if (!(await salesRepository.hasReturnRefundFeature())) {
+      throw new AppError(
+        "Sales return refund setup is pending. Run database migration 0020_sales_return_refunds.sql first.",
+        503
+      );
+    }
+
     const mutation = await db.transaction(async (transaction) => {
       const salesReturn = await salesRepository.findReturnDetail(actor.companyId, salesReturnId);
       if (!salesReturn) {
@@ -2098,6 +2105,16 @@ class SalesService {
 
       if (compareDecimals(normalizeMoney(input.refundAmountPaid), allowedRefundAmount, 2) > 0) {
         throw new AppError("Refund amount cannot exceed pending customer refund balance", 400);
+      }
+
+      if (
+        compareDecimals(normalizeMoney(input.refundAmountPaid), "0.00", 2) > 0 &&
+        !(await salesRepository.hasReturnRefundFeature())
+      ) {
+        throw new AppError(
+          "Sales return refund setup is pending. Run database migration 0020_sales_return_refunds.sql first.",
+          503
+        );
       }
 
       const returnNumber = await this.getNextReturnNumber(actor.companyId, transaction);

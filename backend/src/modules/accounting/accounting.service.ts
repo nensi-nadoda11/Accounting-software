@@ -1,6 +1,7 @@
 import { auditLogService } from "../audit-logs/audit-log.service";
 import { companyRepository } from "../company/company.repository";
 import { customersRepository } from "../customers/customers.repository";
+import { logger } from "../../config/logger";
 import { db } from "../../db";
 import { buildCsvBuffer, compareDecimals, decimalToScaledBigInt, scaledBigIntToDecimal } from "../inventory/inventory.utils";
 import { suppliersRepository } from "../suppliers/suppliers.repository";
@@ -19,7 +20,7 @@ import {
   sumCredits,
   sumDebits
 } from "./accounting.calculation";
-import { DEFAULT_SYSTEM_ACCOUNTS } from "./accounting.default-accounts";
+import { DEFAULT_SYSTEM_ACCOUNTS, type DefaultAccountSeed } from "./accounting.default-accounts";
 import { accountingRepository } from "./accounting.repository";
 import type {
   AccountingActor,
@@ -112,6 +113,14 @@ const subtractMoney = (left: string, right: string) =>
   scaledBigIntToDecimal(decimalToScaledBigInt(left, 2) - decimalToScaledBigInt(right, 2), 2);
 
 class AccountingService {
+  private async logAuditSafely(action: string, task: () => Promise<void>) {
+    try {
+      await task();
+    } catch (error) {
+      logger.error(`Accounting audit log failed for ${action}`, error);
+    }
+  }
+
   private toDate(value: Date | string | null | undefined, fieldName: string): Date {
     if (value instanceof Date) {
       return value;
@@ -623,10 +632,7 @@ class AccountingService {
     }
 
     const offsetKey: SystemAccountKey = targetAccount.systemKey === "retained_earnings" ? "capital" : "retained_earnings";
-    const offsetAccount = await accountingRepository.findAccountBySystemKey(actor.companyId, offsetKey, executor);
-    if (!offsetAccount) {
-      throw new AppError("Default equity account required for opening balances was not found", 409);
-    }
+    const offsetAccount = await this.getSystemAccount(actor.companyId, offsetKey, executor);
 
     const lines: JournalLineInput[] =
       compareDecimals(openingBalance.debit, "0.00", 2) > 0
@@ -1447,41 +1453,101 @@ class AccountingService {
     return account;
   }
 
+  private async ensureSystemAccountFromSeed(
+    companyId: string,
+    seed: DefaultAccountSeed,
+    transaction: TransactionClient,
+    actorId: string | null
+  ) {
+    const existingBySystemKey = await accountingRepository.findAccountBySystemKey(companyId, seed.systemKey, transaction);
+    if (existingBySystemKey) {
+      if (existingBySystemKey.status === "active" && existingBySystemKey.isSystem) {
+        return { account: existingBySystemKey, action: "existing" as const };
+      }
+
+      const repaired = await accountingRepository.updateAccount(
+        companyId,
+        existingBySystemKey.id,
+        {
+          isSystem: true,
+          status: "active",
+          updatedBy: actorId
+        },
+        transaction
+      );
+
+      if (!repaired) {
+        throw new AppError(`Failed to repair system account ${seed.systemKey}`, 500);
+      }
+
+      return { account: repaired, action: "repaired" as const };
+    }
+
+    const existingByCode = await accountingRepository.findAccountByCode(companyId, seed.accountCode, transaction);
+    if (existingByCode) {
+      if (existingByCode.systemKey && existingByCode.systemKey !== seed.systemKey) {
+        throw new AppError(`Account code ${seed.accountCode} is already assigned to another system account`, 409);
+      }
+
+      const repaired = await accountingRepository.updateAccount(
+        companyId,
+        existingByCode.id,
+        {
+          accountName: seed.accountName,
+          accountType: seed.accountType,
+          accountSubtype: seed.accountSubtype,
+          isSystem: true,
+          systemKey: seed.systemKey,
+          normalBalance: seed.normalBalance,
+          status: "active",
+          description: seed.description,
+          updatedBy: actorId
+        },
+        transaction
+      );
+
+      if (!repaired) {
+        throw new AppError(`Failed to repair default account ${seed.accountCode}`, 500);
+      }
+
+      return { account: repaired, action: "repaired" as const };
+    }
+
+    const created = await accountingRepository.createAccount(
+      {
+        companyId,
+        accountCode: seed.accountCode,
+        accountName: seed.accountName,
+        accountType: seed.accountType,
+        accountSubtype: seed.accountSubtype,
+        parentId: null,
+        isSystem: true,
+        systemKey: seed.systemKey,
+        normalBalance: seed.normalBalance,
+        openingBalance: "0.00",
+        openingBalanceType: "none",
+        currentBalance: "0.00",
+        status: "active",
+        description: seed.description,
+        createdBy: actorId,
+        updatedBy: actorId
+      },
+      transaction
+    );
+
+    if (!created) {
+      throw new AppError(`Failed to create default account ${seed.accountCode}`, 500);
+    }
+
+    return { account: created, action: "created" as const };
+  }
+
   private async seedMissingSystemAccounts(companyId: string, executor?: TransactionClient) {
     const seedInTransaction = async (transaction: TransactionClient) => {
       await accountingRepository.acquireScopedLock("seed-default-accounts", companyId, transaction);
 
       for (const seed of DEFAULT_SYSTEM_ACCOUNTS) {
-        const existing = await accountingRepository.findAccountBySystemKey(companyId, seed.systemKey, transaction);
-        if (existing) {
-          continue;
-        }
-
-        const created = await accountingRepository.createAccount(
-          {
-            companyId,
-            accountCode: seed.accountCode,
-            accountName: seed.accountName,
-            accountType: seed.accountType,
-            accountSubtype: seed.accountSubtype,
-            parentId: null,
-            isSystem: true,
-            systemKey: seed.systemKey,
-            normalBalance: seed.normalBalance,
-            openingBalance: "0.00",
-            openingBalanceType: "none",
-            currentBalance: "0.00",
-            status: "active",
-            description: seed.description,
-            createdBy: null,
-            updatedBy: null
-          },
-          transaction
-        );
-
-        if (!created) {
-          throw new AppError("Failed to seed default accounts", 500);
-        }
+        await this.ensureSystemAccountFromSeed(companyId, seed, transaction, null);
       }
     };
 
@@ -1707,46 +1773,27 @@ class AccountingService {
     const seeded = await db.transaction(async (transaction) => {
       const createdIds: string[] = [];
       const existingIds: string[] = [];
+      const repairedIds: string[] = [];
 
       for (const seed of DEFAULT_SYSTEM_ACCOUNTS) {
-        const existing = await accountingRepository.findAccountBySystemKey(actor.companyId, seed.systemKey, transaction);
-        if (existing) {
-          existingIds.push(existing.id);
+        const ensured = await this.ensureSystemAccountFromSeed(actor.companyId, seed, transaction, actor.id);
+        if (ensured.action === "created") {
+          createdIds.push(ensured.account.id);
           continue;
         }
 
-        const created = await accountingRepository.createAccount(
-          {
-            companyId: actor.companyId,
-            accountCode: seed.accountCode,
-            accountName: seed.accountName,
-            accountType: seed.accountType,
-            accountSubtype: seed.accountSubtype,
-            parentId: null,
-            isSystem: true,
-            systemKey: seed.systemKey,
-            normalBalance: seed.normalBalance,
-            openingBalance: "0.00",
-            openingBalanceType: "none",
-            currentBalance: "0.00",
-            status: "active",
-            description: seed.description,
-            createdBy: actor.id,
-            updatedBy: actor.id
-          },
-          transaction
-        );
-
-        if (!created) {
-          throw new AppError("Failed to seed default accounts", 500);
+        if (ensured.action === "repaired") {
+          repairedIds.push(ensured.account.id);
+          continue;
         }
 
-        createdIds.push(created.id);
+        existingIds.push(ensured.account.id);
       }
 
       return {
         createdIds,
-        existingIds
+        existingIds,
+        repairedIds
       };
     });
 
@@ -1847,17 +1894,19 @@ class AccountingService {
       return output;
     });
 
-    await auditLogService.log({
-      companyId: actor.companyId,
-      userId: actor.id,
-      action: "opening_balance_created",
-      entityType: "account_opening_balance",
-      metadata: {
-        count: created.length
-      },
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent
-    });
+    await this.logAuditSafely("opening_balance_created", () =>
+      auditLogService.log({
+        companyId: actor.companyId,
+        userId: actor.id,
+        action: "opening_balance_created",
+        entityType: "account_opening_balance",
+        metadata: {
+          count: created.length
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent
+      })
+    );
 
     return {
       items: created
@@ -1914,18 +1963,20 @@ class AccountingService {
       };
     });
 
-    await auditLogService.log({
-      companyId: actor.companyId,
-      userId: actor.id,
-      action: "opening_balance_updated",
-      entityType: "account_opening_balance",
-      entityId: updated.openingBalance.id,
-      metadata: {
-        journalId: updated.journal.id
-      },
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent
-    });
+    await this.logAuditSafely("opening_balance_updated", () =>
+      auditLogService.log({
+        companyId: actor.companyId,
+        userId: actor.id,
+        action: "opening_balance_updated",
+        entityType: "account_opening_balance",
+        entityId: updated.openingBalance.id,
+        metadata: {
+          journalId: updated.journal.id
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent
+      })
+    );
 
     return {
       openingBalance: {
@@ -1942,17 +1993,19 @@ class AccountingService {
 
   public async lockOpeningBalances(actor: AccountingActor, input: LockOpeningBalancesInput, context: AccountingRequestContext) {
     const rows = await accountingRepository.lockOpeningBalances(actor.companyId, input.ids);
-    await auditLogService.log({
-      companyId: actor.companyId,
-      userId: actor.id,
-      action: "opening_balance_locked",
-      entityType: "account_opening_balance",
-      metadata: {
-        count: rows.length
-      },
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent
-    });
+    await this.logAuditSafely("opening_balance_locked", () =>
+      auditLogService.log({
+        companyId: actor.companyId,
+        userId: actor.id,
+        action: "opening_balance_locked",
+        entityType: "account_opening_balance",
+        metadata: {
+          count: rows.length
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent
+      })
+    );
 
     return {
       count: rows.length

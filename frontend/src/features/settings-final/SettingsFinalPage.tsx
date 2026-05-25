@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { FilePlus2, Palette, RefreshCw, ShieldCheck, UserRoundCog, WalletCards } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import type { z } from "zod";
 
-import { Card, CardContent, CardHeader } from "../../components/ui/Card";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ErrorState } from "../../components/ui/ErrorState";
@@ -22,7 +21,6 @@ import type {
   PaymentMode,
   PermissionMatrix as PermissionMatrixData,
   ProfileSettings,
-  SettingsOverview,
   TaxSettings,
   UiPreference,
 } from "../../types/settings";
@@ -33,7 +31,6 @@ import { PaymentModesTable } from "./components/PaymentModesTable";
 import { PermissionMatrix } from "./components/PermissionMatrix";
 import { ProfileSettingsForm } from "./components/ProfileSettingsForm";
 import { SettingsFinalTabs } from "./components/SettingsFinalTabs";
-import { SystemPolishPanel } from "./components/SystemPolishPanel";
 import { TaxSettingsForm } from "./components/TaxSettingsForm";
 import { ThemeSettingsForm } from "./components/ThemeSettingsForm";
 import {
@@ -68,24 +65,18 @@ const tabDefinitions: Array<{
   label: string;
   canAccess: (hasPermission: (permission: PermissionKey | PermissionKey[]) => boolean) => boolean;
 }> = [
-  { key: "overview", label: "Overview", canAccess: (hasPermission) => hasPermission(ROUTE_PERMISSIONS) },
   { key: "permissions", label: "Permissions", canAccess: (hasPermission) => hasPermission(["settings.view", "permissions.manage"]) },
   { key: "invoice-templates", label: "Invoice Templates", canAccess: (hasPermission) => hasPermission("invoice.settings.manage") },
   { key: "tax-settings", label: "Tax Settings", canAccess: (hasPermission) => hasPermission("tax.settings.manage") },
   { key: "payment-modes", label: "Payment Modes", canAccess: (hasPermission) => hasPermission("payment.settings.manage") },
   { key: "theme", label: "Theme", canAccess: (hasPermission) => hasPermission(["profile.manage", "settings.manage"]) },
   { key: "profile", label: "Profile", canAccess: (hasPermission) => hasPermission("profile.manage") },
-  { key: "system-polish", label: "System Polish", canAccess: () => true },
 ];
 
 export const SettingsFinalPage = () => {
   const auth = useAuth();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  const [overview, setOverview] = useState<SettingsOverview | null>(null);
-  const [overviewLoading, setOverviewLoading] = useState(true);
-  const [overviewError, setOverviewError] = useState<string | null>(null);
 
   const [permissionMatrix, setPermissionMatrix] = useState<PermissionMatrixData | null>(null);
   const [permissionLoading, setPermissionLoading] = useState(false);
@@ -136,26 +127,13 @@ export const SettingsFinalPage = () => {
   );
 
   const requestedTab = searchParams.get("tab") as SettingsTabKey | null;
-  const activeTab = availableTabs.find((tab) => tab.key === requestedTab)?.key ?? availableTabs[0]?.key ?? "overview";
+  const activeTab = availableTabs.find((tab) => tab.key === requestedTab)?.key ?? availableTabs[0]?.key ?? "permissions";
 
   useEffect(() => {
     if (!requestedTab || !availableTabs.some((tab) => tab.key === requestedTab)) {
       setSearchParams({ tab: activeTab }, { replace: true });
     }
   }, [activeTab, availableTabs, requestedTab, setSearchParams]);
-
-  const loadOverview = async () => {
-    try {
-      setOverviewLoading(true);
-      setOverviewError(null);
-      const response = await settingsApi.getOverview();
-      setOverview(response.data);
-    } catch (error) {
-      setOverviewError(getErrorMessage(error, "Failed to load settings overview"));
-    } finally {
-      setOverviewLoading(false);
-    }
-  };
 
   const loadPermissions = async () => {
     try {
@@ -237,10 +215,6 @@ export const SettingsFinalPage = () => {
   };
 
   useEffect(() => {
-    void loadOverview();
-  }, []);
-
-  useEffect(() => {
     if (activeTab === "permissions" && !permissionMatrix && !permissionLoading) {
       void loadPermissions();
     }
@@ -261,8 +235,30 @@ export const SettingsFinalPage = () => {
     }
   }, [activeTab, invoiceLoading, invoiceTemplates, paymentLoading, paymentModes, permissionLoading, permissionMatrix, profileLoading, profileSettings, taxLoading, taxSettings, themeLoading, uiPreferences]);
 
-  const refreshOverview = async () => {
-    await loadOverview();
+  const refreshActiveTab = async () => {
+    if (activeTab === "permissions") {
+      await loadPermissions();
+      return;
+    }
+    if (activeTab === "invoice-templates") {
+      await loadInvoiceTemplates();
+      return;
+    }
+    if (activeTab === "tax-settings") {
+      await loadTaxSettings();
+      return;
+    }
+    if (activeTab === "payment-modes") {
+      await loadPaymentModes();
+      return;
+    }
+    if (activeTab === "theme") {
+      await loadTheme();
+      return;
+    }
+    if (activeTab === "profile") {
+      await loadProfile();
+    }
   };
 
   const handleInvoiceSubmit = async (value: InvoiceTemplateValues) => {
@@ -280,7 +276,7 @@ export const SettingsFinalPage = () => {
       }
       setInvoiceEditorOpen(false);
       setSelectedInvoiceTemplate(null);
-      await Promise.all([loadInvoiceTemplates(), refreshOverview()]);
+      await loadInvoiceTemplates();
     } catch (error) {
       toast.error(getErrorMessage(error, "Unable to save invoice template"));
     } finally {
@@ -300,71 +296,12 @@ export const SettingsFinalPage = () => {
       }
       setPaymentModalOpen(false);
       setSelectedPaymentMode(null);
-      await Promise.all([loadPaymentModes(), refreshOverview()]);
+      await loadPaymentModes();
     } catch (error) {
       toast.error(getErrorMessage(error, "Unable to save payment mode"));
     } finally {
       setPaymentSaving(false);
     }
-  };
-
-  const renderOverview = () => {
-    if (overviewLoading && !overview) {
-      return <LoadingState label="Loading settings overview..." />;
-    }
-
-    if (overviewError && !overview) {
-      return <ErrorState title={overviewError} action={<Button variant="secondary" onClick={() => void loadOverview()}>Retry</Button>} />;
-    }
-
-    if (!overview) {
-      return <EmptyState title="No overview available" />;
-    }
-
-    const iconMap = {
-      permissions: ShieldCheck,
-      invoiceTemplates: FilePlus2,
-      taxSettings: FilePlus2,
-      paymentModes: WalletCards,
-      theme: Palette,
-      profile: UserRoundCog,
-      systemPolish: RefreshCw,
-    } as const;
-
-    return (
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {overview.sections.map((section) => {
-          const Icon = iconMap[section.key];
-          return (
-            <Card key={section.key}>
-              <CardHeader title={section.label} action={<StatusBadge status={section.status} label={section.status} />} />
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="app-accent-text rounded-2xl bg-slate-50 p-3">
-                    <Icon className="size-5" />
-                  </div>
-                  <p className="text-sm text-slate-600">{section.summary}</p>
-                </div>
-                {section.missingItems.length ? (
-                  <div className="space-y-1">
-                    {section.missingItems.map((item) => (
-                      <p key={item} className="text-xs text-amber-700">{item}</p>
-                    ))}
-                  </div>
-                ) : null}
-                <Button
-                  variant="secondary"
-                  disabled={!section.accessible}
-                  onClick={() => setSearchParams({ tab: (section.key === "invoiceTemplates" ? "invoice-templates" : section.key === "taxSettings" ? "tax-settings" : section.key === "paymentModes" ? "payment-modes" : section.key) as SettingsTabKey })}
-                >
-                  Open
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-    );
   };
 
   const renderInvoiceTemplates = () => {
@@ -391,44 +328,49 @@ export const SettingsFinalPage = () => {
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
           {invoiceTemplates.map((template) => (
-            <div key={template.id} className="space-y-3">
-              <InvoiceTemplatePreview
-                templateName={template.templateName}
-                invoiceType={template.invoiceType}
-                layoutConfig={template.layoutConfig}
-                companyName={auth.company?.name}
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setSelectedInvoiceTemplate(template);
-                    setInvoiceEditorOpen(true);
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={template.isDefault}
-                  onClick={async () => {
-                    try {
-                      await settingsApi.setDefaultInvoiceTemplate(template.id);
-                      toast.success("Default template updated");
-                      await Promise.all([loadInvoiceTemplates(), refreshOverview()]);
-                    } catch (error) {
-                      toast.error(getErrorMessage(error, "Unable to update default template"));
-                    }
-                  }}
-                >
-                  Set Default
-                </Button>
-                <Button variant="danger" onClick={() => setConfirmState({ type: "deleteInvoice", item: template })}>
-                  Delete
-                </Button>
-                <StatusBadge status={template.isDefault ? "default" : template.isActive ? "active" : "inactive"} label={template.isDefault ? "Default" : template.isActive ? "Active" : "Inactive"} />
-              </div>
-            </div>
+            <InvoiceTemplatePreview
+              key={template.id}
+              templateName={template.templateName}
+              invoiceType={template.invoiceType}
+              layoutConfig={template.layoutConfig}
+              companyName={auth.company?.name}
+              footer={
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setSelectedInvoiceTemplate(template);
+                      setInvoiceEditorOpen(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        await settingsApi.setDefaultInvoiceTemplate(template.id);
+                        toast.success("Default template updated");
+                        await loadInvoiceTemplates();
+                      } catch (error) {
+                        toast.error(getErrorMessage(error, "Unable to update default template"));
+                      }
+                    }}
+                  >
+                    Set Default
+                  </Button>
+                  <Button variant="danger" onClick={() => setConfirmState({ type: "deleteInvoice", item: template })}>
+                    Delete
+                  </Button>
+                  <div className="ml-auto">
+                    <StatusBadge
+                      status={template.isDefault ? "default" : template.isActive ? "active" : "inactive"}
+                      label={template.isDefault ? "Default" : template.isActive ? "Active" : "Inactive"}
+                    />
+                  </div>
+                </div>
+              }
+            />
           ))}
         </div>
       </div>
@@ -444,7 +386,7 @@ export const SettingsFinalPage = () => {
       <PageHeader
         title="Settings & Final Polishing"
         actions={
-          <Button variant="secondary" onClick={() => void refreshOverview()}>
+          <Button variant="secondary" onClick={() => void refreshActiveTab()}>
             <RefreshCw className="mr-2 size-4" />
             Refresh
           </Button>
@@ -452,8 +394,6 @@ export const SettingsFinalPage = () => {
       />
 
       <SettingsFinalTabs tabs={availableTabs.map((tab) => ({ key: tab.key, label: tab.label }))} activeTab={activeTab} onChange={(tab) => setSearchParams({ tab })} />
-
-      {activeTab === "overview" ? renderOverview() : null}
 
       {activeTab === "permissions" ? (
         auth.hasPermission(["settings.view", "permissions.manage"]) ? (
@@ -472,7 +412,7 @@ export const SettingsFinalPage = () => {
                   setUserPermissionSaving(true);
                   await settingsApi.updateUserPermissions(userId, permissions);
                   toast.success("User permissions updated");
-                  await Promise.all([loadPermissions(), refreshOverview()]);
+                  await loadPermissions();
                 } catch (error) {
                   toast.error(getErrorMessage(error, "Unable to save user permissions"));
                 } finally {
@@ -484,7 +424,7 @@ export const SettingsFinalPage = () => {
                   setRolePermissionSaving(true);
                   await settingsApi.updateRolePermissions(role, permissions);
                   toast.success("Role permissions updated");
-                  await Promise.all([loadPermissions(), refreshOverview()]);
+                  await loadPermissions();
                 } catch (error) {
                   toast.error(getErrorMessage(error, "Unable to save role permissions"));
                 } finally {
@@ -520,7 +460,6 @@ export const SettingsFinalPage = () => {
                   const response = await settingsApi.updateTaxSettings(value);
                   setTaxSettings(response.data);
                   toast.success("Tax settings saved");
-                  await refreshOverview();
                 } catch (error) {
                   toast.error(getErrorMessage(error, "Unable to save tax settings"));
                 } finally {
@@ -564,7 +503,7 @@ export const SettingsFinalPage = () => {
                   try {
                     await settingsApi.setDefaultPaymentMode(item.id);
                     toast.success("Default payment mode updated");
-                    await Promise.all([loadPaymentModes(), refreshOverview()]);
+                    await loadPaymentModes();
                   } catch (error) {
                     toast.error(getErrorMessage(error, "Unable to update default payment mode"));
                   }
@@ -595,7 +534,6 @@ export const SettingsFinalPage = () => {
                   setUiPreferences(response.data);
                   applyUiPreferencesToDocument(response.data);
                   toast.success("Theme preferences saved");
-                  await refreshOverview();
                 } catch (error) {
                   toast.error(getErrorMessage(error, "Unable to save theme preferences"));
                 } finally {
@@ -639,7 +577,6 @@ export const SettingsFinalPage = () => {
                     });
                   }
                   toast.success("Profile updated");
-                  await refreshOverview();
                 } catch (error) {
                   toast.error(getErrorMessage(error, "Unable to update profile"));
                 } finally {
@@ -677,8 +614,6 @@ export const SettingsFinalPage = () => {
         )
       ) : null}
 
-      {activeTab === "system-polish" ? <SystemPolishPanel /> : null}
-
       <InvoiceTemplateEditor
         open={invoiceEditorOpen}
         initialValue={selectedInvoiceTemplate}
@@ -714,13 +649,13 @@ export const SettingsFinalPage = () => {
             if (confirmState.type === "deleteInvoice") {
               await settingsApi.deleteInvoiceTemplate(confirmState.item.id);
               toast.success("Invoice template deleted");
-              await Promise.all([loadInvoiceTemplates(), refreshOverview()]);
+              await loadInvoiceTemplates();
             }
 
             if (confirmState.type === "deletePayment") {
               await settingsApi.deletePaymentMode(confirmState.item.id);
               toast.success("Payment mode deleted");
-              await Promise.all([loadPaymentModes(), refreshOverview()]);
+              await loadPaymentModes();
             }
           } catch (error) {
             toast.error(getErrorMessage(error, "Unable to complete this action"));

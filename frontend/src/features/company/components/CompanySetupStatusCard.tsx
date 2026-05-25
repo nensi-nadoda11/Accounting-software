@@ -96,20 +96,20 @@ export const CompanySetupStatusCard = () => {
             />
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           {checklist.map((item) => (
             <div
               key={item.key}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
+              className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
             >
               <span
-                className={`inline-flex size-5 items-center justify-center rounded-full ${
+                className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full ${
                   item.completed ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"
                 }`}
               >
                 {item.completed ? <Check className="size-3.5" /> : null}
               </span>
-              <span>{item.label}</span>
+              <span className="min-w-0 break-words leading-5">{item.label}</span>
             </div>
           ))}
         </div>

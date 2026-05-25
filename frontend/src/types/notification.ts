@@ -14,14 +14,11 @@ export const NOTIFICATION_PRIORITIES = ["info", "success", "warning", "critical"
 
 export const NOTIFICATION_CHANNELS = ["in_app", "email", "whatsapp", "sms"] as const;
 
-export const NOTIFICATION_LOG_STATUSES = ["pending", "sent", "failed", "skipped"] as const;
-
 export const NOTIFICATION_FREQUENCIES = ["instant", "daily", "weekly"] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 export type NotificationPriority = (typeof NOTIFICATION_PRIORITIES)[number];
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
-export type NotificationLogStatus = (typeof NOTIFICATION_LOG_STATUSES)[number];
 export type NotificationFrequency = (typeof NOTIFICATION_FREQUENCIES)[number];
 
 export interface Notification {
@@ -70,19 +67,6 @@ export interface NotificationTemplate {
   updatedAt: string;
 }
 
-export interface NotificationLog {
-  id: string;
-  notificationId: string | null;
-  notificationTitle: string | null;
-  channel: NotificationChannel;
-  recipient: string;
-  status: NotificationLogStatus;
-  errorMessage: string | null;
-  sentAt: string | null;
-  metadata: Record<string, unknown> | null;
-  createdAt: string;
-}
-
 export interface NotificationListResponse {
   items: Notification[];
   pagination: {
@@ -91,11 +75,6 @@ export interface NotificationListResponse {
     total: number;
     totalPages: number;
   };
-}
-
-export interface NotificationLogsResponse {
-  items: NotificationLog[];
-  pagination: NotificationListResponse["pagination"];
 }
 
 export interface NotificationTemplateListResponse {
@@ -109,15 +88,6 @@ export type NotificationListQuery = {
   priority?: NotificationPriority | "";
   channel?: NotificationChannel | "";
   unread?: boolean;
-  dateFrom?: string;
-  dateTo?: string;
-};
-
-export type NotificationLogsQuery = {
-  page: number;
-  limit: number;
-  channel?: NotificationChannel | "";
-  status?: NotificationLogStatus | "";
   dateFrom?: string;
   dateTo?: string;
 };

@@ -15,7 +15,6 @@ import { notificationsApi } from "../../services/notificationsApi";
 import type {
   Notification,
   NotificationListQuery,
-  NotificationLogsQuery,
   NotificationPreference,
   NotificationTemplate,
   NotificationType,
@@ -24,7 +23,6 @@ import type {
 import { useDebouncedValue } from "../customers/useDebouncedValue";
 import { ManualNotificationModal } from "./components/ManualNotificationModal";
 import { NotificationFilters } from "./components/NotificationFilters";
-import { NotificationLogsTable } from "./components/NotificationLogsTable";
 import { NotificationPreferences } from "./components/NotificationPreferences";
 import { NotificationTabs, type NotificationTabId } from "./components/NotificationTabs";
 import { NotificationTemplateModal } from "./components/NotificationTemplateModal";
@@ -33,6 +31,8 @@ import { NotificationsList } from "./components/NotificationsList";
 import { NOTIFICATIONS_UPDATED_EVENT, notificationTypeOptions } from "./notificationMeta";
 
 const listTabs: NotificationTabId[] = ["all", "unread", "payment", "inventory", "gst", "payroll"];
+const settingsTabs: NotificationTabId[] = ["templates", "preferences"];
+const allTabs = [...listTabs, ...settingsTabs] as const;
 
 const defaultListQuery: NotificationListQuery = {
   page: 1,
@@ -41,15 +41,6 @@ const defaultListQuery: NotificationListQuery = {
   priority: "",
   channel: "",
   unread: undefined,
-  dateFrom: "",
-  dateTo: "",
-};
-
-const defaultLogsQuery: NotificationLogsQuery = {
-  page: 1,
-  limit: 20,
-  channel: "",
-  status: "",
   dateFrom: "",
   dateTo: "",
 };
@@ -118,9 +109,11 @@ export const NotificationsPage = () => {
   const toast = useToast();
   const auth = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = (searchParams.get("tab") as NotificationTabId | null) ?? "all";
+  const requestedTab = searchParams.get("tab");
+  const activeTab = allTabs.includes((requestedTab ?? "all") as NotificationTabId)
+    ? ((requestedTab ?? "all") as NotificationTabId)
+    : "all";
   const [listQuery, setListQuery] = useState<NotificationListQuery>(defaultListQuery);
-  const [logsQuery, setLogsQuery] = useState<NotificationLogsQuery>(defaultLogsQuery);
   const [notifications, setNotifications] = useState<{ items: Notification[]; pagination: { page: number; limit: number; total: number; totalPages: number } } | null>(null);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
@@ -132,8 +125,6 @@ export const NotificationsPage = () => {
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
-  const [logs, setLogs] = useState<{ items: Array<import("../../types/notification").NotificationLog>; pagination: { page: number; limit: number; total: number; totalPages: number } } | null>(null);
-  const [logsLoading, setLogsLoading] = useState(false);
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [manualSending, setManualSending] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Notification | null>(null);
@@ -150,8 +141,6 @@ export const NotificationsPage = () => {
     () => normalizeListQuery(activeTab, JSON.parse(debouncedListQuery) as NotificationListQuery),
     [activeTab, debouncedListQuery],
   );
-  const debouncedLogsQuery = useDebouncedValue(JSON.stringify(logsQuery), 250);
-  const parsedLogsQuery = useMemo(() => JSON.parse(debouncedLogsQuery) as NotificationLogsQuery, [debouncedLogsQuery]);
 
   const loadNotifications = async (query: NotificationListQuery) => {
     try {
@@ -190,17 +179,11 @@ export const NotificationsPage = () => {
     }
   };
 
-  const loadLogs = async (query: NotificationLogsQuery) => {
-    try {
-      setLogsLoading(true);
-      const response = await notificationsApi.listLogs(query);
-      setLogs(response.data);
-    } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load logs"));
-    } finally {
-      setLogsLoading(false);
+  useEffect(() => {
+    if (requestedTab !== activeTab) {
+      setSearchParams({ tab: activeTab }, { replace: true });
     }
-  };
+  }, [activeTab, requestedTab, setSearchParams]);
 
   useEffect(() => {
     if (listTabs.includes(activeTab)) {
@@ -214,11 +197,7 @@ export const NotificationsPage = () => {
     if (activeTab === "templates") {
       void loadTemplates();
     }
-
-    if (activeTab === "logs") {
-      void loadLogs(parsedLogsQuery);
-    }
-  }, [activeTab, normalizedListQuery, parsedLogsQuery]);
+  }, [activeTab, normalizedListQuery]);
 
   const dispatchUpdated = () => window.dispatchEvent(new Event(NOTIFICATIONS_UPDATED_EVENT));
 
@@ -411,20 +390,6 @@ export const NotificationsPage = () => {
             />
           ) : null}
         </div>
-      ) : null}
-
-      {activeTab === "logs" ? (
-        logsLoading || !logs ? (
-          <LoadingState label="Loading logs..." />
-        ) : (
-          <NotificationLogsTable
-            items={logs.items}
-            pagination={logs.pagination}
-            query={logsQuery}
-            onQueryChange={(patch) => setLogsQuery((current) => ({ ...current, ...patch }))}
-            onPageChange={(page) => setLogsQuery((current) => ({ ...current, page }))}
-          />
-        )
       ) : null}
 
       <NotificationTemplateModal

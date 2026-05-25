@@ -5,7 +5,6 @@ import type {
   PaymentMode,
   PermissionMatrix,
   ProfileSettings,
-  SettingsOverview,
   TaxSettings,
   UiPreference
 } from "../types/settings";
@@ -21,7 +20,6 @@ export const applyUiPreferencesToDocument = (preferences: UiPreference | null) =
 };
 
 export const settingsApi = {
-  getOverview: async () => (await client.get<ApiResponse<SettingsOverview>>("/settings/overview")).data,
   getPermissions: async () => (await client.get<ApiResponse<PermissionMatrix>>("/settings/permissions")).data,
   updateUserPermissions: async (userId: string, permissions: PermissionKey[]) =>
     (await client.patch<ApiResponse<{ userId: string; permissions: PermissionKey[] }>>(`/settings/permissions/user/${userId}`, { permissions })).data,

@@ -7,14 +7,12 @@ const indianMobileRegex = /^[6-9]\d{9}$/;
 const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
 export const settingsTabKeys = [
-  "overview",
   "permissions",
   "invoice-templates",
   "tax-settings",
   "payment-modes",
   "theme",
   "profile",
-  "system-polish",
 ] as const;
 
 export type SettingsTabKey = (typeof settingsTabKeys)[number];

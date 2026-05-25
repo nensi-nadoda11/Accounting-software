@@ -10,7 +10,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { SectionGrid } from "../../components/ui/SectionGrid";
 import type { CompanyBranding, CompanyBrandingAssetType } from "../../types/company";
 import { BRANDING_ASSET_SECTIONS } from "./companyOptions";
-import { getBrandingAssetUrl } from "./companyUtils";
+import { getBrandingAssetUrl, readFileAsDataUrl } from "./companyUtils";
 
 export const BrandingPage = () => {
   const toast = useToast();
@@ -66,13 +66,31 @@ export const BrandingPage = () => {
       );
 
       if (!cancelled) {
-        setPreviewUrls(
-          Object.fromEntries(
-            nextEntries.filter(
-              (entry): entry is readonly [CompanyBrandingAssetType, string] => Boolean(entry),
-            ),
-          ) as Partial<Record<CompanyBrandingAssetType, string>>,
-        );
+        const resolvedPreviewUrls = Object.fromEntries(
+          nextEntries.filter(
+            (entry): entry is readonly [CompanyBrandingAssetType, string] => Boolean(entry),
+          ),
+        ) as Partial<Record<CompanyBrandingAssetType, string>>;
+
+        setPreviewUrls((current) => {
+          const nextState: Partial<Record<CompanyBrandingAssetType, string>> = {};
+
+          for (const asset of BRANDING_ASSET_SECTIONS) {
+            const assetUrl = getBrandingAssetUrl(branding, asset.type);
+
+            if (resolvedPreviewUrls[asset.type]) {
+              nextState[asset.type] = resolvedPreviewUrls[asset.type];
+              continue;
+            }
+
+            if (assetUrl && current[asset.type]) {
+              // Keep the already visible preview if background fetch could not resolve it yet.
+              nextState[asset.type] = current[asset.type];
+            }
+          }
+
+          return nextState;
+        });
       }
     };
 
@@ -115,10 +133,13 @@ export const BrandingPage = () => {
                   try {
                     setUploadingType(asset.type);
                     setFileErrors((current) => ({ ...current, [asset.type]: undefined }));
+                    const localPreview = await readFileAsDataUrl(file);
+                    setPreviewUrls((current) => ({ ...current, [asset.type]: localPreview }));
                     const response = await brandingApi.upload({ type: asset.type, file });
                     setBranding(response.data);
                     toast.success(`${asset.label} updated`);
                   } catch (error) {
+                    setPreviewUrls((current) => ({ ...current, [asset.type]: undefined }));
                     toast.error(getErrorMessage(error, `Failed to upload ${asset.label.toLowerCase()}`));
                   } finally {
                     setUploadingType(null);
@@ -130,6 +151,7 @@ export const BrandingPage = () => {
                         try {
                           setRemovingType(asset.type);
                           const response = await brandingApi.remove(asset.type);
+                          setPreviewUrls((current) => ({ ...current, [asset.type]: undefined }));
                           setBranding(response.data);
                           toast.success(`${asset.label} removed`);
                         } catch (error) {

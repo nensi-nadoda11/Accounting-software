@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -10,6 +11,11 @@ import type { PermissionMatrix as PermissionMatrixData } from "../../../types/se
 import { toSortedPermissionSelection } from "../settingsFinalSchemas";
 
 type Scope = "user" | "role";
+type PermissionGroupView = {
+  key: string;
+  label: string;
+  permissions: PermissionKey[];
+};
 
 export const PermissionMatrix = ({
   matrix,
@@ -31,6 +37,7 @@ export const PermissionMatrix = ({
   const [selectedUserId, setSelectedUserId] = useState<string>(matrix.users[0]?.id || "");
   const [selectedRole, setSelectedRole] = useState<Role>(matrix.roles[0]?.role || "admin");
   const [draftPermissions, setDraftPermissions] = useState<PermissionKey[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
   const selectedUser = useMemo(
     () => matrix.users.find((user) => user.id === selectedUserId) || null,
@@ -53,10 +60,62 @@ export const PermissionMatrix = ({
     }
   }, [scope, selectedRoleRecord]);
 
-  const visibleGroups = useMemo(
-    () => matrix.groups.filter((group) => moduleFilter === "all" || group.key === moduleFilter),
-    [matrix.groups, moduleFilter],
+  const groupedModules = useMemo<PermissionGroupView[]>(
+    () => {
+      const grouped = new Map<string, PermissionGroupView>();
+
+      for (const group of matrix.groups) {
+        const normalizedKey = group.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        const existing = grouped.get(normalizedKey);
+
+        if (!existing) {
+          grouped.set(normalizedKey, {
+            key: normalizedKey,
+            label: group.label,
+            permissions: [...group.permissions],
+          });
+          continue;
+        }
+
+        for (const permission of group.permissions) {
+          if (!existing.permissions.includes(permission)) {
+            existing.permissions.push(permission);
+          }
+        }
+      }
+
+      return Array.from(grouped.values());
+    },
+    [matrix.groups],
   );
+
+  const visibleGroups = useMemo(
+    () => groupedModules.filter((group) => moduleFilter === "all" || group.key === moduleFilter),
+    [groupedModules, moduleFilter],
+  );
+
+  const groupedColumns = useMemo(
+    () => visibleGroups.reduce<[PermissionGroupView[], PermissionGroupView[]]>(
+      (columns, group, index) => {
+        columns[index % 2].push(group);
+        return columns;
+      },
+      [[], []],
+    ),
+    [visibleGroups],
+  );
+
+  useEffect(() => {
+    setExpandedGroups((current) => current.filter((key) => visibleGroups.some((group) => group.key === key)));
+  }, [visibleGroups]);
+
+  useEffect(() => {
+    if (moduleFilter === "all") {
+      return;
+    }
+
+    setExpandedGroups(visibleGroups.map((group) => group.key));
+  }, [moduleFilter, visibleGroups]);
 
   const togglePermission = (permission: PermissionKey) => {
     setDraftPermissions((current) =>
@@ -65,6 +124,50 @@ export const PermissionMatrix = ({
         : toSortedPermissionSelection([...current, permission]),
     );
   };
+
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups((current) =>
+      current.includes(groupKey) ? current.filter((key) => key !== groupKey) : [...current, groupKey],
+    );
+  };
+
+  const renderGroupCard = (group: PermissionGroupView) => (
+    <div key={group.key} className="rounded-2xl border border-slate-200">
+      <button
+        type="button"
+        onClick={() => toggleGroup(group.key)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-800">{group.label}</p>
+          <p className="mt-1 text-xs text-slate-500">{group.permissions.length} permissions</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge tone="neutral">
+            {group.permissions.filter((permission) => draftPermissions.includes(permission)).length}/{group.permissions.length}
+          </Badge>
+          {expandedGroups.includes(group.key) ? (
+            <ChevronDown className="size-4 text-slate-400" />
+          ) : (
+            <ChevronRight className="size-4 text-slate-400" />
+          )}
+        </div>
+      </button>
+
+      {expandedGroups.includes(group.key) ? (
+        <div className="grid gap-3 border-t border-slate-100 px-4 py-4 md:grid-cols-2">
+          {group.permissions.map((permission) => (
+            <Checkbox
+              key={permission}
+              label={permission}
+              checked={draftPermissions.includes(permission)}
+              onChange={() => togglePermission(permission)}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 
   return (
     <Card>
@@ -85,7 +188,7 @@ export const PermissionMatrix = ({
         <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
           <Select label="Module" value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}>
             <option value="all">All Modules</option>
-            {matrix.groups.map((group) => (
+            {groupedModules.map((group) => (
               <option key={group.key} value={group.key}>
                 {group.label}
               </option>
@@ -119,25 +222,10 @@ export const PermissionMatrix = ({
           </div>
         </div>
 
-        <div className="space-y-4">
-          {visibleGroups.map((group) => (
-            <div key={group.key} className="rounded-2xl border border-slate-200">
-              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                <p className="text-sm font-semibold text-slate-800">{group.label}</p>
-                <Badge tone="neutral">
-                  {group.permissions.filter((permission) => draftPermissions.includes(permission)).length}/{group.permissions.length}
-                </Badge>
-              </div>
-              <div className="grid gap-3 px-4 py-4 sm:grid-cols-2 xl:grid-cols-3">
-                {group.permissions.map((permission) => (
-                  <Checkbox
-                    key={permission}
-                    label={permission}
-                    checked={draftPermissions.includes(permission)}
-                    onChange={() => togglePermission(permission)}
-                  />
-                ))}
-              </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {groupedColumns.map((column, columnIndex) => (
+            <div key={columnIndex} className="space-y-4">
+              {column.map((group) => renderGroupCard(group))}
             </div>
           ))}
         </div>

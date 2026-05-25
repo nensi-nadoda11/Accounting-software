@@ -1,25 +1,5 @@
 import type { PermissionKey, Role, UserStatus } from "./auth";
 
-export interface AppSetting {
-  key: string;
-  group: string;
-  value: unknown;
-}
-
-export interface OverviewSection {
-  key: "permissions" | "invoiceTemplates" | "taxSettings" | "paymentModes" | "theme" | "profile" | "systemPolish";
-  label: string;
-  status: "configured" | "attention" | "restricted";
-  summary: string;
-  accessible: boolean;
-  missingItems: string[];
-}
-
-export interface SettingsOverview {
-  sections: OverviewSection[];
-  generatedAt: string;
-}
-
 export interface PermissionMatrix {
   roles: Array<{
     role: Role;

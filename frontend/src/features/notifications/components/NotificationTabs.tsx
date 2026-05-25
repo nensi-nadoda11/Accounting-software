@@ -8,8 +8,7 @@ export type NotificationTabId =
   | "gst"
   | "payroll"
   | "templates"
-  | "preferences"
-  | "logs";
+  | "preferences";
 
 const TABS: Array<{ id: NotificationTabId; label: string }> = [
   { id: "all", label: "All" },
@@ -20,7 +19,6 @@ const TABS: Array<{ id: NotificationTabId; label: string }> = [
   { id: "payroll", label: "Payroll" },
   { id: "templates", label: "Templates" },
   { id: "preferences", label: "Preferences" },
-  { id: "logs", label: "Logs" },
 ];
 
 export const NotificationTabs = ({

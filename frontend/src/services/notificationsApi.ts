@@ -5,8 +5,6 @@ import type {
   Notification,
   NotificationListQuery,
   NotificationListResponse,
-  NotificationLogsQuery,
-  NotificationLogsResponse,
   NotificationPreference,
   NotificationPreferenceInput,
   NotificationTemplate,
@@ -71,20 +69,6 @@ export const notificationsApi = {
 
   updateTemplate: async (templateId: string, payload: NotificationTemplateUpdateInput) =>
     (await client.patch<ApiResponse<{ template: NotificationTemplate }>>(`/notifications/templates/${templateId}`, payload)).data,
-
-  listLogs: async (query: NotificationLogsQuery) =>
-    (
-      await client.get<ApiResponse<NotificationLogsResponse>>("/notifications/logs", {
-        params: {
-          page: query.page,
-          limit: query.limit,
-          channel: query.channel || undefined,
-          status: query.status || undefined,
-          dateFrom: query.dateFrom || undefined,
-          dateTo: query.dateTo || undefined,
-        },
-      })
-    ).data,
 
   send: async (payload: ManualNotificationInput) =>
     (await client.post<ApiResponse<Record<string, unknown>>>("/notifications/send", payload)).data,

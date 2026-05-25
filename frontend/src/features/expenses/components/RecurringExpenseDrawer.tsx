@@ -19,7 +19,6 @@ import {
   EXPENSE_GST_RATE_OPTIONS,
   EXPENSE_PAYMENT_MODE_OPTIONS,
   EXPENSE_PRICE_TAX_TYPE_OPTIONS,
-  RECURRING_CREATE_STATUS_OPTIONS,
   RECURRING_FREQUENCY_OPTIONS,
 } from "../expenseOptions";
 import { recurringExpenseSchema, type RecurringExpenseInputValues, type RecurringExpenseValues } from "../expenseSchemas";
@@ -205,13 +204,7 @@ export const RecurringExpenseDrawer = ({
               </option>
             ))}
           </Select>
-          <Select label="Create As" {...form.register("createAsStatus")} error={form.formState.errors.createAsStatus?.message}>
-            {RECURRING_CREATE_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
+          <Input label="Create As" value="Posted" disabled />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

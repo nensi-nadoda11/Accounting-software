@@ -436,7 +436,7 @@ export const createRecurringPayload = (values: RecurringExpenseFormInput): Recur
   endDate: values.endDate || null,
   nextRunDate: values.nextRunDate,
   autoCreateEnabled: values.autoCreateEnabled,
-  createAsStatus: values.createAsStatus,
+  createAsStatus: "posted",
   reminderDaysBefore: values.reminderDaysBefore,
   status: values.status,
 });

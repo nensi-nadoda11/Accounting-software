@@ -13,8 +13,11 @@ import { getPagination } from "../../utils/pagination";
 import { buildReportFile } from "./reports.export";
 import { reportsRepository } from "./reports.repository";
 import type {
+  ReportColumn,
   ReportExportDataset,
   ReportFilePayload,
+  ReportMetaItem,
+  ReportSummaryItem,
   ReportsActor,
   ReportsRequestContext
 } from "./reports.types";
@@ -41,6 +44,21 @@ const toDateOnly = (value: Date) => new Date(Date.UTC(value.getFullYear(), value
 const formatFileBaseName = (reportType: string) =>
   `${reportType.replaceAll(".", "-")}-${new Date().toISOString().slice(0, 10)}`;
 
+const formatDateLabel = (value: Date) =>
+  value.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+
+const humanizeWords = (value: string) =>
+  value
+    .replaceAll(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replaceAll(/[._-]+/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+
 const toPagination = (page: number, limit: number, total: number) => ({
   page,
   limit,
@@ -49,6 +67,8 @@ const toPagination = (page: number, limit: number, total: number) => ({
 });
 
 export class ReportsService {
+  private readonly hiddenExportKeys = new Set(["id"]);
+
   private toAuditEntityId(value: string) {
     return UUID_PATTERN.test(value) ? value : null;
   }
@@ -573,88 +593,323 @@ export class ReportsService {
     return data;
   }
 
-  private createDatasetFromRows(title: string, rows: Array<Record<string, unknown>>) {
+  private inferColumnType(key: string, rows: Array<Record<string, unknown>>): ReportColumn["type"] {
+    const sample = rows.find((row) => row[key] !== null && row[key] !== undefined)?.[key];
+    if (sample instanceof Date) {
+      return key.toLowerCase().endsWith("at") ? "datetime" : "date";
+    }
+
+    if (typeof sample === "number") {
+      return "number";
+    }
+
+    if (typeof sample === "string") {
+      if (/^-?\d+(\.\d+)?$/.test(sample)) {
+        return "number";
+      }
+
+      if (/date$/i.test(key)) {
+        return "date";
+      }
+
+      if (/(createdAt|updatedAt|generatedAt)$/i.test(key)) {
+        return "datetime";
+      }
+    }
+
+    return "string";
+  }
+
+  private shouldHideColumn(key: string, allKeys: string[]) {
+    if (this.hiddenExportKeys.has(key)) {
+      return true;
+    }
+
+    if (/Id$/.test(key)) {
+      const relatedNameKey = key.replace(/Id$/, "Name");
+      const relatedNumberKey = key.replace(/Id$/, "Number");
+      return allKeys.includes(relatedNameKey) || allKeys.includes(relatedNumberKey);
+    }
+
+    return false;
+  }
+
+  private buildDatasetMetadata(query: ExportReportQuery, rowCount: number): ReportMetaItem[] {
+    const metadata: ReportMetaItem[] = [];
+
+    if (query.dateFrom || query.dateTo) {
+      metadata.push({
+        label: "Period",
+        value:
+          query.dateFrom && query.dateTo
+            ? `${formatDateLabel(query.dateFrom)} to ${formatDateLabel(query.dateTo)}`
+            : query.dateFrom
+              ? `From ${formatDateLabel(query.dateFrom)}`
+              : `Until ${formatDateLabel(query.dateTo!)}`
+      });
+    }
+
+    if (query.status) {
+      metadata.push({ label: "Status", value: humanizeWords(query.status) });
+    }
+
+    if (query.paymentMode) {
+      metadata.push({ label: "Payment Mode", value: humanizeWords(query.paymentMode) });
+    }
+
+    if (query.department) {
+      metadata.push({ label: "Department", value: query.department });
+    }
+
+    if (query.gstRate !== undefined) {
+      metadata.push({ label: "GST Rate", value: `${query.gstRate}%` });
+    }
+
+    if (query.includeDrafts) {
+      metadata.push({ label: "Drafts", value: "Included" });
+    }
+
+    if (query.includeCancelled) {
+      metadata.push({ label: "Cancelled", value: "Included" });
+    }
+
+    metadata.push({ label: "Rows", value: String(rowCount) });
+    metadata.push({ label: "Exported On", value: new Date().toLocaleString("en-IN") });
+
+    return metadata;
+  }
+
+  private buildSummaryItems(record: Record<string, unknown> | null | undefined): ReportSummaryItem[] {
+    if (!record) {
+      return [];
+    }
+
+    return Object.entries(record)
+      .filter(([, value]) => value !== null && value !== undefined && value !== "")
+      .map(([key, value]) => ({
+        label: humanizeWords(key),
+        value: typeof value === "string" || typeof value === "number" ? value : String(value)
+      }));
+  }
+
+  private createDatasetFromRows(
+    title: string,
+    rows: Array<Record<string, unknown>>,
+    options?: {
+      subtitle?: string;
+      metadata?: ReportMetaItem[];
+      summary?: ReportSummaryItem[];
+    }
+  ) {
     if (!rows.length) {
       return {
         title,
+        subtitle: options?.subtitle,
         columns: [],
-        rows: []
+        rows: [],
+        metadata: options?.metadata ?? [],
+        summary: options?.summary ?? []
       } satisfies ReportExportDataset;
     }
 
-    const keys = Object.keys(rows[0]!);
+    const keys = Object.keys(rows[0]!).filter((key, _, allKeys) => !this.shouldHideColumn(key, allKeys));
     return {
       title,
-      columns: keys.map((key) => ({ key, label: key })),
-      rows: rows as Array<Record<string, string | number | null | undefined>>
+      subtitle: options?.subtitle,
+      columns: keys.map((key) => ({
+        key,
+        label: humanizeWords(key),
+        type: this.inferColumnType(key, rows)
+      })),
+      rows: rows as Array<Record<string, string | number | Date | null | undefined>>,
+      metadata: options?.metadata ?? [],
+      summary: options?.summary ?? []
     } satisfies ReportExportDataset;
   }
 
-  private datasetFromDetailedResult(title: string, data: { items: unknown[] }) {
-    return this.createDatasetFromRows(title, data.items as Array<Record<string, unknown>>);
+  private datasetFromDetailedResult(
+    title: string,
+    data: { items: unknown[]; totals?: Record<string, unknown> | null | undefined },
+    query: ExportReportQuery
+  ) {
+    return this.createDatasetFromRows(title, data.items as Array<Record<string, unknown>>, {
+      metadata: this.buildDatasetMetadata(query, data.items.length),
+      summary: this.buildSummaryItems(data.totals ?? null)
+    });
+  }
+
+  private datasetFromRowsWithMetadata(title: string, rows: Array<Record<string, unknown>>, query: ExportReportQuery, summary?: ReportSummaryItem[]) {
+    return this.createDatasetFromRows(title, rows, {
+      metadata: this.buildDatasetMetadata(query, rows.length),
+      summary: summary ?? []
+    });
   }
 
   private async buildExportDataset(actor: ReportsActor, query: ExportReportQuery, context: ReportsRequestContext) {
     switch (query.reportType) {
-      case "sales.summary":
-        return this.createDatasetFromRows("Sales Summary", [await this.getSalesSummary(actor, query, context) as Record<string, unknown>]);
+      case "sales.summary": {
+        const data = await this.getSalesSummary(actor, query, context) as Record<string, unknown>;
+        return this.datasetFromRowsWithMetadata("Sales Summary", [data], query, this.buildSummaryItems(data));
+      }
       case "sales.detailed":
-        return this.datasetFromDetailedResult("Sales Detailed", await this.getSalesDetailed(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context));
+        return this.datasetFromDetailedResult(
+          "Sales Detailed",
+          await this.getSalesDetailed(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context),
+          query
+        );
       case "sales.top-customers":
-        return this.createDatasetFromRows("Top Customers", (await this.getSalesTopCustomers(actor, { ...query, limit: 20 }, context)).items as Array<Record<string, unknown>>);
+        return this.datasetFromRowsWithMetadata(
+          "Top Customers",
+          (await this.getSalesTopCustomers(actor, { ...query, limit: 20 }, context)).items as Array<Record<string, unknown>>,
+          query
+        );
       case "sales.top-products":
-        return this.createDatasetFromRows("Top Products", (await this.getSalesTopProducts(actor, { ...query, limit: 20 }, context)).items as Array<Record<string, unknown>>);
-      case "purchases.summary":
-        return this.createDatasetFromRows("Purchase Summary", [await this.getPurchasesSummary(actor, query, context) as Record<string, unknown>]);
+        return this.datasetFromRowsWithMetadata(
+          "Top Products",
+          (await this.getSalesTopProducts(actor, { ...query, limit: 20 }, context)).items as Array<Record<string, unknown>>,
+          query
+        );
+      case "purchases.summary": {
+        const data = await this.getPurchasesSummary(actor, query, context) as Record<string, unknown>;
+        return this.datasetFromRowsWithMetadata("Purchase Summary", [data], query, this.buildSummaryItems(data));
+      }
       case "purchases.detailed":
-        return this.datasetFromDetailedResult("Purchases Detailed", await this.getPurchasesDetailed(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context));
+        return this.datasetFromDetailedResult(
+          "Purchases Detailed",
+          await this.getPurchasesDetailed(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context),
+          query
+        );
       case "customers.ledger":
-        return this.datasetFromDetailedResult("Customer Ledger", await this.getCustomersLedger(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context));
+        return this.datasetFromDetailedResult(
+          "Customer Ledger",
+          await this.getCustomersLedger(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context),
+          query
+        );
       case "customers.outstanding":
-        return this.createDatasetFromRows("Customer Outstanding", (await this.getCustomersOutstanding(actor, query, context)).items as Array<Record<string, unknown>>);
+        return this.datasetFromRowsWithMetadata(
+          "Customer Outstanding",
+          (await this.getCustomersOutstanding(actor, query, context)).items as Array<Record<string, unknown>>,
+          query
+        );
       case "customers.aging":
-        return this.createDatasetFromRows("Customer Aging", (await this.getCustomersAging(actor, query, context)).items as Array<Record<string, unknown>>);
+        return this.datasetFromRowsWithMetadata(
+          "Customer Aging",
+          (await this.getCustomersAging(actor, query, context)).items as Array<Record<string, unknown>>,
+          query
+        );
       case "suppliers.ledger":
-        return this.datasetFromDetailedResult("Supplier Ledger", await this.getSuppliersLedger(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context));
+        return this.datasetFromDetailedResult(
+          "Supplier Ledger",
+          await this.getSuppliersLedger(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context),
+          query
+        );
       case "suppliers.outstanding":
-        return this.createDatasetFromRows("Supplier Outstanding", (await this.getSuppliersOutstanding(actor, query, context)).items as Array<Record<string, unknown>>);
+        return this.datasetFromRowsWithMetadata(
+          "Supplier Outstanding",
+          (await this.getSuppliersOutstanding(actor, query, context)).items as Array<Record<string, unknown>>,
+          query
+        );
       case "suppliers.aging":
-        return this.createDatasetFromRows("Supplier Aging", (await this.getSuppliersAging(actor, query, context)).items as Array<Record<string, unknown>>);
+        return this.datasetFromRowsWithMetadata(
+          "Supplier Aging",
+          (await this.getSuppliersAging(actor, query, context)).items as Array<Record<string, unknown>>,
+          query
+        );
       case "inventory.current-stock":
-        return this.datasetFromDetailedResult("Current Stock", await this.getInventoryCurrentStock(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context));
+        return this.datasetFromDetailedResult(
+          "Current Stock",
+          await this.getInventoryCurrentStock(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context),
+          query
+        );
       case "inventory.valuation":
-        return this.createDatasetFromRows("Inventory Valuation", (await this.getInventoryValuation(actor, query, context)).items as Array<Record<string, unknown>>);
+        return this.datasetFromRowsWithMetadata(
+          "Inventory Valuation",
+          (await this.getInventoryValuation(actor, query, context)).items as Array<Record<string, unknown>>,
+          query
+        );
       case "inventory.expiry":
-        return this.datasetFromDetailedResult("Inventory Expiry", await this.getInventoryExpiry(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context));
+        return this.datasetFromDetailedResult(
+          "Inventory Expiry",
+          await this.getInventoryExpiry(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context),
+          query
+        );
       case "inventory.movement":
-        return this.datasetFromDetailedResult("Inventory Movement", await this.getInventoryMovement(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context));
+        return this.datasetFromDetailedResult(
+          "Inventory Movement",
+          await this.getInventoryMovement(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context),
+          query
+        );
       case "inventory.low-stock":
-        return this.createDatasetFromRows("Low Stock", (await this.getInventoryLowStock(actor, query, context)).items as Array<Record<string, unknown>>);
+        return this.datasetFromRowsWithMetadata(
+          "Low Stock",
+          (await this.getInventoryLowStock(actor, query, context)).items as Array<Record<string, unknown>>,
+          query
+        );
       case "expenses.category-wise":
-        return this.createDatasetFromRows("Expense Category Wise", ((await this.getExpenseCategoryWise(actor, query, context)) as { items: Array<Record<string, unknown>> }).items);
+        return this.datasetFromRowsWithMetadata(
+          "Expense Category Wise",
+          ((await this.getExpenseCategoryWise(actor, query, context)) as { items: Array<Record<string, unknown>> }).items,
+          query
+        );
       case "expenses.monthly":
-        return this.createDatasetFromRows("Expense Monthly", ((await this.getExpenseMonthly(actor, query, context)) as { items: Array<Record<string, unknown>> }).items);
+        return this.datasetFromRowsWithMetadata(
+          "Expense Monthly",
+          ((await this.getExpenseMonthly(actor, query, context)) as { items: Array<Record<string, unknown>> }).items,
+          query
+        );
       case "expenses.payment-mode":
-        return this.createDatasetFromRows("Expense Payment Mode", ((await this.getExpensePaymentMode(actor, query, context)) as { items: Array<Record<string, unknown>> }).items);
-      case "income.summary":
-        return this.createDatasetFromRows("Income Summary", [await this.getIncomeSummary(actor, query, context) as Record<string, unknown>]);
+        return this.datasetFromRowsWithMetadata(
+          "Expense Payment Mode",
+          ((await this.getExpensePaymentMode(actor, query, context)) as { items: Array<Record<string, unknown>> }).items,
+          query
+        );
+      case "income.summary": {
+        const data = await this.getIncomeSummary(actor, query, context) as Record<string, unknown>;
+        return this.datasetFromRowsWithMetadata("Income Summary", [data], query, this.buildSummaryItems(data));
+      }
       case "income.monthly":
-        return this.createDatasetFromRows("Income Monthly", (await this.getIncomeMonthly(actor, query, context)).items as Array<Record<string, unknown>>);
+        return this.datasetFromRowsWithMetadata(
+          "Income Monthly",
+          (await this.getIncomeMonthly(actor, query, context)).items as Array<Record<string, unknown>>,
+          query
+        );
       case "payroll.monthly":
-        return this.createDatasetFromRows("Payroll Monthly", ((await this.getPayrollMonthly(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { items: Array<Record<string, unknown>> }).items);
+        return this.datasetFromRowsWithMetadata(
+          "Payroll Monthly",
+          ((await this.getPayrollMonthly(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { items: Array<Record<string, unknown>> }).items,
+          query
+        );
       case "payroll.employee":
-        return this.createDatasetFromRows("Payroll Employee", ((await this.getPayrollEmployee(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { items: Array<Record<string, unknown>> }).items);
+        return this.datasetFromRowsWithMetadata(
+          "Payroll Employee",
+          ((await this.getPayrollEmployee(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { items: Array<Record<string, unknown>> }).items,
+          query
+        );
       case "payroll.department":
-        return this.createDatasetFromRows("Payroll Department", ((await this.getPayrollDepartment(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { items: Array<Record<string, unknown>> }).items);
-      case "gst.summary":
-        return this.createDatasetFromRows("GST Summary", [await this.getGstSummary(actor, query, context) as Record<string, unknown>]);
+        return this.datasetFromRowsWithMetadata(
+          "Payroll Department",
+          ((await this.getPayrollDepartment(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { items: Array<Record<string, unknown>> }).items,
+          query
+        );
+      case "gst.summary": {
+        const data = await this.getGstSummary(actor, query, context) as Record<string, unknown>;
+        return this.datasetFromRowsWithMetadata("GST Summary", [data], query, this.buildSummaryItems(data));
+      }
       case "gst.hsn":
-        return this.createDatasetFromRows("GST HSN", ((await this.getGstHsn(actor, query, context)) as { items: Array<Record<string, unknown>> }).items);
+        return this.datasetFromRowsWithMetadata(
+          "GST HSN",
+          ((await this.getGstHsn(actor, query, context)) as { items: Array<Record<string, unknown>> }).items,
+          query
+        );
       case "accounting.trial-balance":
-        return this.createDatasetFromRows("Trial Balance", ((await this.getTrialBalance(actor, query, context)) as { items: Array<Record<string, unknown>> }).items);
+        return this.datasetFromRowsWithMetadata(
+          "Trial Balance",
+          ((await this.getTrialBalance(actor, query, context)) as { items: Array<Record<string, unknown>> }).items,
+          query
+        );
       case "accounting.profit-loss": {
         const data = await this.getProfitLoss(actor, query, context) as { items: Array<Record<string, unknown>> };
-        return this.createDatasetFromRows("Profit and Loss", data.items);
+        return this.datasetFromRowsWithMetadata("Profit and Loss", data.items, query);
       }
       case "accounting.balance-sheet": {
         const data = await this.getBalanceSheet(actor, query, context) as {
@@ -662,16 +917,28 @@ export class ReportsService {
           liabilities: Array<Record<string, unknown>>;
           equity: Array<Record<string, unknown>>;
         };
-        return this.createDatasetFromRows("Balance Sheet", [
-          ...data.assets.map((item) => ({ section: "assets", ...item })),
-          ...data.liabilities.map((item) => ({ section: "liabilities", ...item })),
-          ...data.equity.map((item) => ({ section: "equity", ...item }))
-        ]);
+        return this.datasetFromRowsWithMetadata(
+          "Balance Sheet",
+          [
+            ...data.assets.map((item) => ({ section: "assets", ...item })),
+            ...data.liabilities.map((item) => ({ section: "liabilities", ...item })),
+            ...data.equity.map((item) => ({ section: "equity", ...item }))
+          ],
+          query
+        );
       }
       case "accounting.cash-book":
-        return this.createDatasetFromRows("Cash Book", ((await this.getCashBook(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { rows: Array<Record<string, unknown>> }).rows);
+        return this.datasetFromRowsWithMetadata(
+          "Cash Book",
+          ((await this.getCashBook(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { rows: Array<Record<string, unknown>> }).rows,
+          query
+        );
       case "accounting.bank-book":
-        return this.createDatasetFromRows("Bank Book", ((await this.getBankBook(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { rows: Array<Record<string, unknown>> }).rows);
+        return this.datasetFromRowsWithMetadata(
+          "Bank Book",
+          ((await this.getBankBook(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context)) as { rows: Array<Record<string, unknown>> }).rows,
+          query
+        );
       default:
         throw new AppError("Unsupported report type", 400);
     }

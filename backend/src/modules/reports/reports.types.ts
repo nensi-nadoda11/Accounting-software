@@ -58,13 +58,26 @@ export type ReportFilePayload = {
 export type ReportColumn = {
   key: string;
   label: string;
-  type?: "string" | "number" | "date" | "datetime";
+  type?: "string" | "number" | "date" | "datetime" | undefined;
+};
+
+export type ReportMetaItem = {
+  label: string;
+  value: string;
+};
+
+export type ReportSummaryItem = {
+  label: string;
+  value: string | number;
 };
 
 export type ReportExportDataset = {
   title: string;
+  subtitle?: string | undefined;
   columns: ReportColumn[];
-  rows: Array<Record<string, string | number | null | undefined>>;
+  rows: Array<Record<string, string | number | Date | null | undefined>>;
+  metadata?: ReportMetaItem[] | undefined;
+  summary?: ReportSummaryItem[] | undefined;
 };
 
 export type ReportPagination = {

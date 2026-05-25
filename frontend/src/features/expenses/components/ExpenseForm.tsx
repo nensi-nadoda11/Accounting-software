@@ -9,6 +9,8 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { ToggleSwitch } from "../../../components/ui/ToggleSwitch";
+import { getErrorMessage } from "../../../lib/errors";
+import { useToast } from "../../../providers/useToast";
 import type { CompanyBankAccount, CompanyTaxSettings } from "../../../types/company";
 import type { Account } from "../../../types/accounting";
 import type { ExpenseCategory, ExpenseFormInput } from "../../../types/expense";
@@ -20,7 +22,7 @@ import {
   BANK_LINKED_PAYMENT_MODES,
 } from "../expenseOptions";
 import { expenseFormSchema, type ExpenseFormInputValues, type ExpenseFormValues } from "../expenseSchemas";
-import { calculateExpensePreview, resolveIntraState } from "../expenseUtils";
+import { applyExpenseFieldErrors, calculateExpensePreview, resolveIntraState } from "../expenseUtils";
 
 export const ExpenseForm = ({
   initialValues,
@@ -49,6 +51,7 @@ export const ExpenseForm = ({
   onSubmit: (values: ExpenseFormInput, status: "draft" | "posted") => Promise<void>;
   onBackToList: () => void;
 }) => {
+  const toast = useToast();
   const [submitIntent, setSubmitIntent] = useState<"draft" | "posted">("draft");
   const form = useForm<ExpenseFormInputValues, undefined, ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
@@ -100,12 +103,23 @@ export const ExpenseForm = ({
     [amount, companyGstNumber, companyState, gstApplicable, gstRate, priceTaxType, vendorGstNumber],
   );
 
+  const handleSubmit = form.handleSubmit(async (values) => {
+    try {
+      await onSubmit(values, submitIntent);
+    } catch (error) {
+      if (!applyExpenseFieldErrors(error, form.setError)) {
+        toast.error(getErrorMessage(error, "Failed to save expense"));
+      }
+    }
+  });
+
   return (
     <form
       className="space-y-4"
-      onSubmit={form.handleSubmit(async (values) => {
-        await onSubmit(values, submitIntent);
-      })}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleSubmit();
+      }}
     >
       <Card>
         <CardHeader title={editing ? "Edit Expense Draft" : "New Expense"} />

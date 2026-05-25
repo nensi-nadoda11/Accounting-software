@@ -7,9 +7,12 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { Textarea } from "../../../components/ui/Textarea";
+import { getErrorMessage } from "../../../lib/errors";
+import { useToast } from "../../../providers/useToast";
 import type { Account } from "../../../types/accounting";
 import type { ExpenseCategory } from "../../../types/expense";
 import { expenseCategorySchema, type ExpenseCategoryInputValues, type ExpenseCategoryValues } from "../expenseSchemas";
+import { applyExpenseFieldErrors } from "../expenseUtils";
 
 export const ExpenseCategoryDrawer = ({
   open,
@@ -28,6 +31,7 @@ export const ExpenseCategoryDrawer = ({
   onClose: () => void;
   onSubmit: (values: ExpenseCategoryValues) => Promise<void>;
 }) => {
+  const toast = useToast();
   const form = useForm<ExpenseCategoryInputValues, undefined, ExpenseCategoryValues>({
     resolver: zodResolver(expenseCategorySchema),
     defaultValues: {
@@ -55,6 +59,16 @@ export const ExpenseCategoryDrawer = ({
     });
   }, [category, form, open]);
 
+  const handleSubmit = form.handleSubmit(async (values) => {
+    try {
+      await onSubmit(values);
+    } catch (error) {
+      if (!applyExpenseFieldErrors(error, form.setError)) {
+        toast.error(getErrorMessage(error, "Failed to save category"));
+      }
+    }
+  });
+
   return (
     <SideSheet
       open={open}
@@ -66,7 +80,7 @@ export const ExpenseCategoryDrawer = ({
           <Button type="button" variant="secondary" onClick={onClose}>
             Close
           </Button>
-          <Button type="button" loading={submitting} onClick={form.handleSubmit(onSubmit)}>
+          <Button type="button" loading={submitting} onClick={() => void handleSubmit()}>
             Save Category
           </Button>
         </>

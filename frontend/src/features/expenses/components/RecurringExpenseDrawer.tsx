@@ -8,6 +8,8 @@ import { Select } from "../../../components/ui/Select";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { Textarea } from "../../../components/ui/Textarea";
 import { ToggleSwitch } from "../../../components/ui/ToggleSwitch";
+import { getErrorMessage } from "../../../lib/errors";
+import { useToast } from "../../../providers/useToast";
 import type { Account } from "../../../types/accounting";
 import type { CompanyBankAccount, CompanyTaxSettings } from "../../../types/company";
 import type { ExpenseCategory, RecurringExpense } from "../../../types/expense";
@@ -20,7 +22,7 @@ import {
   RECURRING_FREQUENCY_OPTIONS,
 } from "../expenseOptions";
 import { recurringExpenseSchema, type RecurringExpenseInputValues, type RecurringExpenseValues } from "../expenseSchemas";
-import { buildRecurringFormDefaults } from "../expenseUtils";
+import { applyExpenseFieldErrors, buildRecurringFormDefaults } from "../expenseUtils";
 
 export const RecurringExpenseDrawer = ({
   open,
@@ -43,6 +45,7 @@ export const RecurringExpenseDrawer = ({
   onClose: () => void;
   onSubmit: (values: RecurringExpenseValues) => Promise<void>;
 }) => {
+  const toast = useToast();
   const form = useForm<RecurringExpenseInputValues, undefined, RecurringExpenseValues>({
     resolver: zodResolver(recurringExpenseSchema),
     defaultValues: buildRecurringFormDefaults(recurring, taxSettings),
@@ -62,6 +65,16 @@ export const RecurringExpenseDrawer = ({
     }
   }, [form, gstApplicable]);
 
+  const handleSubmit = form.handleSubmit(async (values) => {
+    try {
+      await onSubmit(values);
+    } catch (error) {
+      if (!applyExpenseFieldErrors(error, form.setError)) {
+        toast.error(getErrorMessage(error, "Failed to save recurring expense"));
+      }
+    }
+  });
+
   return (
     <SideSheet
       open={open}
@@ -73,7 +86,7 @@ export const RecurringExpenseDrawer = ({
           <Button type="button" variant="secondary" onClick={onClose}>
             Close
           </Button>
-          <Button type="button" loading={submitting} onClick={form.handleSubmit(onSubmit)}>
+          <Button type="button" loading={submitting} onClick={() => void handleSubmit()}>
             Save Template
           </Button>
         </>

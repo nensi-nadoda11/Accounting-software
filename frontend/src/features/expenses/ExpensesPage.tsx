@@ -548,8 +548,6 @@ export const ExpensesPage = () => {
           setEditingExpense(createdExpense);
         }
       }
-    } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to save expense"));
     } finally {
       setExpenseSubmitState(null);
     }
@@ -611,8 +609,6 @@ export const ExpensesPage = () => {
       setCategoryEditing(null);
       await Promise.all([loadCategoryLookup()]);
       refreshCategories();
-    } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to save category"));
     } finally {
       setCategorySubmitting(false);
     }
@@ -633,8 +629,6 @@ export const ExpensesPage = () => {
       setEditingRecurring(null);
       await loadRecurringLookup();
       refreshRecurring();
-    } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to save recurring expense"));
     } finally {
       setRecurringSubmitting(false);
     }

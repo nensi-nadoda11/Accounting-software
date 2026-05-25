@@ -1,3 +1,6 @@
+import { AxiosError } from "axios";
+import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
+
 import type { CompanyTaxSettings } from "../../types/company";
 import type {
   CategoryWiseExpenseReportRow,
@@ -16,6 +19,11 @@ import type {
   RecurringExpenseFrequency,
 } from "../../types/expense";
 import { EXPENSE_PAYMENT_MODE_LABELS, RECURRING_FREQUENCY_LABELS } from "./expenseOptions";
+
+type ApiErrorShape = {
+  message?: string;
+  errors?: string[];
+};
 
 const DECIMAL_REGEX = /^-?\d+(?:\.\d+)?$/;
 const GST_DIVISOR_SCALE = 4;
@@ -89,6 +97,37 @@ const fromScaled = (value: bigint, scale: number) => {
 };
 
 export const normalizeMoney = (value: string | number | null | undefined) => fromScaled(roundToScale(value, 2), 2);
+
+export const applyExpenseFieldErrors = <TFieldValues extends FieldValues>(
+  error: unknown,
+  setError: UseFormSetError<TFieldValues>,
+) => {
+  if (!(error instanceof AxiosError) || !error.response) {
+    return false;
+  }
+
+  const data = error.response.data as ApiErrorShape | undefined;
+  let handled = false;
+
+  for (const item of data?.errors ?? []) {
+    const separatorIndex = item.indexOf(":");
+    if (separatorIndex < 0) {
+      continue;
+    }
+
+    const field = item.slice(0, separatorIndex).trim() as Path<TFieldValues>;
+    const message = item.slice(separatorIndex + 1).trim();
+
+    if (!field || !message) {
+      continue;
+    }
+
+    setError(field, { type: "server", message });
+    handled = true;
+  }
+
+  return handled;
+};
 
 export const addDecimals = (
   left: string | number | null | undefined,

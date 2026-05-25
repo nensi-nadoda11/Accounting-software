@@ -17,15 +17,12 @@ import { useDebouncedValue } from "../customers/useDebouncedValue";
 import { applyFriendlyFieldErrors, saveDownloadedFile } from "../customers/customerUtils";
 import { bankApi } from "../../services/bankApi";
 import { companyApi } from "../../services/companyApi";
-import { customersApi } from "../../services/customersApi";
 import { inventoryApi } from "../../services/inventoryApi";
 import { salesApi } from "../../services/salesApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../types/company";
-import type { CustomerListItem } from "../../types/customer";
 import type { Warehouse } from "../../types/inventory";
 import type {
   InvoiceStatus,
-  InvoiceType,
   PaymentStatus,
   SalesExportFormat,
   SalesInvoice,
@@ -60,8 +57,6 @@ const isInvoiceStatus = (value: string): value is InvoiceStatus =>
 
 const isPaymentStatus = (value: string): value is PaymentStatus =>
   value === "unpaid" || value === "partial" || value === "paid" || value === "overdue";
-
-const isInvoiceType = (value: string): value is InvoiceType => value === "gst_invoice" || value === "pos";
 
 const buildPrintHtml = (invoice: SalesInvoice) => `<!doctype html>
 <html>
@@ -135,8 +130,6 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   const [invoiceSettings, setInvoiceSettings] = useState<CompanyInvoiceSettings | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [bankAccounts, setBankAccounts] = useState<CompanyBankAccount[]>([]);
-  const [filterCustomers, setFilterCustomers] = useState<CustomerListItem[]>([]);
-
   const [listData, setListData] = useState<SalesListResponse | null>(null);
   const [returnsData, setReturnsData] = useState<SalesReturnsResponse | null>(null);
   const [loadingList, setLoadingList] = useState(false);
@@ -185,14 +178,10 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   const page = Math.max(Number(searchParams.get("page") ?? "1"), 1);
   const invoiceStatus = searchParams.get("invoiceStatus") ?? "";
   const paymentStatus = searchParams.get("paymentStatus") ?? "";
-  const customerId = searchParams.get("customerId") ?? "";
-  const warehouseId = searchParams.get("warehouseId") ?? "";
-  const invoiceType = searchParams.get("invoiceType") ?? "";
   const dateFrom = searchParams.get("dateFrom") ?? "";
   const dateTo = searchParams.get("dateTo") ?? "";
   const invoiceStatusFilter = isInvoiceStatus(invoiceStatus) ? invoiceStatus : "";
   const paymentStatusFilter = isPaymentStatus(paymentStatus) ? paymentStatus : "";
-  const invoiceTypeFilter = isInvoiceType(invoiceType) ? invoiceType : "";
 
   const canView = auth.hasPermission("sales.view");
   const canCreate = auth.hasPermission("sales.create");
@@ -234,19 +223,13 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   }, [debouncedSearch]);
 
   const loadReferenceData = async () => {
-    const [warehouseResult, customerResult] = await Promise.allSettled([
+    const [warehouseResult] = await Promise.allSettled([
       inventoryApi.listWarehouses({ page: 1, limit: 100, status: "active" }),
-      customersApi.list({ page: 1, limit: 100, status: "active" }),
     ]);
 
     setWarehouses(
       warehouseResult.status === "fulfilled"
         ? warehouseResult.value.data.items.filter((warehouse) => warehouse.status === "active")
-        : [],
-    );
-    setFilterCustomers(
-      customerResult.status === "fulfilled"
-        ? customerResult.value.data.items.filter((customer) => customer.status === "active")
         : [],
     );
 
@@ -280,9 +263,6 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
         search: searchParams.get("search") || undefined,
         invoiceStatus: invoiceStatusFilter || undefined,
         paymentStatus: paymentStatusFilter || undefined,
-        customerId: customerId || undefined,
-        warehouseId: warehouseId || undefined,
-        invoiceType: invoiceTypeFilter || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
@@ -302,8 +282,6 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
         page,
         limit: 20,
         search: searchParams.get("search") || undefined,
-        customerId: customerId || undefined,
-        warehouseId: warehouseId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
@@ -408,7 +386,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
     if (tab === "returns") {
       void loadReturns();
     }
-  }, [tab, page, invoiceStatus, paymentStatus, customerId, warehouseId, invoiceType, dateFrom, dateTo, searchParams]);
+  }, [tab, page, invoiceStatus, paymentStatus, dateFrom, dateTo, searchParams]);
 
   const refreshCurrentTab = async () => {
     if (tab === "returns") {
@@ -480,9 +458,15 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
             companyProfile={companyProfile}
             invoiceSettings={invoiceSettings}
             submitting={submittingForm}
-            onSubmit={async (values, setError) => {
+            onSubmit={async (values, setError, submitMode) => {
               try {
                 setSubmittingForm(true);
+                if (submitMode === "draft") {
+                  await salesApi.create({ ...values, invoiceType: "pos", invoiceStatus: "draft" });
+                  toast.success("POS invoice saved as hold");
+                  return;
+                }
+
                 const response = await salesApi.createPos({ ...values, invoiceType: "pos", invoiceStatus: "posted" });
                 toast.success("POS invoice saved");
                 await printInvoice(response.data.invoice.id);
@@ -500,16 +484,19 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
           <PageHeader
             title="Sales Returns"
             actions={
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                 {canExport ? (
                   <>
-                    <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SalesExportFormat)} className="w-28">
-                      <option value="xlsx">XLSX</option>
-                      <option value="pdf">PDF</option>
-                    </Select>
+                    <div className="w-28 shrink-0">
+                      <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SalesExportFormat)} className="w-full">
+                        <option value="xlsx">XLSX</option>
+                        <option value="pdf">PDF</option>
+                      </Select>
+                    </div>
                     <Button
                       type="button"
                       variant="secondary"
+                      className="shrink-0"
                       loading={exporting}
                       onClick={async () => {
                         try {
@@ -518,8 +505,6 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
                             page,
                             limit: 20,
                             search: searchParams.get("search") || undefined,
-                            customerId: customerId || undefined,
-                            warehouseId: warehouseId || undefined,
                             dateFrom: dateFrom || undefined,
                             dateTo: dateTo || undefined,
                             format: exportFormat,
@@ -539,7 +524,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
                   </>
                 ) : null}
                 {canReturn ? (
-                  <Button type="button" onClick={() => void openReturnCreate()}>
+                  <Button type="button" className="shrink-0" onClick={() => void openReturnCreate()}>
                     <Plus className="mr-2 size-4" />
                     New Return
                   </Button>
@@ -553,19 +538,14 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
             values={{
               invoiceStatus: "",
               paymentStatus: "",
-              customerId,
-              warehouseId,
-              invoiceType: "",
               dateFrom,
               dateTo,
             }}
-            customers={filterCustomers}
-            warehouses={warehouses}
             onSearchChange={setSearch}
             onChange={(values) => {
               updateQuery({
-                customerId: values.customerId !== undefined ? values.customerId || null : customerId || null,
-                warehouseId: values.warehouseId !== undefined ? values.warehouseId || null : warehouseId || null,
+                customerId: null,
+                warehouseId: null,
                 dateFrom: values.dateFrom !== undefined ? values.dateFrom || null : dateFrom || null,
                 dateTo: values.dateTo !== undefined ? values.dateTo || null : dateTo || null,
                 page: "1",
@@ -607,16 +587,19 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
           <PageHeader
             title="Sales Invoices"
             actions={
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                 {canExport ? (
                   <>
-                    <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SalesExportFormat)} className="w-28">
-                      <option value="xlsx">XLSX</option>
-                      <option value="pdf">PDF</option>
-                    </Select>
+                    <div className="w-28 shrink-0">
+                      <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SalesExportFormat)} className="w-full">
+                        <option value="xlsx">XLSX</option>
+                        <option value="pdf">PDF</option>
+                      </Select>
+                    </div>
                     <Button
                       type="button"
                       variant="secondary"
+                      className="shrink-0"
                       loading={exporting}
                       onClick={async () => {
                         try {
@@ -627,9 +610,6 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
                             search: searchParams.get("search") || undefined,
                             invoiceStatus: invoiceStatusFilter || undefined,
                             paymentStatus: paymentStatusFilter || undefined,
-                            customerId: customerId || undefined,
-                            warehouseId: warehouseId || undefined,
-                            invoiceType: invoiceTypeFilter || undefined,
                             dateFrom: dateFrom || undefined,
                             dateTo: dateTo || undefined,
                             format: exportFormat,
@@ -651,6 +631,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
                 {canCreate && tab === "invoices" ? (
                   <Button
                     type="button"
+                    className="shrink-0"
                     onClick={() => navigate("/app/sales/pos")}
                   >
                     <Plus className="mr-2 size-4" />
@@ -666,22 +647,16 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
             values={{
               invoiceStatus: invoiceStatusFilter,
               paymentStatus: paymentStatusFilter,
-              customerId,
-              warehouseId,
-              invoiceType: invoiceTypeFilter,
               dateFrom,
               dateTo,
             }}
-            customers={filterCustomers}
-            warehouses={warehouses}
             onSearchChange={setSearch}
             onChange={(values) => {
               updateQuery({
                 invoiceStatus: values.invoiceStatus !== undefined ? values.invoiceStatus || null : invoiceStatusFilter || null,
                 paymentStatus: values.paymentStatus !== undefined ? values.paymentStatus || null : paymentStatusFilter || null,
-                customerId: values.customerId !== undefined ? values.customerId || null : customerId || null,
-                warehouseId: values.warehouseId !== undefined ? values.warehouseId || null : warehouseId || null,
-                invoiceType: values.invoiceType !== undefined ? values.invoiceType || null : invoiceTypeFilter || null,
+                customerId: null,
+                warehouseId: null,
                 dateFrom: values.dateFrom !== undefined ? values.dateFrom || null : dateFrom || null,
                 dateTo: values.dateTo !== undefined ? values.dateTo || null : dateTo || null,
                 page: "1",

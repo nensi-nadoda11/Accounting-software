@@ -43,8 +43,8 @@ export const NestedRouteSidebar = ({
   }
 
   return (
-    <aside className="w-full lg:w-64 lg:flex-none">
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:min-h-[calc(100vh-7.5rem)]">
+    <aside className="w-full lg:w-64 lg:flex-none lg:sticky lg:top-[5.25rem] lg:h-[calc(100vh-5.75rem)] lg:self-start">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
         <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <p className="text-base font-semibold text-slate-900">{title}</p>
           <Button
@@ -58,7 +58,7 @@ export const NestedRouteSidebar = ({
           </Button>
         </div>
 
-        <nav className="space-y-1">
+        <nav className="space-y-1 lg:flex-1 lg:overflow-y-auto">
           {tabs.map((tab) => {
             const active = isTabActive(currentPath, tab.href);
             return (

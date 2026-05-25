@@ -32,7 +32,7 @@ import { CustomerFilters } from "./components/CustomerFilters";
 import { CustomerFormDrawer } from "./components/CustomerFormDrawer";
 import { CustomerLedgerDrawer } from "./components/CustomerLedgerDrawer";
 import { CustomerPaymentsDrawer } from "./components/CustomerPaymentsDrawer";
-import { CUSTOMER_STATUS_LABELS, CUSTOMER_TYPE_LABELS, TAX_TYPE_LABELS } from "./customerOptions";
+import { CUSTOMER_STATUS_LABELS, CUSTOMER_TYPE_LABELS } from "./customerOptions";
 import {
   applyFriendlyFieldErrors,
   createCustomerPayload,
@@ -73,22 +73,21 @@ const toneForStatus = (status: CustomerStatus) => {
   return "danger";
 };
 
-const toneForTaxType = (taxType: TaxType) => {
-  if (taxType === "registered") {
-    return "success";
-  }
-
-  if (taxType === "composition") {
-    return "warning";
-  }
-
-  return "neutral";
-};
-
 const CustomerTableSkeleton = () => (
   <Card>
-    <TableWrapper className="border-none">
-      <Table>
+    <TableWrapper className="border-none overflow-x-visible">
+      <Table className="table-fixed">
+        <colgroup>
+          <col className="w-[10%]" />
+          <col className="w-[11%]" />
+          <col className="w-[10%]" />
+          <col className="w-[15%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[8%]" />
+          <col className="w-[16%]" />
+        </colgroup>
         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
           <tr>
             {["Customer Code", "Name", "Mobile", "GST Number", "Type", "Outstanding", "Credit Limit", "Status", "Actions"].map((head) => (
@@ -270,14 +269,18 @@ export const CustomersPage = () => {
   const rows = useMemo(() => data?.items ?? [], [data]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Customers"
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
             {canExport ? (
               <>
-                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as CustomerExportFormat)} className="w-28">
+                <Select
+                  value={exportFormat}
+                  onChange={(event) => setExportFormat(event.target.value as CustomerExportFormat)}
+                  className="w-24 shrink-0"
+                >
                   <option value="xlsx">XLSX</option>
                   <option value="pdf">PDF</option>
                 </Select>
@@ -316,7 +319,7 @@ export const CustomersPage = () => {
               </>
             ) : null}
             {canCreate ? (
-              <Button type="button" onClick={openCreateForm}>
+              <Button type="button" className="min-w-[172px] whitespace-nowrap" onClick={openCreateForm}>
                 <Plus className="mr-2 size-4" />
                 Add Customer
               </Button>
@@ -380,94 +383,96 @@ export const CustomersPage = () => {
         />
       ) : (
         <Card>
-          <TableWrapper className="border-none">
-            <div className="overflow-x-auto">
-              <Table>
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    {["Customer Code", "Name", "Mobile", "GST Number", "Type", "Outstanding", "Credit Limit", "Status", "Actions"].map((head) => (
-                      <th key={head} className="px-5 py-3 font-semibold">
-                        {head}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-700">
-                  {rows.map((item) => {
-                    const actionCustomer: CustomerActionTarget = {
-                      id: item.id,
-                      name: item.name,
-                      status: item.status,
-                      isBlacklisted: item.isBlacklisted,
-                    };
+          <TableWrapper className="border-none overflow-x-visible">
+            <Table className="table-fixed">
+              <colgroup>
+                <col className="w-[10%]" />
+                <col className="w-[11%]" />
+                <col className="w-[10%]" />
+                <col className="w-[15%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[8%]" />
+                <col className="w-[16%]" />
+              </colgroup>
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  {["Customer Code", "Name", "Mobile", "GST Number", "Type", "Outstanding", "Credit Limit", "Status", "Actions"].map((head) => (
+                    <th key={head} className="px-5 py-3 font-semibold">
+                      {head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-700">
+                {rows.map((item) => {
+                  const actionCustomer: CustomerActionTarget = {
+                    id: item.id,
+                    name: item.name,
+                    status: item.status,
+                    isBlacklisted: item.isBlacklisted,
+                  };
 
-                    return (
-                      <tr key={item.id} className="cursor-pointer transition hover:bg-slate-50" onDoubleClick={() => openDetail(item)}>
-                        <td className="px-5 py-4 font-medium text-slate-900">{item.customerCode}</td>
-                        <td className="px-5 py-4">
-                          <div className="space-y-1">
-                            <p className="font-medium text-slate-900">{item.name}</p>
-                            <div className="flex flex-wrap gap-2">
-                              <Badge tone="neutral">{CUSTOMER_TYPE_LABELS[item.customerType]}</Badge>
-                              <Badge tone={toneForTaxType(item.taxType)}>{TAX_TYPE_LABELS[item.taxType]}</Badge>
-                              {item.isBlacklisted ? <Badge tone="danger">Blacklisted</Badge> : null}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap">{item.mobile}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">{item.gstNumber || "-"}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">{CUSTOMER_TYPE_LABELS[item.customerType]}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <AmountText value={item.outstandingAmount} tone={Number(item.outstandingAmount) > 0 ? "success" : "default"} />
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap">{formatInr(item.creditLimit)}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <Badge tone={toneForStatus(item.status)}>{CUSTOMER_STATUS_LABELS[item.status]}</Badge>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <TableActionIconButton label="View customer" icon={<Eye className="size-4" />} onClick={() => openDetail(item)} />
-                            {canUpdate ? (
-                              <TableActionIconButton
-                                label="Edit customer"
-                                icon={<Pencil className="size-4" />}
-                                disabled={preparingFormId === item.id}
-                                onClick={() => void openEditForm(item.id)}
-                              />
-                            ) : null}
-                            {canLedgerView ? (
-                              <TableActionIconButton label="View ledger" icon={<FileText className="size-4" />} onClick={() => openLedger(item)} />
-                            ) : null}
-                            {canPaymentsView ? (
-                              <TableActionIconButton
-                                label="View payments"
-                                icon={<ReceiptText className="size-4" />}
-                                onClick={() => openPayments(item)}
-                              />
-                            ) : null}
-                            {canUpdate ? (
-                              <TableActionIconButton
-                                label={item.isBlacklisted ? "Remove blacklist" : "Blacklist customer"}
-                                icon={<Ban className="size-4" />}
-                                onClick={() => setActionDialog({ type: "blacklist", customer: actionCustomer })}
-                              />
-                            ) : null}
-                            {canDelete ? (
-                              <TableActionIconButton
-                                label="Delete customer"
-                                tone="danger"
-                                icon={<Trash2 className="size-4" />}
-                                onClick={() => setActionDialog({ type: "delete", customer: actionCustomer })}
-                              />
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-            </div>
+                  return (
+                    <tr key={item.id} className="cursor-pointer transition hover:bg-slate-50" onDoubleClick={() => openDetail(item)}>
+                      <td className="px-5 py-4 font-medium text-slate-900 break-words">{item.customerCode}</td>
+                      <td className="px-5 py-4 break-words">
+                        <p className="font-medium text-slate-900 break-words">{item.name}</p>
+                      </td>
+                      <td className="px-5 py-4 break-words">{item.mobile}</td>
+                      <td className="px-5 py-4 break-words">{item.gstNumber || "-"}</td>
+                      <td className="px-5 py-4 break-words">{CUSTOMER_TYPE_LABELS[item.customerType]}</td>
+                      <td className="px-5 py-4">
+                        <AmountText value={item.outstandingAmount} tone={Number(item.outstandingAmount) > 0 ? "success" : "default"} />
+                      </td>
+                      <td className="px-5 py-4">{formatInr(item.creditLimit)}</td>
+                      <td className="px-4 py-4">
+                        <Badge tone={toneForStatus(item.status)}>{CUSTOMER_STATUS_LABELS[item.status]}</Badge>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-nowrap items-center justify-start gap-1 whitespace-nowrap">
+                          <TableActionIconButton label="View customer" icon={<Eye className="size-4" />} onClick={() => openDetail(item)} />
+                          {canUpdate ? (
+                            <TableActionIconButton
+                              label="Edit customer"
+                              icon={<Pencil className="size-4" />}
+                              disabled={preparingFormId === item.id}
+                              onClick={() => void openEditForm(item.id)}
+                            />
+                          ) : null}
+                          {canLedgerView ? (
+                            <TableActionIconButton label="View ledger" icon={<FileText className="size-4" />} onClick={() => openLedger(item)} />
+                          ) : null}
+                          {canPaymentsView ? (
+                            <TableActionIconButton
+                              label="View payments"
+                              icon={<ReceiptText className="size-4" />}
+                              onClick={() => openPayments(item)}
+                            />
+                          ) : null}
+                          {canUpdate ? (
+                            <TableActionIconButton
+                              label={item.isBlacklisted ? "Remove blacklist" : "Blacklist customer"}
+                              icon={<Ban className="size-4" />}
+                              onClick={() => setActionDialog({ type: "blacklist", customer: actionCustomer })}
+                            />
+                          ) : null}
+                          {canDelete ? (
+                            <TableActionIconButton
+                              label="Delete customer"
+                              tone="danger"
+                              icon={<Trash2 className="size-4" />}
+                              onClick={() => setActionDialog({ type: "delete", customer: actionCustomer })}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
           </TableWrapper>
           {data?.pagination ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4">

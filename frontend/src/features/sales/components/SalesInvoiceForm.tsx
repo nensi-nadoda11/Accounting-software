@@ -425,25 +425,6 @@ export const SalesInvoiceForm = ({
     }
   }, [productDirectory, productDirectoryLoaded]);
 
-  const loadProducts = async (search: string) => {
-    try {
-      setProductLookupLoading(true);
-      const response = await productsApi.lookup(search, 20);
-      setProductLookup(
-        response.data.map((product) => ({
-          id: product.id,
-          label: product.name,
-          description: [product.productCode, product.sku, product.barcode].filter(Boolean).join(" · "),
-          meta: product.unit.symbol ? `${product.salePrice} · ${product.unit.symbol}` : product.salePrice,
-        })),
-      );
-    } finally {
-      setProductLookupLoading(false);
-    }
-  };
-
-  void loadProducts;
-
   const loadBatches = async (index: number, productId?: string, warehouseId?: string | null) => {
     const resolvedProductId = (productId ?? (form.getValues(`items.${index}.productId`) as string | undefined)) ?? "";
     const resolvedWarehouseId =
@@ -584,6 +565,60 @@ export const SalesInvoiceForm = ({
     }
   };
 
+  const getLookupValue = (index: number) => {
+    const item = values.items[index];
+    if (!item?.productId) {
+      return null;
+    }
+
+    const product = productDetails[item.productId];
+    if (!product) {
+      return productLookup.find((option) => option.id === item.productId) ?? null;
+    }
+
+    return {
+      id: product.id,
+      label: product.name,
+      description: [product.productCode, product.sku, product.barcode].filter(Boolean).join(" · "),
+      meta: product.unit.symbol,
+    };
+  };
+
+  const resetForm = () =>
+    form.reset({
+      ...buildSalesFormDefaults(initialInvoice, invoiceSettings, mode === "pos" ? "pos" : "gst_invoice"),
+      grandTotalPreview: Number(initialInvoice?.grandTotal ?? 0),
+    });
+
+  const submitDraft = form.handleSubmit(async (output) => {
+    setSubmitMode("draft");
+    try {
+      await onSubmit(createSalesPayload({ ...output, invoiceStatus: "draft" }), form.setError, "draft");
+    } catch (error) {
+      applyFriendlyFieldErrors(error, form.setError);
+    }
+  });
+
+  const submitPosted = form.handleSubmit(async (output) => {
+    setSubmitMode("posted");
+    try {
+      await onSubmit(createSalesPayload({ ...output, invoiceStatus: "posted" }), form.setError, "posted");
+    } catch (error) {
+      applyFriendlyFieldErrors(error, form.setError);
+    }
+  });
+
+  const posSummaryRows = [
+    { key: "subtotal", label: "Subtotal" },
+    { key: "itemDiscountTotal", label: "Item Discount" },
+    { key: "invoiceDiscountTotal", label: "Invoice Discount" },
+    { key: "taxableAmount", label: "Taxable" },
+    { key: "gstTotal", label: "GST" },
+    { key: "grandTotal", label: "Grand Total", emphasis: true },
+    { key: "paidAmount", label: "Paid" },
+    { key: "dueAmount", label: "Due", tone: "danger" as const },
+  ] as const;
+
   return (
     <form
       className="space-y-5"
@@ -591,227 +626,336 @@ export const SalesInvoiceForm = ({
         event.preventDefault();
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-        <div className="flex items-center gap-3">
-          {mode === "invoice" ? (
-            <Button type="button" variant="secondary" onClick={onBack}>
-              <ArrowLeft className="mr-2 size-4" />
-              Back to List
-            </Button>
-          ) : null}
-          <h1 className="text-xl font-semibold text-slate-900">
-            {mode === "pos" ? "POS Billing" : initialInvoice ? "Edit Sales Draft" : "New Sales Invoice"}
-          </h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {initialInvoice && onPrint ? (
-            <Button type="button" variant="secondary" onClick={() => onPrint(initialInvoice)}>
-              <FileText className="mr-2 size-4" />
-              PDF / Print
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              form.reset({
-                ...buildSalesFormDefaults(initialInvoice, invoiceSettings, mode === "pos" ? "pos" : "gst_invoice"),
-                grandTotalPreview: Number(initialInvoice?.grandTotal ?? 0),
-              })
-            }
-          >
-            Reset
-          </Button>
-          {mode === "invoice" ? (
-            <Button
-              type="button"
-              variant="secondary"
-              loading={submitting && submitMode === "draft"}
-              onClick={form.handleSubmit(async (output) => {
-                setSubmitMode("draft");
-                try {
-                  await onSubmit(createSalesPayload({ ...output, invoiceStatus: "draft" }), form.setError, "draft");
-                } catch (error) {
-                  applyFriendlyFieldErrors(error, form.setError);
-                }
-              })}
-            >
-              <Save className="mr-2 size-4" />
-              Save Draft
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            loading={submitting && submitMode === "posted"}
-            onClick={form.handleSubmit(async (output) => {
-              setSubmitMode("posted");
-              try {
-                await onSubmit(createSalesPayload({ ...output, invoiceStatus: "posted" }), form.setError, "posted");
-              } catch (error) {
-                applyFriendlyFieldErrors(error, form.setError);
-              }
-            })}
-          >
-            <Save className="mr-2 size-4" />
-            {mode === "pos" ? "Save & Print" : "Save & Post"}
-          </Button>
-        </div>
-      </div>
+      {mode === "pos" ? (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <h1 className="text-xl font-semibold text-slate-900">POS Billing</h1>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" onClick={resetForm}>
+                Reset
+              </Button>
+              <Button type="button" loading={submitting && submitMode === "posted"} onClick={submitPosted}>
+                <Save className="mr-2 size-4" />
+                Save & Print
+              </Button>
+            </div>
+          </div>
 
-      <Card>
-        <CardHeader title={mode === "pos" ? "Quick Entry" : "Header"} />
-        <CardContent className={`grid gap-4 ${mode === "pos" ? "md:grid-cols-2 xl:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-4"}`}>
-          {mode === "invoice" || !isWalkIn ? (
-            <div className="flex flex-col gap-2">
-              <AsyncLookupSelect
-                label="Customer"
-                value={customerLookupValue}
-                loading={customerLoading}
-                options={customerLookup}
-                placeholder="Search customer"
-                error={form.formState.errors.customerId?.message}
-                onSearch={(value) => void loadCustomers(value)}
-                onSelect={(option) => void handleCustomerSelect(option)}
-                onClear={() => {
-                  setCustomerLookupValue(null);
-                  setCustomerDetail(null);
-                  form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="space-y-5">
+              <Card>
+                <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-slate-700">Customer</span>
+                    <div className="flex gap-2">
+                      <div className="min-w-0 flex-1">
+                        <AsyncLookupSelect
+                          value={customerLookupValue}
+                          loading={customerLoading}
+                          options={customerLookup}
+                          placeholder="Search customer"
+                          error={form.formState.errors.customerId?.message}
+                          onSearch={(value) => void loadCustomers(value)}
+                          onSelect={(option) => void handleCustomerSelect(option)}
+                          onClear={() => {
+                            setCustomerLookupValue(null);
+                            setCustomerDetail(null);
+                            form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
+                          }}
+                        />
+                      </div>
+                      {canCreateCustomer ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="shrink-0 px-3"
+                          onClick={() => setCustomerDrawerOpen(true)}
+                          aria-label="Add customer"
+                        >
+                          <Plus className="size-4" />
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium text-slate-700">Walk-in Customer</span>
+                    <ToggleSwitch
+                      label="Walk-in Customer"
+                      checked={Boolean(isWalkIn)}
+                      onCheckedChange={(checked) => {
+                        form.setValue("isWalkIn", checked, { shouldDirty: true, shouldValidate: true });
+                        if (checked) {
+                          form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
+                          setCustomerLookupValue(null);
+                          if (!form.getValues("walkInName")) {
+                            form.setValue("walkInName", "Walk-in Customer", { shouldDirty: true, shouldValidate: true });
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <Input type="date" label="Invoice Date" {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
+                  <Input label="Place of Supply" {...form.register("placeOfSupply")} error={form.formState.errors.placeOfSupply?.message} />
+
+                  {isWalkIn ? (
+                    <>
+                      <Input label="Walk-in Name" {...form.register("walkInName")} error={form.formState.errors.walkInName?.message} />
+                      <Input label="Walk-in Mobile" {...form.register("walkInMobile")} error={form.formState.errors.walkInMobile?.message} />
+                    </>
+                  ) : null}
+
+                  <SearchableSelect
+                    label="Warehouse"
+                    value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
+                    options={warehouses.map((warehouse) => ({
+                      value: warehouse.id,
+                      label: warehouse.name,
+                      description: warehouse.warehouseCode ?? null,
+                    }))}
+                    placeholder="Select Warehouse"
+                    searchPlaceholder="Search warehouse"
+                    error={form.formState.errors.warehouseId?.message}
+                    onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
+                  />
+
+                  <Select label="Price Tax Type" {...form.register("priceTaxType")} error={form.formState.errors.priceTaxType?.message}>
+                    {SALES_PRICE_TAX_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </CardContent>
+              </Card>
+
+              <SalesItemsTable
+                form={form}
+                fields={fields}
+                warehouses={warehouses}
+                productLookupOptions={productLookup}
+                productLookupLoading={productLookupLoading}
+                productLookupNoResultsLabel={productLookupMessage ?? "No matching active products found"}
+                batchOptions={batchOptions}
+                loadingBatchIndex={loadingBatchIndex}
+                preview={preview}
+                compact
+                append={append}
+                remove={remove}
+                onProductSearch={(value) => void loadProductsWithFallback(value)}
+                onProductSelect={(index, option) => void handleProductSelect(index, option)}
+                onBatchLoad={(index) => void loadBatches(index)}
+                onBatchSelect={handleBatchSelect}
+                getLookupValue={getLookupValue}
+              />
+
+            </div>
+
+            <div className="space-y-5 xl:sticky xl:top-6 xl:self-start">
+              <SalesTotalsPanel totals={preview} sticky={false} title="Invoice Summary" rows={posSummaryRows} showStatus={false} />
+
+              <Card>
+                <CardHeader title="Payment" />
+                <CardContent className="space-y-4">
+                  <Input type="number" min="0" step="0.01" label="Paid Amount" {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
+                  <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
+                    <option value="">Select Payment Mode</option>
+                    {SALES_PAYMENT_MODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  {isBankPaymentMode(currentPaymentMode) ? (
+                    <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
+                      <option value="">Select Bank Account</option>
+                      {bankAccounts.map((bankAccount) => (
+                        <option key={bankAccount.id} value={bankAccount.id}>
+                          {bankAccount.bankName} · {bankAccount.accountNumber.slice(-4)}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : null}
+                  <Input label="Reference (optional)" placeholder="Enter reference" {...form.register("paymentReference")} error={form.formState.errors.paymentReference?.message} />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent>
+              <Textarea
+                label="Notes (optional)"
+                rows={2}
+                placeholder="Add a note..."
+                className="min-h-[88px]"
+                {...form.register("notes")}
+                error={form.formState.errors.notes?.message}
+              />
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div className="flex items-center gap-3">
+              <Button type="button" variant="secondary" onClick={onBack}>
+                <ArrowLeft className="mr-2 size-4" />
+                Back to List
+              </Button>
+              <h1 className="text-xl font-semibold text-slate-900">{initialInvoice ? "Edit Sales Draft" : "New Sales Invoice"}</h1>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {initialInvoice && onPrint ? (
+                <Button type="button" variant="secondary" onClick={() => onPrint(initialInvoice)}>
+                  <FileText className="mr-2 size-4" />
+                  PDF / Print
+                </Button>
+              ) : null}
+              <Button type="button" variant="secondary" onClick={resetForm}>
+                Reset
+              </Button>
+              <Button type="button" variant="secondary" loading={submitting && submitMode === "draft"} onClick={submitDraft}>
+                <Save className="mr-2 size-4" />
+                Save Draft
+              </Button>
+              <Button type="button" loading={submitting && submitMode === "posted"} onClick={submitPosted}>
+                <Save className="mr-2 size-4" />
+                Save & Post
+              </Button>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader title="Header" />
+            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col gap-2">
+                <AsyncLookupSelect
+                  label="Customer"
+                  value={customerLookupValue}
+                  loading={customerLoading}
+                  options={customerLookup}
+                  placeholder="Search customer"
+                  error={form.formState.errors.customerId?.message}
+                  onSearch={(value) => void loadCustomers(value)}
+                  onSelect={(option) => void handleCustomerSelect(option)}
+                  onClear={() => {
+                    setCustomerLookupValue(null);
+                    setCustomerDetail(null);
+                    form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
+                  }}
+                />
+                {canCreateCustomer ? (
+                  <div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-auto px-0 text-emerald-700 hover:bg-transparent hover:text-emerald-800"
+                      onClick={() => setCustomerDrawerOpen(true)}
+                    >
+                      <Plus className="mr-2 size-4" />
+                      Add Customer
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+              <ToggleSwitch
+                label="Walk-in Sale"
+                checked={Boolean(isWalkIn)}
+                onCheckedChange={(checked) => {
+                  form.setValue("isWalkIn", checked, { shouldDirty: true, shouldValidate: true });
+                  if (checked) {
+                    form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
+                    setCustomerLookupValue(null);
+                  }
                 }}
               />
-              {canCreateCustomer ? (
-                <div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-auto px-0 text-emerald-700 hover:bg-transparent hover:text-emerald-800"
-                    onClick={() => setCustomerDrawerOpen(true)}
-                  >
-                    <Plus className="mr-2 size-4" />
-                    Add Customer
-                  </Button>
-                </div>
+              {isWalkIn ? (
+                <>
+                  <Input label="Walk-in Name" {...form.register("walkInName")} error={form.formState.errors.walkInName?.message} />
+                  <Input label="Walk-in Mobile" {...form.register("walkInMobile")} error={form.formState.errors.walkInMobile?.message} />
+                </>
               ) : null}
-            </div>
-          ) : null}
-          <div className={mode === "pos" ? "xl:col-span-2" : undefined}>
-            <ToggleSwitch
-              label="Walk-in Sale"
-              checked={Boolean(isWalkIn)}
-              onCheckedChange={(checked) => {
-                form.setValue("isWalkIn", checked, { shouldDirty: true, shouldValidate: true });
-                if (checked) {
-                  form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
-                  setCustomerLookupValue(null);
-                }
-              }}
-            />
-          </div>
-          {isWalkIn ? (
-            <>
-              <Input label="Walk-in Name" {...form.register("walkInName")} error={form.formState.errors.walkInName?.message} />
-              <Input label="Walk-in Mobile" {...form.register("walkInMobile")} error={form.formState.errors.walkInMobile?.message} />
-            </>
-          ) : null}
-          <Input type="date" label="Invoice Date" {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
-          {mode === "invoice" ? (
-            <Input type="date" label="Due Date" {...form.register("dueDate")} error={form.formState.errors.dueDate?.message} />
-          ) : null}
-          <Input label="Place of Supply" {...form.register("placeOfSupply")} error={form.formState.errors.placeOfSupply?.message} />
-          <SearchableSelect
-            label="Warehouse"
-            value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
-            options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name, description: warehouse.warehouseCode ?? null }))}
-            placeholder="Select Warehouse"
-            searchPlaceholder="Search warehouse"
-            error={form.formState.errors.warehouseId?.message}
-            onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
-          />
-          <Select label="Price Tax Type" {...form.register("priceTaxType")} error={form.formState.errors.priceTaxType?.message}>
-            {SALES_PRICE_TAX_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-          {mode === "invoice" ? (
-            <>
-              <Textarea label="Notes" rows={3} {...form.register("notes")} error={form.formState.errors.notes?.message} />
-              <Textarea label="Terms" rows={3} {...form.register("termsConditions")} error={form.formState.errors.termsConditions?.message} />
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <SalesItemsTable
-        form={form}
-        fields={fields}
-        warehouses={warehouses}
-        productLookupOptions={productLookup}
-        productLookupLoading={productLookupLoading}
-        productLookupNoResultsLabel={productLookupMessage ?? "No matching active products found"}
-        batchOptions={batchOptions}
-        loadingBatchIndex={loadingBatchIndex}
-        preview={preview}
-        compact={mode === "pos"}
-        append={append}
-        remove={remove}
-        onProductSearch={(value) => void loadProductsWithFallback(value)}
-        onProductSelect={(index, option) => void handleProductSelect(index, option)}
-        onBatchLoad={(index) => void loadBatches(index)}
-        onBatchSelect={handleBatchSelect}
-        getLookupValue={(index) => {
-          const item = values.items[index];
-          if (!item?.productId) {
-            return null;
-          }
-
-          const product = productDetails[item.productId];
-          if (!product) {
-            return productLookup.find((option) => option.id === item.productId) ?? null;
-          }
-
-          return {
-            id: product.id,
-            label: product.name,
-            description: [product.productCode, product.sku, product.barcode].filter(Boolean).join(" · "),
-            meta: product.unit.symbol,
-          };
-        }}
-      />
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-5">
-          <Card>
-            <CardHeader title="Payment" />
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <Input type="number" min="0" step="0.01" label="Paid Amount" {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
-              <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
-                <option value="">Select Payment Mode</option>
-                {SALES_PAYMENT_MODE_OPTIONS.map((option) => (
+              <Input type="date" label="Invoice Date" {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
+              <Input type="date" label="Due Date" {...form.register("dueDate")} error={form.formState.errors.dueDate?.message} />
+              <Input label="Place of Supply" {...form.register("placeOfSupply")} error={form.formState.errors.placeOfSupply?.message} />
+              <SearchableSelect
+                label="Warehouse"
+                value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
+                options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name, description: warehouse.warehouseCode ?? null }))}
+                placeholder="Select Warehouse"
+                searchPlaceholder="Search warehouse"
+                error={form.formState.errors.warehouseId?.message}
+                onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
+              />
+              <Select label="Price Tax Type" {...form.register("priceTaxType")} error={form.formState.errors.priceTaxType?.message}>
+                {SALES_PRICE_TAX_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </Select>
-              {isBankPaymentMode(currentPaymentMode) ? (
-                <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
-                  <option value="">Select Bank Account</option>
-                  {bankAccounts.map((bankAccount) => (
-                    <option key={bankAccount.id} value={bankAccount.id}>
-                      {bankAccount.bankName} · {bankAccount.accountNumber.slice(-4)}
-                    </option>
-                  ))}
-                </Select>
-              ) : (
-                <div />
-              )}
-              <Input label="Payment Reference" {...form.register("paymentReference")} error={form.formState.errors.paymentReference?.message} />
+              <Textarea label="Notes" rows={3} {...form.register("notes")} error={form.formState.errors.notes?.message} />
+              <Textarea label="Terms" rows={3} {...form.register("termsConditions")} error={form.formState.errors.termsConditions?.message} />
             </CardContent>
           </Card>
-        </div>
 
-        <SalesTotalsPanel totals={preview} sticky={mode !== "pos"} />
-      </div>
+          <SalesItemsTable
+            form={form}
+            fields={fields}
+            warehouses={warehouses}
+            productLookupOptions={productLookup}
+            productLookupLoading={productLookupLoading}
+            productLookupNoResultsLabel={productLookupMessage ?? "No matching active products found"}
+            batchOptions={batchOptions}
+            loadingBatchIndex={loadingBatchIndex}
+            preview={preview}
+            append={append}
+            remove={remove}
+            onProductSearch={(value) => void loadProductsWithFallback(value)}
+            onProductSelect={(index, option) => void handleProductSelect(index, option)}
+            onBatchLoad={(index) => void loadBatches(index)}
+            onBatchSelect={handleBatchSelect}
+            getLookupValue={getLookupValue}
+          />
+
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="space-y-5">
+              <Card>
+                <CardHeader title="Payment" />
+                <CardContent className="grid gap-4 md:grid-cols-2">
+                  <Input type="number" min="0" step="0.01" label="Paid Amount" {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
+                  <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
+                    <option value="">Select Payment Mode</option>
+                    {SALES_PAYMENT_MODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  {isBankPaymentMode(currentPaymentMode) ? (
+                    <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
+                      <option value="">Select Bank Account</option>
+                      {bankAccounts.map((bankAccount) => (
+                        <option key={bankAccount.id} value={bankAccount.id}>
+                          {bankAccount.bankName} · {bankAccount.accountNumber.slice(-4)}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <div />
+                  )}
+                  <Input label="Payment Reference" {...form.register("paymentReference")} error={form.formState.errors.paymentReference?.message} />
+                </CardContent>
+              </Card>
+            </div>
+
+            <SalesTotalsPanel totals={preview} />
+          </div>
+        </>
+      )}
+
       <CustomerFormDrawer
         open={customerDrawerOpen}
         onClose={() => setCustomerDrawerOpen(false)}
@@ -821,4 +965,3 @@ export const SalesInvoiceForm = ({
     </form>
   );
 };
-

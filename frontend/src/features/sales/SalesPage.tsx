@@ -409,7 +409,10 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
     }
 
     try {
-      const detail = "items" in invoice && invoice.items ? invoice : await salesApi.get(invoice.id).then((response) => response.data.invoice);
+      const detail =
+        "items" in invoice && invoice.items
+          ? invoice
+          : (await salesApi.get(invoice.id)).data.invoice;
       setSelectedReturnInvoice(detail);
       setReturnLookupValue({
         id: detail.id,

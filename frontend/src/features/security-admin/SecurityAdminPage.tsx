@@ -111,17 +111,32 @@ export const SecurityAdminPage = () => {
       return;
     }
 
-    setAuditLoading(true);
-    void securityAdminApi
-      .listAuditLogs(debouncedAuditFilters)
-      .then((response) => {
+    let active = true;
+    const loadAuditLogs = async () => {
+      try {
+        setAuditLoading(true);
+        const response = await securityAdminApi.listAuditLogs(debouncedAuditFilters);
+        if (!active) {
+          return;
+        }
         setAuditLogs(response.data.items);
         setAuditPagination(response.data.pagination);
-      })
-      .catch((error) => {
-        toast.error(getErrorMessage(error, "Failed to load audit logs"));
-      })
-      .finally(() => setAuditLoading(false));
+      } catch (error) {
+        if (active) {
+          toast.error(getErrorMessage(error, "Failed to load audit logs"));
+        }
+      } finally {
+        if (active) {
+          setAuditLoading(false);
+        }
+      }
+    };
+
+    void loadAuditLogs();
+
+    return () => {
+      active = false;
+    };
   }, [activeTab, debouncedAuditFilters, toast]);
 
   useEffect(() => {
@@ -129,17 +144,32 @@ export const SecurityAdminPage = () => {
       return;
     }
 
-    setLoginLoading(true);
-    void securityAdminApi
-      .listLoginLogs(debouncedLoginFilters)
-      .then((response) => {
+    let active = true;
+    const loadLoginLogs = async () => {
+      try {
+        setLoginLoading(true);
+        const response = await securityAdminApi.listLoginLogs(debouncedLoginFilters);
+        if (!active) {
+          return;
+        }
         setLoginLogs(response.data.items);
         setLoginPagination(response.data.pagination);
-      })
-      .catch((error) => {
-        toast.error(getErrorMessage(error, "Failed to load login logs"));
-      })
-      .finally(() => setLoginLoading(false));
+      } catch (error) {
+        if (active) {
+          toast.error(getErrorMessage(error, "Failed to load login logs"));
+        }
+      } finally {
+        if (active) {
+          setLoginLoading(false);
+        }
+      }
+    };
+
+    void loadLoginLogs();
+
+    return () => {
+      active = false;
+    };
   }, [activeTab, debouncedLoginFilters, toast]);
 
   useEffect(() => {
@@ -147,17 +177,32 @@ export const SecurityAdminPage = () => {
       return;
     }
 
-    setBackupLoading(true);
-    void securityAdminApi
-      .listBackups(debouncedBackupFilters)
-      .then((response) => {
+    let active = true;
+    const loadBackups = async () => {
+      try {
+        setBackupLoading(true);
+        const response = await securityAdminApi.listBackups(debouncedBackupFilters);
+        if (!active) {
+          return;
+        }
         setBackups(response.data.items);
         setBackupPagination(response.data.pagination);
-      })
-      .catch((error) => {
-        toast.error(getErrorMessage(error, "Failed to load backups"));
-      })
-      .finally(() => setBackupLoading(false));
+      } catch (error) {
+        if (active) {
+          toast.error(getErrorMessage(error, "Failed to load backups"));
+        }
+      } finally {
+        if (active) {
+          setBackupLoading(false);
+        }
+      }
+    };
+
+    void loadBackups();
+
+    return () => {
+      active = false;
+    };
   }, [activeTab, debouncedBackupFilters, backupReloadKey, toast]);
 
   useEffect(() => {
@@ -165,18 +210,81 @@ export const SecurityAdminPage = () => {
       return;
     }
 
-    setRestoreLoading(true);
-    void securityAdminApi
-      .listRestoreLogs(debouncedRestoreFilters)
-      .then((response) => {
+    let active = true;
+    const loadRestoreLogs = async () => {
+      try {
+        setRestoreLoading(true);
+        const response = await securityAdminApi.listRestoreLogs(debouncedRestoreFilters);
+        if (!active) {
+          return;
+        }
         setRestoreLogs(response.data.items);
         setRestorePagination(response.data.pagination);
-      })
-      .catch((error) => {
-        toast.error(getErrorMessage(error, "Failed to load restore logs"));
-      })
-      .finally(() => setRestoreLoading(false));
+      } catch (error) {
+        if (active) {
+          toast.error(getErrorMessage(error, "Failed to load restore logs"));
+        }
+      } finally {
+        if (active) {
+          setRestoreLoading(false);
+        }
+      }
+    };
+
+    void loadRestoreLogs();
+
+    return () => {
+      active = false;
+    };
   }, [activeTab, debouncedRestoreFilters, restoreReloadKey, toast]);
+
+  const handleAuditExport = async () => {
+    const exportFilters = Object.fromEntries(
+      Object.entries(auditFilters).filter(([key]) => key !== "page" && key !== "limit"),
+    ) as Omit<AuditFilters, "page" | "limit">;
+
+    try {
+      setAuditExporting(true);
+      const file = await securityAdminApi.exportAuditLogs(exportFilters);
+      downloadBlob(file.blob, file.fileName);
+      toast.success("Audit logs exported");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to export audit logs"));
+    } finally {
+      setAuditExporting(false);
+    }
+  };
+
+  const handleBackupDownload = async (backup: Backup) => {
+    try {
+      setDownloadingBackupId(backup.id);
+      const file = await securityAdminApi.downloadBackup(backup.id);
+      downloadBlob(file.blob, file.fileName);
+      toast.success("Backup downloaded");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to download backup"));
+    } finally {
+      setDownloadingBackupId(null);
+    }
+  };
+
+  const handleBackupDelete = async () => {
+    if (!selectedBackup) {
+      return;
+    }
+
+    try {
+      setDeletingBackup(true);
+      await securityAdminApi.deleteBackup(selectedBackup.id);
+      toast.success("Backup deleted");
+      setBackupDeleteOpen(false);
+      setBackupReloadKey((current) => current + 1);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to delete backup"));
+    } finally {
+      setDeletingBackup(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -203,22 +311,7 @@ export const SecurityAdminPage = () => {
               loading={auditLoading}
               canExport={canAuditExport}
               exporting={auditExporting}
-              onExport={() => {
-                const exportFilters = Object.fromEntries(
-                  Object.entries(auditFilters).filter(([key]) => key !== "page" && key !== "limit"),
-                ) as Omit<AuditFilters, "page" | "limit">;
-                setAuditExporting(true);
-                void securityAdminApi
-                  .exportAuditLogs(exportFilters)
-                  .then((file) => {
-                    downloadBlob(file.blob, file.fileName);
-                    toast.success("Audit logs exported");
-                  })
-                  .catch((error) => {
-                    toast.error(getErrorMessage(error, "Failed to export audit logs"));
-                  })
-                  .finally(() => setAuditExporting(false));
-              }}
+              onExport={() => void handleAuditExport()}
               onOpen={setSelectedAuditLog}
             />
           ) : null}
@@ -248,19 +341,7 @@ export const SecurityAdminPage = () => {
               restoringId={restoringBackup ? selectedBackup?.id ?? null : null}
               deletingId={deletingBackup ? selectedBackup?.id ?? null : null}
               onCreate={() => setBackupCreateOpen(true)}
-              onDownload={(backup) => {
-                setDownloadingBackupId(backup.id);
-                void securityAdminApi
-                  .downloadBackup(backup.id)
-                  .then((file) => {
-                    downloadBlob(file.blob, file.fileName);
-                    toast.success("Backup downloaded");
-                  })
-                  .catch((error) => {
-                    toast.error(getErrorMessage(error, "Failed to download backup"));
-                  })
-                  .finally(() => setDownloadingBackupId(null));
-              }}
+              onDownload={(backup) => void handleBackupDownload(backup)}
               onRestore={(backup) => {
                 setSelectedBackup(backup);
                 setBackupRestoreOpen(true);
@@ -336,24 +417,7 @@ export const SecurityAdminPage = () => {
         title="Delete Backup"
         description={`Hide ${selectedBackup?.backupName ?? "this backup"} from the list?`}
         loading={deletingBackup}
-        onConfirm={() => {
-          if (!selectedBackup) {
-            return;
-          }
-
-          setDeletingBackup(true);
-          void securityAdminApi
-            .deleteBackup(selectedBackup.id)
-            .then(() => {
-              toast.success("Backup deleted");
-              setBackupDeleteOpen(false);
-              setBackupReloadKey((current) => current + 1);
-            })
-            .catch((error) => {
-              toast.error(getErrorMessage(error, "Failed to delete backup"));
-            })
-            .finally(() => setDeletingBackup(false));
-        }}
+        onConfirm={() => void handleBackupDelete()}
       />
     </div>
   );

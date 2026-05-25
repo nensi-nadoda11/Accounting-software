@@ -340,28 +340,25 @@ class CustomersRepository {
     const paymentConditions: SQL[] = [eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId)];
     const returnConditions: SQL[] = [eq(salesReturns.companyId, companyId), eq(salesReturns.customerId, customerId)];
 
-    const [salesRow, returnRow, paymentRow, overdueRow] = await Promise.all([
+    const [salesRows, returnRows, paymentRows, overdueRows] = await Promise.all([
       db
         .select({
           totalSales: sql<string>`coalesce(sum(${salesInvoices.grandTotal}), 0)`
         })
         .from(salesInvoices)
-        .where(and(...invoiceConditions))
-        .then((rows) => rows[0]),
+        .where(and(...invoiceConditions)),
       db
         .select({
           totalReturns: sql<string>`coalesce(sum(${salesReturns.grandTotal}), 0)`
         })
         .from(salesReturns)
-        .where(and(...returnConditions))
-        .then((rows) => rows[0]),
+        .where(and(...returnConditions)),
       db
         .select({
           totalPayments: sql<string>`coalesce(sum(${salesPayments.amount}), 0)`
         })
         .from(salesPayments)
-        .where(and(...paymentConditions))
-        .then((rows) => rows[0]),
+        .where(and(...paymentConditions)),
       db
         .select({
           overdueAmount: sql<string>`coalesce(sum(${salesInvoices.dueAmount}), 0)`
@@ -373,8 +370,12 @@ class CustomersRepository {
             sql`${salesInvoices.dueDate} IS NOT NULL AND ${salesInvoices.dueDate} < CURRENT_DATE AND ${salesInvoices.dueAmount} > 0`
           )
         )
-        .then((rows) => rows[0])
     ]);
+
+    const salesRow = salesRows[0];
+    const returnRow = returnRows[0];
+    const paymentRow = paymentRows[0];
+    const overdueRow = overdueRows[0];
 
     return {
       totalSales: salesRow?.totalSales ?? "0.00",
@@ -387,23 +388,24 @@ class CustomersRepository {
   }
 
   public async hasLinkedTransactions(companyId: string, customerId: string): Promise<boolean> {
-    const [invoiceRow, paymentRow, returnRow] = await Promise.all([
+    const [invoiceRows, paymentRows, returnRows] = await Promise.all([
       db
         .select({ value: count() })
         .from(salesInvoices)
-        .where(and(eq(salesInvoices.companyId, companyId), eq(salesInvoices.customerId, customerId), isNull(salesInvoices.deletedAt)))
-        .then((rows) => rows[0]),
+        .where(and(eq(salesInvoices.companyId, companyId), eq(salesInvoices.customerId, customerId), isNull(salesInvoices.deletedAt))),
       db
         .select({ value: count() })
         .from(salesPayments)
-        .where(and(eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId)))
-        .then((rows) => rows[0]),
+        .where(and(eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId))),
       db
         .select({ value: count() })
         .from(salesReturns)
         .where(and(eq(salesReturns.companyId, companyId), eq(salesReturns.customerId, customerId)))
-        .then((rows) => rows[0])
     ]);
+
+    const invoiceRow = invoiceRows[0];
+    const paymentRow = paymentRows[0];
+    const returnRow = returnRows[0];
 
     return (invoiceRow?.value ?? 0) > 0 || (paymentRow?.value ?? 0) > 0 || (returnRow?.value ?? 0) > 0;
   }

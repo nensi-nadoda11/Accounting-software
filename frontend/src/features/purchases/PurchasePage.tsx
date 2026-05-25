@@ -369,7 +369,10 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
     }
 
     try {
-      const detail = "items" in invoice && invoice.items ? invoice : await purchasesApi.get(invoice.id).then((response) => response.data.invoice);
+      const detail =
+        "items" in invoice && invoice.items
+          ? invoice
+          : (await purchasesApi.get(invoice.id)).data.invoice;
       setSelectedReturnInvoice(detail);
       setReturnLookupValue({
         id: detail.id,

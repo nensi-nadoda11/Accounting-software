@@ -70,15 +70,28 @@ export const ManualNotificationModal = ({
       return;
     }
 
+    let active = true;
     setForm(initialForm);
     setErrors({});
-    void notificationsApi
-      .listRecipients()
-      .then((response) => setRecipients(response.data.items))
-      .catch((error) => {
-        setRecipients([]);
-        toast.error(getErrorMessage(error, "Failed to load recipients"));
-      });
+    const loadRecipients = async () => {
+      try {
+        const response = await notificationsApi.listRecipients();
+        if (active) {
+          setRecipients(response.data.items);
+        }
+      } catch (error) {
+        if (active) {
+          setRecipients([]);
+          toast.error(getErrorMessage(error, "Failed to load recipients"));
+        }
+      }
+    };
+
+    void loadRecipients();
+
+    return () => {
+      active = false;
+    };
   }, [open, toast]);
 
   const updateField = <TField extends ManualNotificationField>(field: TField, value: ManualNotificationInput[TField]) => {

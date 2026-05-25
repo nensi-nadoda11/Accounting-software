@@ -1167,16 +1167,16 @@ export class AccountingRepository {
       .where(and(eq(paymentAllocations.companyId, companyId), eq(paymentAllocations.paymentId, paymentId)))
       .orderBy(asc(paymentAllocations.createdAt));
 
-    const bankAccount =
-      paymentRow.payment.bankAccountId
-        ? await this
-            .getExecutor(executor)
-            .select()
-            .from(companyBankAccounts)
-            .where(and(eq(companyBankAccounts.companyId, companyId), eq(companyBankAccounts.id, paymentRow.payment.bankAccountId)))
-            .limit(1)
-            .then((rows) => rows[0] ?? null)
-        : null;
+    const bankAccountRows = paymentRow.payment.bankAccountId
+      ? await this
+          .getExecutor(executor)
+          .select()
+          .from(companyBankAccounts)
+          .where(and(eq(companyBankAccounts.companyId, companyId), eq(companyBankAccounts.id, paymentRow.payment.bankAccountId)))
+          .limit(1)
+      : [];
+
+    const bankAccount = bankAccountRows[0] ?? null;
 
     return {
       ...paymentRow,

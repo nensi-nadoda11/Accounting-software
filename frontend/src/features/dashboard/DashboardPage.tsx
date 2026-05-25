@@ -1,5 +1,5 @@
 import { CalendarRange } from "lucide-react";
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "../../components/ui/Button";
 import { ErrorState } from "../../components/ui/ErrorState";
@@ -75,7 +75,7 @@ export const DashboardPage = () => {
     [auth, roleDashboard.data?.quickActions]
   );
 
-  const loadCore = useEffectEvent(async () => {
+  const loadCore = useCallback(async () => {
     setSummary((current) => ({ ...current, loading: true, error: null }));
     setRoleDashboard((current) => ({ ...current, loading: true, error: null }));
     setAlerts((current) => ({ ...current, loading: true, error: null }));
@@ -113,9 +113,9 @@ export const DashboardPage = () => {
         ? { data: tasksResponse.value.data, loading: false, error: null }
         : { ...current, loading: false, error: message }
     );
-  });
+  }, []);
 
-  const loadChart = useEffectEvent(async (chartKey: DashboardChartKey) => {
+  const loadChart = useCallback(async (chartKey: DashboardChartKey) => {
     setCharts((current) => ({
       ...current,
       [chartKey]: { ...current[chartKey], loading: true, error: null }
@@ -133,15 +133,15 @@ export const DashboardPage = () => {
         [chartKey]: { ...current[chartKey], loading: false, error: "Chart could not be loaded." }
       }));
     }
-  });
+  }, [filters]);
 
-  const loadCharts = useEffectEvent(async () => {
+  const loadCharts = useCallback(async () => {
     await Promise.all(chartConfig.map((chart) => loadChart(chart.key)));
-  });
+  }, [loadChart]);
 
   useEffect(() => {
     void loadCore();
-  }, []);
+  }, [loadCore]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -149,7 +149,7 @@ export const DashboardPage = () => {
     }, 150);
 
     return () => window.clearTimeout(timer);
-  }, [filters]);
+  }, [filters, loadCharts]);
 
   const handleApplyFilters = async () => {
     setFiltersPending(true);

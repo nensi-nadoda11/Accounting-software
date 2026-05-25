@@ -45,19 +45,20 @@ export const AppLayout = () => {
     }
 
     let active = true;
-
-    void settingsApi
-      .getUiPreferences()
-      .then((response) => {
+    const loadUiPreferences = async () => {
+      try {
+        const response = await settingsApi.getUiPreferences();
         if (active) {
           applyUiPreferencesToDocument(response.data);
         }
-      })
-      .catch(() => {
+      } catch {
         if (active) {
           applyUiPreferencesToDocument(null);
         }
-      });
+      }
+    };
+
+    void loadUiPreferences();
 
     return () => {
       active = false;

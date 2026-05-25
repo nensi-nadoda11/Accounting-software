@@ -304,8 +304,8 @@ class ReportsRepository {
       .limit(filters.limit)
       .offset((filters.page - 1) * filters.limit);
 
-    const [totalRow, totalsRow] = await Promise.all([
-      db.select({ value: count() }).from(salesInvoices).where(whereClause).then((items) => items[0]),
+    const [totalRows, totalsRows] = await Promise.all([
+      db.select({ value: count() }).from(salesInvoices).where(whereClause),
       db
         .select({
           taxableAmount: sql<string>`coalesce(sum(${salesInvoices.taxableAmount}), 0)`,
@@ -316,8 +316,10 @@ class ReportsRepository {
         })
         .from(salesInvoices)
         .where(whereClause)
-        .then((items) => items[0])
     ]);
+
+    const totalRow = totalRows[0];
+    const totalsRow = totalsRows[0];
 
     return {
       items: rows,
@@ -425,8 +427,8 @@ class ReportsRepository {
       .limit(filters.limit)
       .offset((filters.page - 1) * filters.limit);
 
-    const [totalRow, totalsRow] = await Promise.all([
-      db.select({ value: count() }).from(purchaseInvoices).where(whereClause).then((items) => items[0]),
+    const [totalRows, totalsRows] = await Promise.all([
+      db.select({ value: count() }).from(purchaseInvoices).where(whereClause),
       db
         .select({
           taxableAmount: sql<string>`coalesce(sum(${purchaseInvoices.taxableAmount}), 0)`,
@@ -437,8 +439,10 @@ class ReportsRepository {
         })
         .from(purchaseInvoices)
         .where(whereClause)
-        .then((items) => items[0])
     ]);
+
+    const totalRow = totalRows[0];
+    const totalsRow = totalsRows[0];
 
     return {
       items: rows,

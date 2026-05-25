@@ -46,6 +46,39 @@ const isAuthBootstrapSafeRequest = (url: string) =>
   url.includes("/users/accept-invite") ||
   isAuthRefreshRequest(url);
 
+const refreshAccessToken = async () => {
+  try {
+    const response = await refreshClient.post("/auth/refresh");
+    const session = response.data.data as LoginResponse | undefined;
+    const token = session?.accessToken;
+
+    if (!token) {
+      throw new Error("Missing access token");
+    }
+
+    tokenStore.set(token);
+    if (session?.user) {
+      dispatchSessionUpdated({
+        accessToken: token,
+        user: session.user,
+        company: session.company ?? null,
+        permissions: session.permissions,
+      });
+    }
+
+    return token;
+  } catch (refreshError) {
+    if (refreshError instanceof AxiosError && shouldInvalidateSession(refreshError)) {
+      tokenStore.clear();
+      dispatchSessionExpired();
+    }
+
+    throw refreshError;
+  } finally {
+    refreshPromise = null;
+  }
+};
+
 client.interceptors.request.use(async (config) => {
   const requestUrl = config.url ?? "";
   const bootstrapPromise = authBootstrap.get();
@@ -80,35 +113,7 @@ client.interceptors.response.use(
 
     try {
       if (!refreshPromise) {
-        refreshPromise = refreshClient
-          .post("/auth/refresh")
-          .then((response) => {
-            const session = response.data.data as LoginResponse | undefined;
-            const token = session?.accessToken;
-            if (!token) {
-              throw new Error("Missing access token");
-            }
-            tokenStore.set(token);
-            if (session?.user) {
-              dispatchSessionUpdated({
-                accessToken: token,
-                user: session.user,
-                company: session.company ?? null,
-                permissions: session.permissions,
-              });
-            }
-            return token;
-          })
-          .catch((refreshError) => {
-            if (refreshError instanceof AxiosError && shouldInvalidateSession(refreshError)) {
-              tokenStore.clear();
-              dispatchSessionExpired();
-            }
-            throw refreshError;
-          })
-          .finally(() => {
-            refreshPromise = null;
-          });
+        refreshPromise = refreshAccessToken();
       }
 
       const newToken = await refreshPromise;

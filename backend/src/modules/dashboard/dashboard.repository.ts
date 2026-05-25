@@ -219,11 +219,12 @@ export class DashboardRepository {
       .limit(limit)
       .offset(offset);
 
-    const totalRow = await db
+    const totalRows = await db
       .select({ value: count() })
       .from(auditLogs)
-      .where(whereClause)
-      .then((result) => result[0]?.value ?? 0);
+      .where(whereClause);
+
+    const totalRow = totalRows[0]?.value ?? 0;
 
     return { rows, total: totalRow };
   }

@@ -4,17 +4,12 @@ import { Button } from "../../../components/ui/Button";
 import { Card, CardContent } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
-import type { Warehouse } from "../../../types/inventory";
-import type { SupplierListItem } from "../../../types/supplier";
 import { PURCHASE_PAYMENT_STATUS_OPTIONS, PURCHASE_STATUS_OPTIONS } from "../purchaseOptions";
 import type { PaymentStatus, PurchaseStatus } from "../../../types/purchase";
-import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
 export const PurchaseFilters = ({
   search,
   values,
-  suppliers,
-  warehouses,
   showPurchaseStatus = true,
   showPaymentStatus = true,
   onSearchChange,
@@ -25,65 +20,76 @@ export const PurchaseFilters = ({
   values: {
     purchaseStatus: PurchaseStatus | "";
     paymentStatus: PaymentStatus | "";
-    supplierId: string;
-    warehouseId: string;
     dateFrom: string;
     dateTo: string;
   };
-  suppliers: SupplierListItem[];
-  warehouses: Warehouse[];
   showPurchaseStatus?: boolean;
   showPaymentStatus?: boolean;
   onSearchChange: (value: string) => void;
-  onChange: (value: Partial<{ purchaseStatus: string; paymentStatus: string; supplierId: string; warehouseId: string; dateFrom: string; dateTo: string }>) => void;
+  onChange: (value: Partial<{ purchaseStatus: string; paymentStatus: string; dateFrom: string; dateTo: string }>) => void;
   onReset: () => void;
 }) => (
   <Card>
-    <CardContent className="grid gap-3 xl:grid-cols-[minmax(16rem,2fr)_repeat(6,minmax(0,1fr))_auto]">
-      <Input
-        value={search}
-        placeholder="Search purchase no, supplier, supplier invoice no"
-        onChange={(event) => onSearchChange(event.target.value)}
-      />
+    <CardContent className="grid gap-4 xl:grid-cols-[minmax(16rem,1.55fr)_minmax(10rem,0.72fr)_minmax(10rem,0.72fr)_minmax(9rem,0.62fr)_minmax(9rem,0.62fr)_auto] xl:items-end">
+      <div className="min-w-0">
+        <Input
+          label="Search"
+          value={search}
+          placeholder="Search purchase no, supplier, supplier invoice no, warehouse"
+          onChange={(event) => onSearchChange(event.target.value)}
+        />
+      </div>
       {showPurchaseStatus ? (
-        <Select value={values.purchaseStatus} onChange={(event) => onChange({ purchaseStatus: event.target.value })}>
-          {PURCHASE_STATUS_OPTIONS.map((option) => (
-            <option key={option.label} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
+        <div className="min-w-0">
+          <Select
+            label="Purchase Status"
+            value={values.purchaseStatus}
+            onChange={(event) => onChange({ purchaseStatus: event.target.value })}
+          >
+            {PURCHASE_STATUS_OPTIONS.map((option) => (
+              <option key={option.label} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
       ) : null}
       {showPaymentStatus ? (
-        <Select value={values.paymentStatus} onChange={(event) => onChange({ paymentStatus: event.target.value })}>
-          {PURCHASE_PAYMENT_STATUS_OPTIONS.map((option) => (
-            <option key={option.label} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
+        <div className="min-w-0">
+          <Select
+            label="Payment Status"
+            value={values.paymentStatus}
+            onChange={(event) => onChange({ paymentStatus: event.target.value })}
+          >
+            {PURCHASE_PAYMENT_STATUS_OPTIONS.map((option) => (
+              <option key={option.label} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
       ) : null}
-      <Select value={values.supplierId} onChange={(event) => onChange({ supplierId: event.target.value })}>
-        <option value="">All Suppliers</option>
-        {suppliers.map((supplier) => (
-          <option key={supplier.id} value={supplier.id}>
-            {supplier.name}
-          </option>
-        ))}
-      </Select>
-      <WarehouseLookupSelect
-        label={undefined}
-        value={values.warehouseId}
-        warehouses={warehouses}
-        placeholder="All Warehouses"
-        noResultsLabel="No matching warehouses found"
-        onChange={(value) => onChange({ warehouseId: value ?? "" })}
-      />
-      <Input type="date" value={values.dateFrom} onChange={(event) => onChange({ dateFrom: event.target.value })} />
-      <Input type="date" value={values.dateTo} onChange={(event) => onChange({ dateTo: event.target.value })} />
-      <Button type="button" variant="secondary" onClick={onReset}>
-        <RotateCcw className="size-4" />
-      </Button>
+      <div className="min-w-0">
+        <Input
+          label="From Date"
+          type="date"
+          value={values.dateFrom}
+          onChange={(event) => onChange({ dateFrom: event.target.value })}
+        />
+      </div>
+      <div className="min-w-0">
+        <Input
+          label="To Date"
+          type="date"
+          value={values.dateTo}
+          onChange={(event) => onChange({ dateTo: event.target.value })}
+        />
+      </div>
+      <div className="flex xl:justify-end">
+        <Button type="button" variant="secondary" className="shrink-0" onClick={onReset} aria-label="Reset filters">
+          <RotateCcw className="size-4" />
+        </Button>
+      </div>
     </CardContent>
   </Card>
 );

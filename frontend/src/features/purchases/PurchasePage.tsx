@@ -18,7 +18,6 @@ import { bankApi } from "../../services/bankApi";
 import { companyApi } from "../../services/companyApi";
 import { inventoryApi } from "../../services/inventoryApi";
 import { purchasesApi } from "../../services/purchasesApi";
-import { suppliersApi } from "../../services/suppliersApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../types/company";
 import type { Warehouse } from "../../types/inventory";
 import type {
@@ -32,7 +31,6 @@ import type {
   PurchaseReturn,
   PurchaseReturnsResponse,
 } from "../../types/purchase";
-import type { SupplierListItem } from "../../types/supplier";
 import { PurchaseDetailDrawer } from "./components/PurchaseDetailDrawer";
 import { PurchaseFilters } from "./components/PurchaseFilters";
 import { PurchaseForm } from "./components/PurchaseForm";
@@ -67,7 +65,6 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   const [invoiceSettings, setInvoiceSettings] = useState<CompanyInvoiceSettings | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [bankAccounts, setBankAccounts] = useState<CompanyBankAccount[]>([]);
-  const [filterSuppliers, setFilterSuppliers] = useState<SupplierListItem[]>([]);
 
   const [listData, setListData] = useState<PurchaseListResponse | null>(null);
   const [returnsData, setReturnsData] = useState<PurchaseReturnsResponse | null>(null);
@@ -114,8 +111,6 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   const page = Math.max(Number(searchParams.get("page") ?? "1"), 1);
   const purchaseStatus = searchParams.get("purchaseStatus") ?? "";
   const paymentStatus = searchParams.get("paymentStatus") ?? "";
-  const supplierId = searchParams.get("supplierId") ?? "";
-  const warehouseId = searchParams.get("warehouseId") ?? "";
   const dateFrom = searchParams.get("dateFrom") ?? "";
   const dateTo = searchParams.get("dateTo") ?? "";
   const purchaseStatusFilter = isPurchaseStatus(purchaseStatus) ? purchaseStatus : "";
@@ -160,19 +155,13 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
   }, [debouncedSearch, searchQuery]);
 
   const loadReferenceData = async () => {
-    const [warehouseResult, supplierResult] = await Promise.allSettled([
+    const [warehouseResult] = await Promise.allSettled([
       inventoryApi.listWarehouses({ page: 1, limit: 100, status: "active" }),
-      suppliersApi.list({ page: 1, limit: 100, status: "active" }),
     ]);
 
     setWarehouses(
       warehouseResult.status === "fulfilled"
         ? warehouseResult.value.data.items.filter((warehouse) => warehouse.status === "active")
-        : [],
-    );
-    setFilterSuppliers(
-      supplierResult.status === "fulfilled"
-        ? supplierResult.value.data.items.filter((supplier) => supplier.status === "active")
         : [],
     );
 
@@ -207,8 +196,6 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         search: searchQuery || undefined,
         purchaseStatus: purchaseStatusFilter || undefined,
         paymentStatus: paymentStatusFilter || undefined,
-        supplierId: supplierId || undefined,
-        warehouseId: warehouseId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
@@ -228,8 +215,6 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         page,
         limit: 20,
         search: searchQuery || undefined,
-        supplierId: supplierId || undefined,
-        warehouseId: warehouseId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
@@ -333,7 +318,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
     if (tab === "returns") {
       void loadReturns();
     }
-  }, [tab, page, purchaseStatusFilter, paymentStatusFilter, supplierId, warehouseId, dateFrom, dateTo, searchQuery]);
+  }, [tab, page, purchaseStatusFilter, paymentStatusFilter, dateFrom, dateTo, searchQuery]);
 
   useEffect(() => {
     if (tab !== "new") {
@@ -394,16 +379,21 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
       <PageHeader
         title="Purchase Invoices"
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-end">
             {canExport ? (
               <>
-                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PurchaseExportFormat)} className="w-28">
+                <Select
+                  value={exportFormat}
+                  onChange={(event) => setExportFormat(event.target.value as PurchaseExportFormat)}
+                  className="w-28 shrink-0"
+                >
                   <option value="xlsx">XLSX</option>
                   <option value="pdf">PDF</option>
                 </Select>
                 <Button
                   type="button"
                   variant="secondary"
+                  className="shrink-0"
                   loading={exporting}
                   onClick={async () => {
                     try {
@@ -414,8 +404,6 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
                         search: searchParams.get("search") || undefined,
                         purchaseStatus: purchaseStatusFilter || undefined,
                         paymentStatus: paymentStatusFilter || undefined,
-                        supplierId: supplierId || undefined,
-                        warehouseId: warehouseId || undefined,
                         dateFrom: dateFrom || undefined,
                         dateTo: dateTo || undefined,
                         format: exportFormat,
@@ -435,7 +423,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
               </>
             ) : null}
             {canCreate && tab === "invoices" ? (
-              <Button type="button" onClick={() => navigate("/app/purchases/new")}>
+              <Button type="button" className="shrink-0" onClick={() => navigate("/app/purchases/new")}>
                 <Plus className="mr-2 size-4" />
                 New Purchase
               </Button>
@@ -449,20 +437,14 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         values={{
           purchaseStatus: purchaseStatusFilter,
           paymentStatus: paymentStatusFilter,
-          supplierId,
-          warehouseId,
           dateFrom,
           dateTo,
         }}
-        suppliers={filterSuppliers}
-        warehouses={warehouses}
         onSearchChange={setSearch}
         onChange={(values) => {
           updateQuery({
             purchaseStatus: values.purchaseStatus !== undefined ? values.purchaseStatus || null : purchaseStatusFilter || null,
             paymentStatus: values.paymentStatus !== undefined ? values.paymentStatus || null : paymentStatusFilter || null,
-            supplierId: values.supplierId !== undefined ? values.supplierId || null : supplierId || null,
-            warehouseId: values.warehouseId !== undefined ? values.warehouseId || null : warehouseId || null,
             dateFrom: values.dateFrom !== undefined ? values.dateFrom || null : dateFrom || null,
             dateTo: values.dateTo !== undefined ? values.dateTo || null : dateTo || null,
             page: "1",
@@ -570,16 +552,21 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
       <PageHeader
         title="Purchase Returns"
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-end">
             {canExport ? (
               <>
-                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PurchaseExportFormat)} className="w-28">
+                <Select
+                  value={exportFormat}
+                  onChange={(event) => setExportFormat(event.target.value as PurchaseExportFormat)}
+                  className="w-28 shrink-0"
+                >
                   <option value="xlsx">XLSX</option>
                   <option value="pdf">PDF</option>
                 </Select>
                 <Button
                   type="button"
                   variant="secondary"
+                  className="shrink-0"
                   loading={exporting}
                   onClick={async () => {
                     try {
@@ -588,8 +575,6 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
                         page,
                         limit: 20,
                         search: searchParams.get("search") || undefined,
-                        supplierId: supplierId || undefined,
-                        warehouseId: warehouseId || undefined,
                         dateFrom: dateFrom || undefined,
                         dateTo: dateTo || undefined,
                         format: exportFormat,
@@ -609,7 +594,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
               </>
             ) : null}
             {canReturn ? (
-              <Button type="button" onClick={() => void openReturnCreate()}>
+              <Button type="button" className="shrink-0" onClick={() => void openReturnCreate()}>
                 <Plus className="mr-2 size-4" />
                 New Return
               </Button>
@@ -623,20 +608,14 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         values={{
           purchaseStatus: "",
           paymentStatus: "",
-          supplierId,
-          warehouseId,
           dateFrom,
           dateTo,
         }}
-        suppliers={filterSuppliers}
-        warehouses={warehouses}
         showPurchaseStatus={false}
         showPaymentStatus={false}
         onSearchChange={setSearch}
         onChange={(values) => {
           updateQuery({
-            supplierId: values.supplierId !== undefined ? values.supplierId || null : supplierId || null,
-            warehouseId: values.warehouseId !== undefined ? values.warehouseId || null : warehouseId || null,
             dateFrom: values.dateFrom !== undefined ? values.dateFrom || null : dateFrom || null,
             dateTo: values.dateTo !== undefined ? values.dateTo || null : dateTo || null,
             page: "1",

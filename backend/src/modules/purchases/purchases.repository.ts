@@ -70,7 +70,9 @@ class PurchasesRepository {
         or(
           ilike(purchaseInvoices.purchaseNumber, searchPattern),
           ilike(purchaseInvoices.supplierInvoiceNumber, searchPattern),
-          ilike(suppliers.name, searchPattern)
+          ilike(suppliers.name, searchPattern),
+          ilike(warehouses.name, searchPattern),
+          ilike(warehouses.warehouseCode, searchPattern)
         )!
       );
     }
@@ -111,7 +113,9 @@ class PurchasesRepository {
         or(
           ilike(purchaseReturns.returnNumber, searchPattern),
           ilike(purchaseInvoices.purchaseNumber, searchPattern),
-          ilike(suppliers.name, searchPattern)
+          ilike(suppliers.name, searchPattern),
+          ilike(warehouses.name, searchPattern),
+          ilike(warehouses.warehouseCode, searchPattern)
         )!
       );
     }

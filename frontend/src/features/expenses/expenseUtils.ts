@@ -363,7 +363,7 @@ export const buildRecurringFormDefaults = (
     endDate: recurring?.endDate?.slice(0, 10) ?? null,
     nextRunDate: recurring?.nextRunDate?.slice(0, 10) ?? today,
     autoCreateEnabled: recurring?.autoCreateEnabled ?? true,
-    createAsStatus: recurring?.createAsStatus ?? "draft",
+    createAsStatus: recurring?.createAsStatus ?? "posted",
     reminderDaysBefore: recurring?.reminderDaysBefore ?? 0,
     status: recurring?.status ?? "active",
   };

@@ -54,6 +54,84 @@ type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const INDIAN_GST_STATE_CODE_LENGTH = 2;
 
 class ExpensesService {
+  private assertExpenseDraftState(input: {
+    expenseDate: Date;
+    gstApplicable: boolean;
+    gstRate: number;
+    paymentMode: "cash" | "bank" | "upi" | "card" | "cheque" | "neft" | "rtgs" | "imps" | "other";
+    bankAccountId: string | null;
+    referenceNumber: string | null;
+    chequeNumber: string | null;
+    chequeDate: Date | null;
+  }) {
+    const bankLinkedModes = new Set(["bank", "upi", "card", "cheque", "neft", "rtgs", "imps"]);
+    const referenceRequiredModes = new Set(["bank", "upi", "card", "neft", "rtgs", "imps"]);
+    const allowedGstRates = new Set([0, 0.25, 3, 5, 12, 18, 28]);
+
+    if (input.expenseDate.getTime() > Date.now()) {
+      throw new AppError("Expense date cannot be in the future", 400);
+    }
+
+    if (!input.gstApplicable && input.gstRate !== 0) {
+      throw new AppError("GST rate must be 0 when GST is not applicable", 400);
+    }
+
+    if (input.gstApplicable && !allowedGstRates.has(input.gstRate)) {
+      throw new AppError("GST rate must be one of 0, 0.25, 3, 5, 12, 18, or 28", 400);
+    }
+
+    if (bankLinkedModes.has(input.paymentMode) && !input.bankAccountId) {
+      throw new AppError("Bank account is required for the selected payment mode", 400);
+    }
+
+    if (referenceRequiredModes.has(input.paymentMode) && !input.referenceNumber) {
+      throw new AppError("Reference number is required for the selected payment mode", 400);
+    }
+
+    if (input.paymentMode === "cheque") {
+      if (!input.chequeNumber) {
+        throw new AppError("Cheque number is required for cheque payments", 400);
+      }
+
+      if (!input.chequeDate) {
+        throw new AppError("Cheque date is required for cheque payments", 400);
+      }
+    }
+  }
+
+  private assertRecurringTemplateState(input: {
+    startDate: Date;
+    endDate: Date | null;
+    nextRunDate: Date;
+    gstApplicable: boolean;
+    gstRate: number;
+    paymentMode: "cash" | "bank" | "upi" | "card" | "cheque" | "neft" | "rtgs" | "imps" | "other";
+    bankAccountId: string | null;
+  }) {
+    const bankLinkedModes = new Set(["bank", "upi", "card", "cheque", "neft", "rtgs", "imps"]);
+    const allowedGstRates = new Set([0, 0.25, 3, 5, 12, 18, 28]);
+
+    if (input.endDate && input.endDate < input.startDate) {
+      throw new AppError("End date must be greater than or equal to start date", 400);
+    }
+
+    if (input.nextRunDate < input.startDate) {
+      throw new AppError("Next run date must be greater than or equal to start date", 400);
+    }
+
+    if (!input.gstApplicable && input.gstRate !== 0) {
+      throw new AppError("GST rate must be 0 when GST is not applicable", 400);
+    }
+
+    if (input.gstApplicable && !allowedGstRates.has(input.gstRate)) {
+      throw new AppError("GST rate must be one of 0, 0.25, 3, 5, 12, 18, or 28", 400);
+    }
+
+    if (bankLinkedModes.has(input.paymentMode) && !input.bankAccountId) {
+      throw new AppError("Bank account is required for the selected payment mode", 400);
+    }
+  }
+
   private buildExpenseAttachmentDownloadPath(expenseId: string, attachmentId: string) {
     return `/api/v1/expenses/${expenseId}/attachments/${attachmentId}/download`;
   }
@@ -642,6 +720,17 @@ class ExpensesService {
       );
 
       const expenseDate = input.expenseDate ?? existing.expenseDate;
+      this.assertExpenseDraftState({
+        expenseDate,
+        gstApplicable: mutation.totals.gstApplicable,
+        gstRate: Number(mutation.totals.gstRate),
+        paymentMode: input.paymentMode ?? existing.paymentMode,
+        bankAccountId: input.bankAccountId ?? existing.bankAccountId,
+        referenceNumber: input.referenceNumber ?? existing.referenceNumber,
+        chequeNumber: input.chequeNumber ?? existing.chequeNumber,
+        chequeDate: input.chequeDate ?? existing.chequeDate
+      });
+
       const updatedExpense = await expensesRepository.updateExpense(
         actor.companyId,
         expenseId,
@@ -1302,7 +1391,23 @@ class ExpensesService {
         throw new AppError("Only active expense categories can be used", 400);
       }
 
-      await this.resolveExpenseAccount(actor.companyId, input.expenseAccountId ?? null, category.defaultAccountId, false, transaction);
+      this.assertRecurringTemplateState({
+        startDate: input.startDate,
+        endDate: input.endDate ?? null,
+        nextRunDate: input.nextRunDate,
+        gstApplicable: input.gstApplicable ?? false,
+        gstRate: input.gstRate ?? 0,
+        paymentMode: input.paymentMode,
+        bankAccountId: input.bankAccountId ?? null
+      });
+
+      await this.resolveExpenseAccount(
+        actor.companyId,
+        input.expenseAccountId ?? null,
+        category.defaultAccountId,
+        (input.createAsStatus ?? "draft") === "posted",
+        transaction
+      );
       if (input.bankAccountId) {
         await this.getBankAccountOrThrow(actor.companyId, input.bankAccountId);
       }
@@ -1372,15 +1477,34 @@ class ExpensesService {
         throw new AppError("Only active expense categories can be used", 400);
       }
 
+      const nextStartDate = input.startDate ?? existing.startDate;
+      const nextEndDate = input.endDate ?? existing.endDate;
+      const nextRunDate = input.nextRunDate ?? existing.nextRunDate;
+      const nextGstApplicable = input.gstApplicable ?? existing.gstApplicable;
+      const nextGstRate = input.gstRate ?? Number(existing.gstRate);
+      const nextPaymentMode = input.paymentMode ?? existing.paymentMode;
+      const nextBankAccountId = input.bankAccountId ?? existing.bankAccountId;
+      const nextCreateAsStatus = input.createAsStatus ?? existing.createAsStatus;
+
+      this.assertRecurringTemplateState({
+        startDate: nextStartDate,
+        endDate: nextEndDate,
+        nextRunDate,
+        gstApplicable: nextGstApplicable,
+        gstRate: nextGstRate,
+        paymentMode: nextPaymentMode,
+        bankAccountId: nextBankAccountId
+      });
+
       await this.resolveExpenseAccount(
         actor.companyId,
         input.expenseAccountId ?? existing.expenseAccountId,
         category.defaultAccountId,
-        false,
+        nextCreateAsStatus === "posted",
         transaction
       );
-      if (input.bankAccountId ?? existing.bankAccountId) {
-        await this.getBankAccountOrThrow(actor.companyId, input.bankAccountId ?? existing.bankAccountId!);
+      if (nextBankAccountId) {
+        await this.getBankAccountOrThrow(actor.companyId, nextBankAccountId);
       }
 
       const updated = await expensesRepository.updateRecurringExpense(
@@ -1393,17 +1517,17 @@ class ExpensesService {
           payeeName: input.payeeName ?? existing.payeeName,
           description: input.description?.trim() ?? existing.description,
           amount: input.amount !== undefined ? normalizeMoney(input.amount) : existing.amount,
-          gstApplicable: input.gstApplicable ?? existing.gstApplicable,
+          gstApplicable: nextGstApplicable,
           gstRate: input.gstRate !== undefined ? normalizeMoney(input.gstRate) : existing.gstRate,
           priceTaxType: input.priceTaxType ?? existing.priceTaxType,
-          paymentMode: input.paymentMode ?? existing.paymentMode,
-          bankAccountId: input.bankAccountId ?? existing.bankAccountId,
+          paymentMode: nextPaymentMode,
+          bankAccountId: nextBankAccountId,
           frequency: input.frequency ?? existing.frequency,
-          startDate: input.startDate ?? existing.startDate,
-          endDate: input.endDate ?? existing.endDate,
-          nextRunDate: input.nextRunDate ?? existing.nextRunDate,
+          startDate: nextStartDate,
+          endDate: nextEndDate,
+          nextRunDate,
           autoCreateEnabled: input.autoCreateEnabled ?? existing.autoCreateEnabled,
-          createAsStatus: input.createAsStatus ?? existing.createAsStatus,
+          createAsStatus: nextCreateAsStatus,
           reminderDaysBefore: input.reminderDaysBefore ?? existing.reminderDaysBefore,
           status: input.status ?? existing.status,
           updatedBy: actor.id

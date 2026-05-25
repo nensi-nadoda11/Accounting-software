@@ -467,8 +467,6 @@ export const NotificationsPage = () => {
             if (listTabs.includes(activeTab)) {
               await loadNotifications(normalizedListQuery);
             }
-          } catch (error) {
-            toast.error(getErrorMessage(error, "Failed to send notification"));
           } finally {
             setManualSending(false);
           }

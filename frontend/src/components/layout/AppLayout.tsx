@@ -71,11 +71,11 @@ export const AppLayout = () => {
       <div
         className={
           nestedSidebarConfig && visibleSidebarTabs.length
-            ? "max-w-none py-6 pr-4 sm:pr-6 lg:pr-8"
+            ? "max-w-none py-4 pr-4 sm:pr-6 lg:pr-8"
             : "mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
         }
       >
-        <div className={nestedSidebarConfig ? "flex flex-col gap-3 lg:flex-row lg:items-start" : undefined}>
+        <div className={nestedSidebarConfig ? "flex flex-col gap-2 lg:flex-row lg:items-start" : undefined}>
           {nestedSidebarConfig && visibleSidebarTabs.length ? (
             <NestedRouteSidebar
               title={nestedSidebarConfig.title}

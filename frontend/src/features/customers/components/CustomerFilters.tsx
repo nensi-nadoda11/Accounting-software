@@ -31,7 +31,7 @@ export const CustomerFilters = ({
 }) => (
   <Card>
     <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <label className="relative md:col-span-2 xl:col-span-2">
+      <label className="relative md:col-span-2 xl:col-span-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
         <input
           value={search}
@@ -99,7 +99,7 @@ export const CustomerFilters = ({
             </option>
           ))}
         </Select>
-        <Button type="button" variant="secondary" onClick={onReset}>
+        <Button type="button" variant="secondary" className="shrink-0" onClick={onReset}>
           <RotateCcw className="mr-2 size-4" />
           Reset
         </Button>

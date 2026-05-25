@@ -33,7 +33,6 @@ import type {
   Supplier,
   SupplierListItem,
   SupplierMutableStatus,
-  SupplierSortBy,
   SupplierStatus,
   SupplierType,
   TaxType,
@@ -72,9 +71,6 @@ const isSupplierType = (value: string | null): value is SupplierType =>
 
 const isTaxType = (value: string | null): value is TaxType =>
   value === "registered" || value === "unregistered" || value === "composition";
-
-const isSortBy = (value: string | null): value is SupplierSortBy =>
-  value === "name" || value === "createdAt" || value === "outstandingPayable" || value === "supplierCode";
 
 const isSortOrder = (value: string | null): value is SortOrder => value === "asc" || value === "desc";
 
@@ -147,15 +143,12 @@ export const SuppliersPage = () => {
   const statusParam = searchParams.get("status");
   const supplierTypeParam = searchParams.get("supplierType");
   const taxTypeParam = searchParams.get("taxType");
-  const sortByParam = searchParams.get("sortBy");
   const sortOrderParam = searchParams.get("sortOrder");
   const status: SupplierStatus | "" = isSupplierStatus(statusParam) ? statusParam : "";
   const supplierType: SupplierType | "" = isSupplierType(supplierTypeParam) ? supplierTypeParam : "";
   const taxType: TaxType | "" = isTaxType(taxTypeParam) ? taxTypeParam : "";
-  const hasOutstanding = parseBooleanFilter(searchParams.get("hasOutstanding"));
   const isBlacklisted = parseBooleanFilter(searchParams.get("isBlacklisted"));
-  const isPreferred = parseBooleanFilter(searchParams.get("isPreferred"));
-  const sortBy: SupplierSortBy = isSortBy(sortByParam) ? sortByParam : "createdAt";
+  const sortBy = "createdAt" as const;
   const sortOrder: SortOrder = isSortOrder(sortOrderParam) ? sortOrderParam : "desc";
 
   useEffect(() => {
@@ -165,6 +158,7 @@ export const SuppliersPage = () => {
   const updateQuery = useCallback(
     (updates: Record<string, string | null>) => {
       const next = new URLSearchParams(searchParams);
+      ["hasOutstanding", "isPreferred", "sortBy"].forEach((key) => next.delete(key));
 
       Object.entries(updates).forEach(([key, value]) => {
         if (!value) {
@@ -202,9 +196,7 @@ export const SuppliersPage = () => {
         status: status || undefined,
         supplierType: supplierType || undefined,
         taxType: taxType || undefined,
-        hasOutstanding: hasOutstanding === "" ? undefined : hasOutstanding === "true",
         isBlacklisted: isBlacklisted === "" ? undefined : isBlacklisted === "true",
-        isPreferred: isPreferred === "" ? undefined : isPreferred === "true",
         sortBy,
         sortOrder,
       });
@@ -214,7 +206,7 @@ export const SuppliersPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [hasOutstanding, isBlacklisted, isPreferred, page, searchParams, sortBy, sortOrder, status, supplierType, taxType]);
+  }, [isBlacklisted, page, searchParams, sortBy, sortOrder, status, supplierType, taxType]);
 
   useEffect(() => {
     void loadSuppliers();
@@ -313,9 +305,7 @@ export const SuppliersPage = () => {
                       status: status || undefined,
                       supplierType: supplierType || undefined,
                       taxType: taxType || undefined,
-                      hasOutstanding: hasOutstanding === "" ? undefined : hasOutstanding === "true",
                       isBlacklisted: isBlacklisted === "" ? undefined : isBlacklisted === "true",
-                      isPreferred: isPreferred === "" ? undefined : isPreferred === "true",
                       sortBy,
                       sortOrder,
                     });
@@ -348,10 +338,7 @@ export const SuppliersPage = () => {
           status: status || "",
           supplierType: supplierType || "",
           taxType: taxType || "",
-          hasOutstanding,
           isBlacklisted,
-          isPreferred,
-          sortBy,
           sortOrder,
         }}
         onSearchChange={setSearchInput}
@@ -360,10 +347,7 @@ export const SuppliersPage = () => {
             status: values.status !== undefined ? values.status || null : status || null,
             supplierType: values.supplierType !== undefined ? values.supplierType || null : supplierType || null,
             taxType: values.taxType !== undefined ? values.taxType || null : taxType || null,
-            hasOutstanding: values.hasOutstanding !== undefined ? values.hasOutstanding || null : hasOutstanding || null,
             isBlacklisted: values.isBlacklisted !== undefined ? values.isBlacklisted || null : isBlacklisted || null,
-            isPreferred: values.isPreferred !== undefined ? values.isPreferred || null : isPreferred || null,
-            sortBy: values.sortBy ?? sortBy,
             sortOrder: values.sortOrder ?? sortOrder,
             page: "1",
           })

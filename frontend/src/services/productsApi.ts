@@ -123,11 +123,11 @@ export const productsApi = {
           taxType: query.taxType || undefined,
           sortBy: query.sortBy,
           sortOrder: query.sortOrder,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "products.csv",
+      `products.${query.format ?? "pdf"}`,
     ),
 
   generateBarcode: async (productId: string, replaceExisting = false) =>

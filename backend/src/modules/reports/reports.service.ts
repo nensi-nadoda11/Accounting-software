@@ -7,6 +7,8 @@ import { customersRepository } from "../customers/customers.repository";
 import { suppliersRepository } from "../suppliers/suppliers.repository";
 import { auditLogService } from "../audit-logs/audit-log.service";
 import { AppError } from "../../utils/app-error";
+import { logger } from "../../config/logger";
+import { reportExports } from "../../db/schema";
 import { getPagination } from "../../utils/pagination";
 import { buildReportFile } from "./reports.export";
 import { reportsRepository } from "./reports.repository";
@@ -27,7 +29,7 @@ import type {
 } from "./reports.validator";
 
 const MAX_EXPORT_ROWS = 5000;
-const MAX_PDF_EXPORT_ROWS = 200;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type NormalizedQuery = ReportSummaryQuery & {
   dateFrom?: Date | undefined;
@@ -47,6 +49,10 @@ const toPagination = (page: number, limit: number, total: number) => ({
 });
 
 export class ReportsService {
+  private toAuditEntityId(value: string) {
+    return UUID_PATTERN.test(value) ? value : null;
+  }
+
   private async resolveQuery(actor: ReportsActor, query: ReportSummaryQuery, options?: { requireDateRange?: boolean }) {
     let dateFrom = query.dateFrom;
     let dateTo = query.dateTo;
@@ -118,7 +124,7 @@ export class ReportsService {
       userId: actor.id,
       action,
       entityType: "report",
-      entityId: reportType,
+      entityId: this.toAuditEntityId(reportType),
       metadata: {
         reportType,
         filters: query
@@ -128,16 +134,62 @@ export class ReportsService {
     });
   }
 
+  private async safeLogAction(
+    actor: ReportsActor,
+    action: string,
+    reportType: string,
+    query: Record<string, unknown>,
+    context: ReportsRequestContext
+  ) {
+    try {
+      await this.logAction(actor, action, reportType, query, context);
+    } catch (error) {
+      logger.warn("Reports audit log failed", {
+        action,
+        reportType,
+        companyId: actor.companyId,
+        userId: actor.id,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  private async listRecentExportsSafe(companyId: string, limit: number) {
+    try {
+      return await reportsRepository.listRecentExports(companyId, limit);
+    } catch (error) {
+      logger.warn("Reports export history unavailable", {
+        companyId,
+        limit,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return [];
+    }
+  }
+
+  private async createReportExportSafe(data: typeof reportExports.$inferInsert) {
+    try {
+      await reportsRepository.createReportExport(data);
+    } catch (error) {
+      logger.warn("Report export history write failed", {
+        companyId: data.companyId,
+        reportType: data.reportType,
+        status: data.status,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
   public async getOverview(actor: ReportsActor, query: ReportOverviewQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query);
     const [salesSummary, purchaseSummary, incomeSummary, recentExports] = await Promise.all([
       reportsRepository.getSalesSummary(actor.companyId, resolved),
       reportsRepository.getPurchasesSummary(actor.companyId, resolved),
       reportsRepository.getIncomeSummary(actor.companyId, resolved),
-      reportsRepository.listRecentExports(actor.companyId, 8)
+      this.listRecentExportsSafe(actor.companyId, 8)
     ]);
 
-    await this.logAction(actor, "reports_overview_viewed", "overview", resolved, context);
+    await this.safeLogAction(actor, "reports_overview_viewed", "overview", resolved, context);
 
     return {
       summaryCards: [
@@ -152,15 +204,15 @@ export class ReportsService {
   }
 
   public async listExports(actor: ReportsActor, query: ReportExportsQuery, context: ReportsRequestContext) {
-    const data = await reportsRepository.listRecentExports(actor.companyId, query.limit);
-    await this.logAction(actor, "reports_exports_viewed", "exports", query, context);
+    const data = await this.listRecentExportsSafe(actor.companyId, query.limit);
+    await this.safeLogAction(actor, "reports_exports_viewed", "exports", query, context);
     return { items: data };
   }
 
   public async getSalesSummary(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await reportsRepository.getSalesSummary(actor.companyId, resolved);
-    await this.logAction(actor, "sales_report_viewed", "sales.summary", resolved, context);
+    await this.safeLogAction(actor, "sales_report_viewed", "sales.summary", resolved, context);
     return data;
   }
 
@@ -168,7 +220,7 @@ export class ReportsService {
     const pagination = getPagination(query.page, query.limit);
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await reportsRepository.getSalesDetailed(actor.companyId, { ...resolved, ...pagination });
-    await this.logAction(actor, "sales_report_viewed", "sales.detailed", { ...resolved, ...pagination }, context);
+    await this.safeLogAction(actor, "sales_report_viewed", "sales.detailed", { ...resolved, ...pagination }, context);
     return {
       items: data.items,
       totals: data.totals,
@@ -179,21 +231,21 @@ export class ReportsService {
   public async getSalesTopCustomers(actor: ReportsActor, query: ReportTopQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await reportsRepository.getSalesTopCustomers(actor.companyId, resolved, query.limit);
-    await this.logAction(actor, "sales_report_viewed", "sales.top-customers", resolved, context);
+    await this.safeLogAction(actor, "sales_report_viewed", "sales.top-customers", resolved, context);
     return { items: data };
   }
 
   public async getSalesTopProducts(actor: ReportsActor, query: ReportTopQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await reportsRepository.getSalesTopProducts(actor.companyId, resolved, query.limit);
-    await this.logAction(actor, "sales_report_viewed", "sales.top-products", resolved, context);
+    await this.safeLogAction(actor, "sales_report_viewed", "sales.top-products", resolved, context);
     return { items: data };
   }
 
   public async getPurchasesSummary(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await reportsRepository.getPurchasesSummary(actor.companyId, resolved);
-    await this.logAction(actor, "purchase_report_viewed", "purchases.summary", resolved, context);
+    await this.safeLogAction(actor, "purchase_report_viewed", "purchases.summary", resolved, context);
     return data;
   }
 
@@ -201,7 +253,7 @@ export class ReportsService {
     const pagination = getPagination(query.page, query.limit);
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await reportsRepository.getPurchasesDetailed(actor.companyId, { ...resolved, ...pagination });
-    await this.logAction(actor, "purchase_report_viewed", "purchases.detailed", { ...resolved, ...pagination }, context);
+    await this.safeLogAction(actor, "purchase_report_viewed", "purchases.detailed", { ...resolved, ...pagination }, context);
     return {
       items: data.items,
       totals: data.totals,
@@ -247,7 +299,7 @@ export class ReportsService {
     const end = start + pagination.limit;
     const items = allRows.slice(start, end);
 
-    await this.logAction(actor, "customer_report_viewed", "customers.ledger", { ...resolved, ...pagination }, context);
+    await this.safeLogAction(actor, "customer_report_viewed", "customers.ledger", { ...resolved, ...pagination }, context);
 
     return {
       customer,
@@ -259,14 +311,14 @@ export class ReportsService {
   public async getCustomersOutstanding(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query);
     const data = await reportsRepository.listCustomersOutstanding(actor.companyId, resolved);
-    await this.logAction(actor, "customer_report_viewed", "customers.outstanding", resolved, context);
+    await this.safeLogAction(actor, "customer_report_viewed", "customers.outstanding", resolved, context);
     return { items: data };
   }
 
   public async getCustomersAging(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query);
     const data = await reportsRepository.listCustomersAging(actor.companyId, resolved);
-    await this.logAction(actor, "customer_report_viewed", "customers.aging", resolved, context);
+    await this.safeLogAction(actor, "customer_report_viewed", "customers.aging", resolved, context);
     return { items: data };
   }
 
@@ -308,7 +360,7 @@ export class ReportsService {
     const end = start + pagination.limit;
     const items = allRows.slice(start, end);
 
-    await this.logAction(actor, "supplier_report_viewed", "suppliers.ledger", { ...resolved, ...pagination }, context);
+    await this.safeLogAction(actor, "supplier_report_viewed", "suppliers.ledger", { ...resolved, ...pagination }, context);
 
     return {
       supplier,
@@ -320,14 +372,14 @@ export class ReportsService {
   public async getSuppliersOutstanding(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query);
     const data = await reportsRepository.listSuppliersOutstanding(actor.companyId, resolved);
-    await this.logAction(actor, "supplier_report_viewed", "suppliers.outstanding", resolved, context);
+    await this.safeLogAction(actor, "supplier_report_viewed", "suppliers.outstanding", resolved, context);
     return { items: data };
   }
 
   public async getSuppliersAging(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query);
     const data = await reportsRepository.listSuppliersAging(actor.companyId, resolved);
-    await this.logAction(actor, "supplier_report_viewed", "suppliers.aging", resolved, context);
+    await this.safeLogAction(actor, "supplier_report_viewed", "suppliers.aging", resolved, context);
     return { items: data };
   }
 
@@ -349,7 +401,7 @@ export class ReportsService {
       status: undefined,
       expiryAlertDays: 30
     });
-    await this.logAction(actor, "inventory_report_viewed", "inventory.current-stock", { ...resolved, ...pagination }, context);
+    await this.safeLogAction(actor, "inventory_report_viewed", "inventory.current-stock", { ...resolved, ...pagination }, context);
     return {
       items: data.rows,
       pagination: toPagination(pagination.page, pagination.limit, data.total)
@@ -364,7 +416,7 @@ export class ReportsService {
       productId: resolved.productId,
       warehouseId: undefined
     });
-    await this.logAction(actor, "inventory_report_viewed", "inventory.valuation", resolved, context);
+    await this.safeLogAction(actor, "inventory_report_viewed", "inventory.valuation", resolved, context);
     return { items: data };
   }
 
@@ -372,7 +424,7 @@ export class ReportsService {
     const pagination = getPagination(query.page, query.limit);
     const resolved = await this.resolveQuery(actor, query);
     const data = await reportsRepository.listInventoryExpiry(actor.companyId, { ...resolved, ...pagination });
-    await this.logAction(actor, "inventory_report_viewed", "inventory.expiry", { ...resolved, ...pagination }, context);
+    await this.safeLogAction(actor, "inventory_report_viewed", "inventory.expiry", { ...resolved, ...pagination }, context);
     return {
       items: data.items,
       pagination: toPagination(pagination.page, pagination.limit, data.total)
@@ -394,7 +446,7 @@ export class ReportsService {
       dateFrom: resolved.dateFrom,
       dateTo: resolved.dateTo
     });
-    await this.logAction(actor, "inventory_report_viewed", "inventory.movement", { ...resolved, ...pagination }, context);
+    await this.safeLogAction(actor, "inventory_report_viewed", "inventory.movement", { ...resolved, ...pagination }, context);
     return {
       items: data.rows,
       pagination: toPagination(pagination.page, pagination.limit, data.total)
@@ -404,91 +456,91 @@ export class ReportsService {
   public async getInventoryLowStock(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query);
     const data = await reportsRepository.listInventoryLowStock(actor.companyId, resolved);
-    await this.logAction(actor, "inventory_report_viewed", "inventory.low-stock", resolved, context);
+    await this.safeLogAction(actor, "inventory_report_viewed", "inventory.low-stock", resolved, context);
     return { items: data };
   }
 
   public async getExpenseCategoryWise(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await expensesService.getCategoryWiseReport({ companyId: actor.companyId }, resolved as never);
-    await this.logAction(actor, "expense_report_viewed", "expenses.category-wise", resolved, context);
+    await this.safeLogAction(actor, "expense_report_viewed", "expenses.category-wise", resolved, context);
     return data;
   }
 
   public async getExpenseMonthly(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await expensesService.getMonthlyReport({ companyId: actor.companyId }, resolved as never);
-    await this.logAction(actor, "expense_report_viewed", "expenses.monthly", resolved, context);
+    await this.safeLogAction(actor, "expense_report_viewed", "expenses.monthly", resolved, context);
     return data;
   }
 
   public async getExpensePaymentMode(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await expensesService.getPaymentModeReport({ companyId: actor.companyId }, resolved as never);
-    await this.logAction(actor, "expense_report_viewed", "expenses.payment-mode", resolved, context);
+    await this.safeLogAction(actor, "expense_report_viewed", "expenses.payment-mode", resolved, context);
     return data;
   }
 
   public async getIncomeSummary(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await reportsRepository.getIncomeSummary(actor.companyId, resolved);
-    await this.logAction(actor, "income_report_viewed", "income.summary", resolved, context);
+    await this.safeLogAction(actor, "income_report_viewed", "income.summary", resolved, context);
     return data;
   }
 
   public async getIncomeMonthly(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await reportsRepository.getIncomeMonthly(actor.companyId, resolved);
-    await this.logAction(actor, "income_report_viewed", "income.monthly", resolved, context);
+    await this.safeLogAction(actor, "income_report_viewed", "income.monthly", resolved, context);
     return { items: data };
   }
 
   public async getPayrollMonthly(actor: ReportsActor, query: ReportPaginatedQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await payrollService.getMonthlyReport({ companyId: actor.companyId }, resolved as never);
-    await this.logAction(actor, "payroll_report_viewed", "payroll.monthly", resolved, context);
+    await this.safeLogAction(actor, "payroll_report_viewed", "payroll.monthly", resolved, context);
     return data;
   }
 
   public async getPayrollEmployee(actor: ReportsActor, query: ReportPaginatedQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await payrollService.getEmployeeReport({ companyId: actor.companyId }, resolved as never);
-    await this.logAction(actor, "payroll_report_viewed", "payroll.employee", resolved, context);
+    await this.safeLogAction(actor, "payroll_report_viewed", "payroll.employee", resolved, context);
     return data;
   }
 
   public async getPayrollDepartment(actor: ReportsActor, query: ReportPaginatedQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await payrollService.getDepartmentReport({ companyId: actor.companyId }, resolved as never);
-    await this.logAction(actor, "payroll_report_viewed", "payroll.department", resolved, context);
+    await this.safeLogAction(actor, "payroll_report_viewed", "payroll.department", resolved, context);
     return data;
   }
 
   public async getGstSummary(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await gstService.getSummary(actor as never, resolved as never, context);
-    await this.logAction(actor, "gst_report_viewed", "gst.summary", resolved, context);
+    await this.safeLogAction(actor, "gst_report_viewed", "gst.summary", resolved, context);
     return data;
   }
 
   public async getGstHsn(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await gstService.getHsnSummary(actor as never, { ...resolved, source: "all" } as never, context);
-    await this.logAction(actor, "gst_report_viewed", "gst.hsn", resolved, context);
+    await this.safeLogAction(actor, "gst_report_viewed", "gst.hsn", resolved, context);
     return data;
   }
 
   public async getTrialBalance(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await accountingService.getTrialBalance(actor as never, resolved as never, context as never);
-    await this.logAction(actor, "accounting_report_viewed", "accounting.trial-balance", resolved, context);
+    await this.safeLogAction(actor, "accounting_report_viewed", "accounting.trial-balance", resolved, context);
     return data;
   }
 
   public async getProfitLoss(actor: ReportsActor, query: ReportSummaryQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await accountingService.getProfitLoss(actor as never, resolved as never, context as never);
-    await this.logAction(actor, "accounting_report_viewed", "accounting.profit-loss", resolved, context);
+    await this.safeLogAction(actor, "accounting_report_viewed", "accounting.profit-loss", resolved, context);
     return data;
   }
 
@@ -503,21 +555,21 @@ export class ReportsService {
       { ...resolved, asOfDate: resolved.dateTo } as never,
       context as never
     );
-    await this.logAction(actor, "accounting_report_viewed", "accounting.balance-sheet", resolved, context);
+    await this.safeLogAction(actor, "accounting_report_viewed", "accounting.balance-sheet", resolved, context);
     return data;
   }
 
   public async getCashBook(actor: ReportsActor, query: ReportPaginatedQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await accountingService.getCashBook(actor as never, resolved as never, context as never);
-    await this.logAction(actor, "accounting_report_viewed", "accounting.cash-book", resolved, context);
+    await this.safeLogAction(actor, "accounting_report_viewed", "accounting.cash-book", resolved, context);
     return data;
   }
 
   public async getBankBook(actor: ReportsActor, query: ReportPaginatedQuery, context: ReportsRequestContext) {
     const resolved = await this.resolveQuery(actor, query, { requireDateRange: true });
     const data = await accountingService.getBankBook(actor as never, resolved as never, context as never);
-    await this.logAction(actor, "accounting_report_viewed", "accounting.bank-book", resolved, context);
+    await this.safeLogAction(actor, "accounting_report_viewed", "accounting.bank-book", resolved, context);
     return data;
   }
 
@@ -638,13 +690,9 @@ export class ReportsService {
         throw new AppError("Export is too large. Narrow the filters and try again.", 400);
       }
 
-      if (query.format === "pdf" && dataset.rows.length > MAX_PDF_EXPORT_ROWS) {
-        throw new AppError("PDF export is limited to 200 rows. Use CSV or XLSX for larger reports.", 400);
-      }
-
       const file = buildReportFile(dataset, query.format, formatFileBaseName(query.reportType));
 
-      await reportsRepository.createReportExport({
+      await this.createReportExportSafe({
         companyId: actor.companyId,
         reportType: query.reportType,
         exportFormat: query.format,
@@ -654,10 +702,10 @@ export class ReportsService {
         generatedBy: actor.id
       });
 
-      await this.logAction(actor, "report_exported", query.reportType, mergedQuery, context);
+      await this.safeLogAction(actor, "report_exported", query.reportType, mergedQuery, context);
       return file;
     } catch (error) {
-      await reportsRepository.createReportExport({
+      await this.createReportExportSafe({
         companyId: actor.companyId,
         reportType: query.reportType,
         exportFormat: query.format,

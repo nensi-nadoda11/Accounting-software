@@ -105,11 +105,11 @@ export const salesApi = {
           invoiceType: query.invoiceType || undefined,
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "sales.csv",
+      `sales.${query.format ?? "pdf"}`,
     ),
 
   getPdfFile: async (invoiceId: string) =>
@@ -180,11 +180,11 @@ export const salesApi = {
           warehouseId: query.warehouseId || undefined,
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "sales-returns.csv",
+      `sales-returns.${query.format ?? "pdf"}`,
     ),
 
   sendEmail: async (invoiceId: string, payload: { email: string | null; subject?: string | null; message?: string | null }) =>

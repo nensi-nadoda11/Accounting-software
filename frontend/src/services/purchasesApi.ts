@@ -99,15 +99,15 @@ export const purchasesApi = {
           warehouseId: query.warehouseId || undefined,
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "purchases.csv",
+      `purchases.${query.format ?? "pdf"}`,
     ),
 
   downloadPdf: async (purchaseId: string) =>
-    extractDownload(client.get(`/purchases/${purchaseId}/pdf`, { responseType: "blob" }), `purchase-${purchaseId}.csv`),
+    extractDownload(client.get(`/purchases/${purchaseId}/pdf`, { responseType: "blob" }), `purchase-${purchaseId}.pdf`),
 
   listPayments: async (purchaseId: string, query: PurchasePaymentsQuery) =>
     (
@@ -159,16 +159,16 @@ export const purchasesApi = {
           warehouseId: query.warehouseId || undefined,
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "purchase-returns.csv",
+      `purchase-returns.${query.format ?? "pdf"}`,
     ),
 
   downloadReturnPdf: async (purchaseReturnId: string) =>
     extractDownload(
       client.get(`/purchases/returns/${purchaseReturnId}/pdf`, { responseType: "blob" }),
-      `purchase-return-${purchaseReturnId}.csv`,
+      `purchase-return-${purchaseReturnId}.pdf`,
     ),
 };

@@ -3,6 +3,8 @@ import { productCategories, productUnits, products } from "../../db/schema";
 import { auditLogService } from "../audit-logs/audit-log.service";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
 import { productsRepository } from "./products.repository";
 import type {
   BarcodeRequestInput,
@@ -26,7 +28,7 @@ import type {
   ProductRequestContext,
   ProductType
 } from "./products.types";
-import { buildCsvBuffer, buildPricePreview, calculateMargin, calculateMarkup, compareDecimals, multiplyScaled, normalizeMoney, normalizeQuantity, normalizeRate } from "./products.utils";
+import { buildPricePreview, calculateMargin, calculateMarkup, compareDecimals, multiplyScaled, normalizeMoney, normalizeQuantity, normalizeRate } from "./products.utils";
 
 type ProductRecord = typeof products.$inferSelect;
 type ProductCategoryRecord = typeof productCategories.$inferSelect;
@@ -671,12 +673,6 @@ class ProductsService {
     return row;
   };
 
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
-  }
-
   public async listProducts(actor: Pick<ProductActor, "companyId">, query: ListProductsQuery) {
     const pagination = getPagination(query.page, query.limit);
     const params: {
@@ -1189,7 +1185,6 @@ class ProductsService {
     query: ExportProductsQuery,
     context: ProductRequestContext
   ): Promise<ProductExportPayload> {
-    this.ensureCsvFormat(query.format);
     const params: {
       companyId: string;
       search?: string;
@@ -1221,61 +1216,64 @@ class ProductsService {
 
     const rows = await productsRepository.listProductsForExport(params);
 
-    const content = buildCsvBuffer(
-      [
-        "Product Code",
-        "Type",
-        "Name",
-        "SKU",
-        "Barcode",
-        "Category",
-        "Unit",
-        "Brand",
-        "HSN/SAC",
-        "Tax Type",
-        "GST Rate",
-        "Cess Rate",
-        "Price Tax Type",
-        "Purchase Price",
-        "Sale Price",
-        "Final Sale Price",
-        "MRP",
-        "Wholesale Price",
-        "Minimum Sale Price",
-        "Default Discount",
-        "Opening Stock Qty",
-        "Opening Stock Value",
-        "Status"
+    const dataset: ReportExportDataset = {
+      title: "Products",
+      columns: [
+        { key: "productCode", label: "Product Code" },
+        { key: "productType", label: "Type" },
+        { key: "name", label: "Name" },
+        { key: "sku", label: "SKU" },
+        { key: "barcode", label: "Barcode" },
+        { key: "category", label: "Category" },
+        { key: "unit", label: "Unit" },
+        { key: "brand", label: "Brand" },
+        { key: "hsnSacCode", label: "HSN/SAC" },
+        { key: "taxType", label: "Tax Type" },
+        { key: "gstRate", label: "GST Rate", type: "number" },
+        { key: "cessRate", label: "Cess Rate", type: "number" },
+        { key: "priceTaxType", label: "Price Tax Type" },
+        { key: "purchasePrice", label: "Purchase Price", type: "number" },
+        { key: "salePrice", label: "Sale Price", type: "number" },
+        { key: "finalSalePrice", label: "Final Sale Price", type: "number" },
+        { key: "mrp", label: "MRP", type: "number" },
+        { key: "wholesalePrice", label: "Wholesale Price", type: "number" },
+        { key: "minimumSalePrice", label: "Minimum Sale Price", type: "number" },
+        { key: "defaultDiscount", label: "Default Discount", type: "number" },
+        { key: "openingStockQuantity", label: "Opening Stock Qty", type: "number" },
+        { key: "openingStockValue", label: "Opening Stock Value", type: "number" },
+        { key: "status", label: "Status" }
       ],
-      rows.map((row) => {
+      rows: rows.map((row) => {
         const preview = this.buildProductPreview(row.product);
-        return [
-          row.product.productCode,
-          row.product.productType,
-          row.product.name,
-          row.product.sku,
-          row.product.barcode ?? "",
-          row.categoryName ?? "",
-          row.unitSymbol ?? row.unitName ?? "",
-          row.product.brand ?? "",
-          row.product.hsnSacCode ?? "",
-          row.product.taxType,
-          normalizeRate(row.product.gstRate),
-          normalizeRate(row.product.cessRate),
-          row.product.priceTaxType,
-          normalizeMoney(row.product.purchasePrice),
-          normalizeMoney(row.product.salePrice),
-          preview.finalSalePrice,
-          normalizeMoney(row.product.mrp),
-          normalizeMoney(row.product.wholesalePrice),
-          normalizeMoney(row.product.minimumSalePrice),
-          normalizeRate(row.product.defaultDiscount),
-          normalizeQuantity(row.product.openingStockQuantity),
-          normalizeMoney(row.product.openingStockValue),
-          row.product.status
-        ];
+
+        return {
+          productCode: row.product.productCode,
+          productType: row.product.productType,
+          name: row.product.name,
+          sku: row.product.sku,
+          barcode: row.product.barcode ?? "",
+          category: row.categoryName ?? "",
+          unit: row.unitSymbol ?? row.unitName ?? "",
+          brand: row.product.brand ?? "",
+          hsnSacCode: row.product.hsnSacCode ?? "",
+          taxType: row.product.taxType,
+          gstRate: normalizeRate(row.product.gstRate),
+          cessRate: normalizeRate(row.product.cessRate),
+          priceTaxType: row.product.priceTaxType,
+          purchasePrice: normalizeMoney(row.product.purchasePrice),
+          salePrice: normalizeMoney(row.product.salePrice),
+          finalSalePrice: preview.finalSalePrice,
+          mrp: normalizeMoney(row.product.mrp),
+          wholesalePrice: normalizeMoney(row.product.wholesalePrice),
+          minimumSalePrice: normalizeMoney(row.product.minimumSalePrice),
+          defaultDiscount: normalizeRate(row.product.defaultDiscount),
+          openingStockQuantity: normalizeQuantity(row.product.openingStockQuantity),
+          openingStockValue: normalizeMoney(row.product.openingStockValue),
+          status: row.product.status
+        };
       })
-    );
+    };
+    const file = buildReportFile(dataset, query.format, `products-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1290,11 +1288,7 @@ class ProductsService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `products-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async getPriceHistory(

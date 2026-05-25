@@ -108,11 +108,11 @@ export const expensesApi = {
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
           recurringExpenseId: query.recurringExpenseId || undefined,
-          format: "csv",
+          format: "pdf",
         },
         responseType: "blob",
       }),
-      "expenses.csv",
+      "expenses.pdf",
     ),
 
   listCategories: async (query: ExpenseCategoryFiltersQuery) =>

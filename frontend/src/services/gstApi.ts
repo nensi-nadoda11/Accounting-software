@@ -96,7 +96,7 @@ export const gstApi = {
         },
         responseType: "blob",
       }),
-      "gst-sales.csv",
+      `gst-sales.${query.format ?? "pdf"}`,
     ),
 
   listPurchases: async (query: GstFilters) =>
@@ -131,7 +131,7 @@ export const gstApi = {
         },
         responseType: "blob",
       }),
-      "gst-purchases.csv",
+      `gst-purchases.${query.format ?? "pdf"}`,
     ),
 
   listItc: async (query: GstFilters) =>
@@ -164,7 +164,7 @@ export const gstApi = {
         },
         responseType: "blob",
       }),
-      "gst-itc.csv",
+      `gst-itc.${query.format ?? "pdf"}`,
     ),
 
   updateItcStatus: async (
@@ -225,7 +225,7 @@ export const gstApi = {
         },
         responseType: "blob",
       }),
-      "gst-hsn-summary.csv",
+      `gst-hsn-summary.${query.format ?? "pdf"}`,
     ),
 
   getTaxSummary: async (query: GstFilters) =>
@@ -244,7 +244,7 @@ export const gstApi = {
         },
         responseType: "blob",
       }),
-      "gst-tax-summary.csv",
+      `gst-tax-summary.${query.format ?? "pdf"}`,
     ),
 
   listAdjustments: async (query: GstFilters) =>
@@ -283,7 +283,7 @@ export const gstApi = {
         },
         responseType: "blob",
       }),
-      "gstr1.csv",
+      `gstr1.${query.format ?? "pdf"}`,
     ),
 
   exportGstr3b: async (query: GstFilters & { format?: GstExportFormat }) =>
@@ -295,6 +295,6 @@ export const gstApi = {
         },
         responseType: "blob",
       }),
-      "gstr3b.csv",
+      `gstr3b.${query.format ?? "pdf"}`,
     ),
 };

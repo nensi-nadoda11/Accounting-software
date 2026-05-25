@@ -61,7 +61,7 @@ export const securityAdminApi = {
         responseType: "blob",
         params: compactParams(filters)
       }),
-      `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+      `audit-logs-${new Date().toISOString().slice(0, 10)}.pdf`
     ),
 
   listLoginLogs: async (filters: LoginLogFilters) =>

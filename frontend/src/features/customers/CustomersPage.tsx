@@ -125,7 +125,7 @@ export const CustomersPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<CustomerExportFormat>("xlsx");
+  const [exportFormat, setExportFormat] = useState<CustomerExportFormat>("pdf");
   const [submitting, setSubmitting] = useState(false);
   const [preparingFormId, setPreparingFormId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -278,7 +278,6 @@ export const CustomersPage = () => {
             {canExport ? (
               <>
                 <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as CustomerExportFormat)} className="w-28">
-                  <option value="csv">CSV</option>
                   <option value="xlsx">XLSX</option>
                   <option value="pdf">PDF</option>
                 </Select>

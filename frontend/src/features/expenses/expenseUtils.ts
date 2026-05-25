@@ -378,6 +378,86 @@ export const downloadLocalCsv = (fileName: string, headers: string[], rows: stri
   URL.revokeObjectURL(url);
 };
 
+const pdfEscape = (value: string) =>
+  value.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
+
+export const downloadLocalPdfTable = (fileName: string, title: string, headers: string[], rows: string[][]) => {
+  const maxColumnWidth = Math.max(12, Math.floor(140 / Math.max(headers.length, 1)));
+  const lines = [
+    title,
+    "",
+    headers.map((header) => header.padEnd(maxColumnWidth).slice(0, maxColumnWidth)).join(" "),
+    headers.map(() => "-".repeat(maxColumnWidth)).join(" "),
+    ...rows.map((row) =>
+      row
+        .map((cell) => (cell ?? "").padEnd(maxColumnWidth).slice(0, maxColumnWidth))
+        .join(" "),
+    ),
+  ];
+
+  const pageHeight = 792;
+  const pageWidth = 612;
+  const fontSize = 9;
+  const lineHeight = 14;
+  const linesPerPage = 48;
+  const pages = Array.from(
+    { length: Math.max(1, Math.ceil(lines.length / linesPerPage)) },
+    (_, index) => lines.slice(index * linesPerPage, (index + 1) * linesPerPage),
+  );
+
+  const objects: string[] = [];
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  const pageRefs = pages.map((_, index) => `${4 + index * 2} 0 R`).join(" ");
+  objects.push(`<< /Type /Pages /Count ${pages.length} /Kids [${pageRefs}] >>`);
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+  for (const pageLines of pages) {
+    const pageObjectId = objects.length + 1;
+    const contentObjectId = pageObjectId + 1;
+    const contentLines = ["BT", `/F1 ${fontSize} Tf`];
+    let y = pageHeight - 48;
+
+    for (const line of pageLines) {
+      contentLines.push(`1 0 0 1 36 ${y} Tm (${pdfEscape(line)}) Tj`);
+      y -= lineHeight;
+    }
+
+    contentLines.push("ET");
+    const stream = contentLines.join("\n");
+
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectId} 0 R >>`,
+    );
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+  }
+
+  let body = "%PDF-1.4\n";
+  const offsets: number[] = [0];
+
+  for (let index = 0; index < objects.length; index += 1) {
+    offsets.push(body.length);
+    body += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+  }
+
+  const xrefOffset = body.length;
+  body += `xref\n0 ${objects.length + 1}\n`;
+  body += "0000000000 65535 f \n";
+
+  for (let index = 1; index < offsets.length; index += 1) {
+    body += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
+  }
+
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  const blob = new Blob([body], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
 export const sumExpenseTotals = (
   items: Array<
     | CategoryWiseExpenseReportRow

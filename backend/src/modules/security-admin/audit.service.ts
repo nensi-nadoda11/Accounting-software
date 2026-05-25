@@ -1,10 +1,10 @@
 import { auditLogService } from "../audit-logs/audit-log.service";
 import { getPagination } from "../../utils/pagination";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
 import type { ListAuditLogsQuery, ListLoginLogsQuery, ListRestoreLogsQuery } from "./audit.validator";
 import { securityAdminAuditRepository } from "./audit.repository";
 import type { SecurityAdminActor, SecurityAdminRequestContext } from "./audit.types";
-
-const csvEscape = (value: string) => `"${value.replaceAll('"', '""')}"`;
 
 const toDisplay = (value: unknown) => {
   if (value === null || value === undefined) {
@@ -121,29 +121,37 @@ export class SecurityAdminAuditService {
       exportAll: true
     });
 
-    const headers = ["Date", "User", "Role", "Module", "Action", "Entity Type", "Entity ID", "Status", "IP", "Path", "Method"];
-    const rows = result.rows.map((row) => [
-      row.log.createdAt.toISOString(),
-      row.log.userNameSnapshot ?? row.currentUserFullName ?? row.currentUserEmail ?? "System",
-      row.log.userRoleSnapshot ?? "",
-      row.log.module,
-      row.log.action,
-      row.log.entityType ?? "",
-      row.log.entityId ?? "",
-      row.log.status,
-      row.log.ipAddress ?? "",
-      row.log.requestPath ?? "",
-      row.log.requestMethod ?? ""
-    ]);
-
-    return {
-      fileName: `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content: Buffer.from(
-        `\uFEFF${[headers, ...rows].map((row) => row.map((value) => csvEscape(toDisplay(value))).join(",")).join("\n")}`,
-        "utf-8"
-      )
+    const dataset: ReportExportDataset = {
+      title: "Audit Logs",
+      columns: [
+        { key: "createdAt", label: "Date" },
+        { key: "userName", label: "User" },
+        { key: "userRole", label: "Role" },
+        { key: "module", label: "Module" },
+        { key: "action", label: "Action" },
+        { key: "entityType", label: "Entity Type" },
+        { key: "entityId", label: "Entity ID" },
+        { key: "status", label: "Status" },
+        { key: "ipAddress", label: "IP" },
+        { key: "requestPath", label: "Path" },
+        { key: "requestMethod", label: "Method" }
+      ],
+      rows: result.rows.map((row) => ({
+        createdAt: row.log.createdAt.toISOString(),
+        userName: row.log.userNameSnapshot ?? row.currentUserFullName ?? row.currentUserEmail ?? "System",
+        userRole: row.log.userRoleSnapshot ?? "",
+        module: toDisplay(row.log.module),
+        action: row.log.action,
+        entityType: row.log.entityType ?? "",
+        entityId: row.log.entityId ?? "",
+        status: row.log.status,
+        ipAddress: row.log.ipAddress ?? "",
+        requestPath: row.log.requestPath ?? "",
+        requestMethod: row.log.requestMethod ?? ""
+      }))
     };
+
+    return buildReportFile(dataset, "pdf", `audit-logs-${new Date().toISOString().slice(0, 10)}`);
   }
 
   public async listLoginLogs(actor: SecurityAdminActor, query: ListLoginLogsQuery) {

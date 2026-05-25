@@ -152,11 +152,11 @@ export const suppliersApi = {
           isPreferred: query.isPreferred,
           sortBy: query.sortBy,
           sortOrder: query.sortOrder,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "suppliers.csv",
+      `suppliers.${query.format ?? "pdf"}`,
     ),
 
   exportLedger: async (
@@ -169,10 +169,10 @@ export const suppliersApi = {
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
           transactionType: query.transactionType || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      `supplier-ledger-${supplierId}.csv`,
+      `supplier-ledger-${supplierId}.${query.format ?? "pdf"}`,
     ),
 };

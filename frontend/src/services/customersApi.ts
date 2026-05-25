@@ -130,11 +130,11 @@ export const customersApi = {
           isBlacklisted: query.isBlacklisted,
           sortBy: query.sortBy,
           sortOrder: query.sortOrder,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "customers.csv",
+      `customers.${query.format ?? "pdf"}`,
     ),
 
   exportLedger: async (
@@ -147,10 +147,10 @@ export const customersApi = {
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
           transactionType: query.transactionType || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      `customer-ledger-${customerId}.csv`,
+      `customer-ledger-${customerId}.${query.format ?? "pdf"}`,
     ),
 };

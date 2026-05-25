@@ -5,17 +5,28 @@ import type { SectionNavItem } from "../../constants/navigation";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/Button";
 
-const isTabActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
+const toComparableUrl = (value: string) => new URL(value, "http://localhost");
+
+const isTabActive = (currentPath: string, href: string) => {
+  const current = toComparableUrl(currentPath);
+  const target = toComparableUrl(href);
+
+  if (current.pathname !== target.pathname) {
+    return current.pathname.startsWith(`${target.pathname}/`);
+  }
+
+  return target.search ? current.search === target.search : true;
+};
 
 export const NestedRouteSidebar = ({
   title,
-  pathname,
+  currentPath,
   tabs,
   open,
   onToggle,
 }: {
   title: string;
-  pathname: string;
+  currentPath: string;
   tabs: readonly SectionNavItem[];
   open: boolean;
   onToggle: () => void;
@@ -49,7 +60,7 @@ export const NestedRouteSidebar = ({
 
         <nav className="space-y-1">
           {tabs.map((tab) => {
-            const active = isTabActive(pathname, tab.href);
+            const active = isTabActive(currentPath, tab.href);
             return (
               <Link
                 key={tab.href}

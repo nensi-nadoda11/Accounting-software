@@ -12,6 +12,8 @@ import { auditLogService } from "../audit-logs/audit-log.service";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
 import { inventoryRepository } from "./inventory.repository";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
 import type {
   AddOpeningStockInput,
   CreateAdjustmentInput,
@@ -45,7 +47,6 @@ import type {
 } from "./inventory.types";
 import {
   addDecimals,
-  buildCsvBuffer,
   calculateStockValue,
   calculateWeightedAverageCost,
   compareDecimals,
@@ -306,12 +307,6 @@ class InventoryService {
           }
         : null
     };
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Currently only CSV export is available for inventory endpoints", 400);
-    }
   }
 
   private getTodayDateOnly() {
@@ -1984,7 +1979,6 @@ class InventoryService {
   }
 
   public async exportMovements(actor: InventoryActor, query: ExportMovementsQuery, context: InventoryRequestContext): Promise<InventoryExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await inventoryRepository.listMovementsForExport({
       companyId: actor.companyId,
       referenceType: query.referenceType ?? null,
@@ -1998,42 +1992,44 @@ class InventoryService {
       })
     });
 
-    const content = buildCsvBuffer(
-      [
-        "Movement Date",
-        "Movement Type",
-        "Product Code",
-        "Product Name",
-        "Warehouse Code",
-        "Warehouse Name",
-        "Batch Number",
-        "Reference Type",
-        "Reference Number",
-        "In Quantity",
-        "Out Quantity",
-        "Balance After",
-        "Rate",
-        "Value",
-        "Remarks"
+    const dataset: ReportExportDataset = {
+      title: "Inventory Movements",
+      columns: [
+        { key: "movementDate", label: "Movement Date" },
+        { key: "movementType", label: "Movement Type" },
+        { key: "productCode", label: "Product Code" },
+        { key: "productName", label: "Product Name" },
+        { key: "warehouseCode", label: "Warehouse Code" },
+        { key: "warehouseName", label: "Warehouse Name" },
+        { key: "batchNumber", label: "Batch Number" },
+        { key: "referenceType", label: "Reference Type" },
+        { key: "referenceNumber", label: "Reference Number" },
+        { key: "inQuantity", label: "In Quantity", type: "number" },
+        { key: "outQuantity", label: "Out Quantity", type: "number" },
+        { key: "balanceAfter", label: "Balance After", type: "number" },
+        { key: "rate", label: "Rate", type: "number" },
+        { key: "value", label: "Value", type: "number" },
+        { key: "remarks", label: "Remarks" }
       ],
-      rows.map((row) => [
-        row.movement.movementDate.toISOString(),
-        row.movement.movementType,
-        row.productCode ?? "",
-        row.productName ?? "",
-        row.warehouseCode ?? "",
-        row.warehouseName ?? "",
-        row.batchNumber ?? "",
-        row.movement.referenceType ?? "",
-        row.movement.referenceNumber ?? "",
-        normalizeQuantity(row.movement.inQuantity),
-        normalizeQuantity(row.movement.outQuantity),
-        normalizeQuantity(row.movement.balanceAfter),
-        normalizeMoney(row.movement.rate),
-        normalizeMoney(row.movement.value),
-        row.movement.remarks ?? ""
-      ])
-    );
+      rows: rows.map((row) => ({
+        movementDate: row.movement.movementDate.toISOString(),
+        movementType: row.movement.movementType,
+        productCode: row.productCode ?? "",
+        productName: row.productName ?? "",
+        warehouseCode: row.warehouseCode ?? "",
+        warehouseName: row.warehouseName ?? "",
+        batchNumber: row.batchNumber ?? "",
+        referenceType: row.movement.referenceType ?? "",
+        referenceNumber: row.movement.referenceNumber ?? "",
+        inQuantity: normalizeQuantity(row.movement.inQuantity),
+        outQuantity: normalizeQuantity(row.movement.outQuantity),
+        balanceAfter: normalizeQuantity(row.movement.balanceAfter),
+        rate: normalizeMoney(row.movement.rate),
+        value: normalizeMoney(row.movement.value),
+        remarks: row.movement.remarks ?? ""
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `inventory-movements-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -2049,11 +2045,7 @@ class InventoryService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `inventory-movements-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async listStock(actor: Pick<InventoryActor, "companyId">, query: ListStockQuery) {
@@ -2179,7 +2171,6 @@ class InventoryService {
   }
 
   public async exportStock(actor: InventoryActor, query: ExportStockQuery, context: InventoryRequestContext): Promise<InventoryExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await inventoryRepository.listStockForExport({
       companyId: actor.companyId,
       expiryAlertDays: env.INVENTORY_EXPIRY_ALERT_DAYS,
@@ -2196,40 +2187,42 @@ class InventoryService {
       })
     });
 
-    const content = buildCsvBuffer(
-      [
-        "Product Code",
-        "Product Name",
-        "SKU",
-        "Category",
-        "Warehouse Code",
-        "Warehouse Name",
-        "Batch Number",
-        "Expiry Date",
-        "Available Quantity",
-        "Reserved Quantity",
-        "Damaged Quantity",
-        "Expired Quantity",
-        "Average Cost",
-        "Stock Value"
+    const dataset: ReportExportDataset = {
+      title: "Inventory Stock",
+      columns: [
+        { key: "productCode", label: "Product Code" },
+        { key: "productName", label: "Product Name" },
+        { key: "sku", label: "SKU" },
+        { key: "category", label: "Category" },
+        { key: "warehouseCode", label: "Warehouse Code" },
+        { key: "warehouseName", label: "Warehouse Name" },
+        { key: "batchNumber", label: "Batch Number" },
+        { key: "expiryDate", label: "Expiry Date" },
+        { key: "availableQuantity", label: "Available Quantity", type: "number" },
+        { key: "reservedQuantity", label: "Reserved Quantity", type: "number" },
+        { key: "damagedQuantity", label: "Damaged Quantity", type: "number" },
+        { key: "expiredQuantity", label: "Expired Quantity", type: "number" },
+        { key: "averageCost", label: "Average Cost", type: "number" },
+        { key: "stockValue", label: "Stock Value", type: "number" }
       ],
-      rows.map((row) => [
-        row.product.productCode,
-        row.product.name,
-        row.product.sku,
-        row.categoryName ?? "",
-        row.warehouseCode ?? "",
-        row.warehouseName ?? "",
-        row.batchNumber ?? "",
-        row.expiryDate ? toDateOnly(row.expiryDate) : "",
-        normalizeQuantity(row.balance.availableQuantity),
-        normalizeQuantity(row.balance.reservedQuantity),
-        normalizeQuantity(row.balance.damagedQuantity),
-        normalizeQuantity(row.balance.expiredQuantity),
-        normalizeMoney(row.balance.averageCost),
-        normalizeMoney(row.balance.stockValue)
-      ])
-    );
+      rows: rows.map((row) => ({
+        productCode: row.product.productCode,
+        productName: row.product.name,
+        sku: row.product.sku,
+        category: row.categoryName ?? "",
+        warehouseCode: row.warehouseCode ?? "",
+        warehouseName: row.warehouseName ?? "",
+        batchNumber: row.batchNumber ?? "",
+        expiryDate: row.expiryDate ? toDateOnly(row.expiryDate) : "",
+        availableQuantity: normalizeQuantity(row.balance.availableQuantity),
+        reservedQuantity: normalizeQuantity(row.balance.reservedQuantity),
+        damagedQuantity: normalizeQuantity(row.balance.damagedQuantity),
+        expiredQuantity: normalizeQuantity(row.balance.expiredQuantity),
+        averageCost: normalizeMoney(row.balance.averageCost),
+        stockValue: normalizeMoney(row.balance.stockValue)
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `inventory-stock-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -2245,11 +2238,7 @@ class InventoryService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `inventory-stock-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async listAlerts(actor: Pick<InventoryActor, "companyId">, query: ListAlertsQuery) {
@@ -2380,22 +2369,32 @@ class InventoryService {
     query: ExportValuationQuery,
     context: InventoryRequestContext
   ): Promise<InventoryExportPayload> {
-    this.ensureCsvFormat(query.format);
     const valuation = await this.getValuation(actor, query, context);
 
-    const content = buildCsvBuffer(
-      ["Product Code", "Product Name", "SKU", "Category", "Unit", "Quantity", "Average Cost", "Stock Value"],
-      valuation.items.map((item) => [
-        item.product.productCode,
-        item.product.name,
-        item.product.sku,
-        item.category ?? "",
-        item.unit ?? "",
-        item.quantity,
-        item.averageCost,
-        item.stockValue
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Inventory Valuation",
+      columns: [
+        { key: "productCode", label: "Product Code" },
+        { key: "productName", label: "Product Name" },
+        { key: "sku", label: "SKU" },
+        { key: "category", label: "Category" },
+        { key: "unit", label: "Unit" },
+        { key: "quantity", label: "Quantity", type: "number" },
+        { key: "averageCost", label: "Average Cost", type: "number" },
+        { key: "stockValue", label: "Stock Value", type: "number" }
+      ],
+      rows: valuation.items.map((item) => ({
+        productCode: item.product.productCode,
+        productName: item.product.name,
+        sku: item.product.sku,
+        category: item.category ?? "",
+        unit: item.unit ?? "",
+        quantity: item.quantity,
+        averageCost: item.averageCost,
+        stockValue: item.stockValue
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `inventory-valuation-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -2410,11 +2409,7 @@ class InventoryService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `inventory-valuation-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 }
 

@@ -309,10 +309,10 @@ export const payrollApi = {
           paymentStatus: query.paymentStatus || undefined,
           month: query.month || undefined,
           department: query.department || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "payroll.csv",
+      `payroll.${query.format ?? "pdf"}`,
     ),
 };

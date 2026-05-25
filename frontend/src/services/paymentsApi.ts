@@ -105,11 +105,11 @@ export const paymentsApi = {
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
           isAdvance: query.isAdvance,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "payments.csv",
+      `payments.${query.format ?? "pdf"}`,
     ),
 
   listAllocations: async (paymentId: string) =>

@@ -154,8 +154,22 @@ export const HR_PAYROLL_TABS = [
   },
 ] as const satisfies readonly SectionNavItem[];
 
+export const REPORTS_TABS = [
+  { label: "Overview", href: "/app/reports?tab=overview", permissions: ["reports.view", "report.view"] },
+  { label: "Sales", href: "/app/reports?tab=sales", permissions: ["reports.sales.view"] },
+  { label: "Purchases", href: "/app/reports?tab=purchases", permissions: ["reports.purchase.view"] },
+  { label: "Customers", href: "/app/reports?tab=customers", permissions: ["reports.customer.view"] },
+  { label: "Suppliers", href: "/app/reports?tab=suppliers", permissions: ["reports.supplier.view"] },
+  { label: "Inventory", href: "/app/reports?tab=inventory", permissions: ["reports.inventory.view"] },
+  { label: "Expenses", href: "/app/reports?tab=expenses", permissions: ["reports.expense.view"] },
+  { label: "Income", href: "/app/reports?tab=income", permissions: ["reports.income.view"] },
+  { label: "Payroll", href: "/app/reports?tab=payroll", permissions: ["reports.payroll.view"] },
+  { label: "GST", href: "/app/reports?tab=gst", permissions: ["reports.gst.view"] },
+  { label: "Accounting", href: "/app/reports?tab=accounting", permissions: ["reports.accounting.view"] },
+  { label: "Exports", href: "/app/reports?tab=exports", permissions: ["reports.export"] },
+] as const satisfies readonly SectionNavItem[];
+
 const DASHBOARD_ROUTES = [{ href: "/app/dashboard", permissions: ["dashboard.view"] }] as const satisfies readonly PermissionAwareRoute[];
-const REPORTS_ROUTES = [{ href: "/app/reports", permissions: ["reports.view", "report.view"] }] as const satisfies readonly PermissionAwareRoute[];
 
 const isRouteAccessible = (route: PermissionAwareRoute, hasPermission: NavPermissionChecker) =>
   route.permissions ? hasPermission(Array.from(route.permissions)) : true;
@@ -175,7 +189,7 @@ const getRoutesForMenu = (menu: TopNavMenu): readonly PermissionAwareRoute[] => 
     case "hr-payroll":
       return HR_PAYROLL_TABS;
     case "reports":
-      return REPORTS_ROUTES;
+      return REPORTS_TABS;
     case "settings":
       return SETTINGS_TABS;
     default:
@@ -236,6 +250,11 @@ const SIDEBAR_ROUTE_CONFIGS: ReadonlyArray<{
     title: "HR & Payroll",
     tabs: HR_PAYROLL_TABS,
     matches: ["/app/hr-payroll"],
+  },
+  {
+    title: "Reports",
+    tabs: REPORTS_TABS,
+    matches: ["/app/reports"],
   },
 ] as const;
 

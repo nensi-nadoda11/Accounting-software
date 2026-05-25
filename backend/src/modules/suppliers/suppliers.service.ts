@@ -3,6 +3,8 @@ import { suppliers } from "../../db/schema";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
 import { auditLogService } from "../audit-logs/audit-log.service";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
 import { suppliersRepository } from "./suppliers.repository";
 import type {
   BlacklistInput,
@@ -138,15 +140,6 @@ const formatCentsToDecimal = (value: bigint): string => {
 
 const normalizeDecimalString = (value: string | number | null | undefined): string =>
   formatCentsToDecimal(parseDecimalToCents(value));
-
-const csvEscape = (value: string | null | undefined) => {
-  const safeValue = value ?? "";
-  if (/[",\n]/.test(safeValue)) {
-    return `"${safeValue.replace(/"/g, "\"\"")}"`;
-  }
-
-  return safeValue;
-};
 
 class SuppliersService {
   private mapSupplier(supplier: SupplierRecord) {
@@ -502,25 +495,6 @@ class SuppliersService {
       isCreditLimitExceeded: usedPayable > creditLimit,
       remainingCreditLimit: formatCentsToDecimal(remainingCreditLimit)
     };
-  }
-
-  private buildCsvFile(fileName: string, headers: string[], rows: string[][]): SupplierExportPayload {
-    const lines = [
-      headers.map((header) => csvEscape(header)).join(","),
-      ...rows.map((row) => row.map((entry) => csvEscape(entry)).join(","))
-    ];
-
-    return {
-      fileName,
-      contentType: "text/csv; charset=utf-8",
-      content: Buffer.from(`\uFEFF${lines.join("\n")}`, "utf-8")
-    };
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
   }
 
   private buildNextSupplierCode(previousCode: string | null): string {
@@ -1263,8 +1237,6 @@ class SuppliersService {
     query: ExportSuppliersQuery,
     context: SupplierRequestContext
   ): Promise<SupplierExportPayload> {
-    this.ensureCsvFormat(query.format);
-
     const params: {
       companyId: string;
       search?: string | null;
@@ -1312,25 +1284,25 @@ class SuppliersService {
 
     const rows = await suppliersRepository.listSuppliersForExport(params);
 
-    const csv = this.buildCsvFile(
-      `suppliers-${new Date().toISOString().slice(0, 10)}.csv`,
-      [
-        "Supplier Code",
-        "Name",
-        "Supplier Type",
-        "Business Name",
-        "Mobile",
-        "Email",
-        "GST Number",
-        "Tax Type",
-        "Status",
-        "Blacklisted",
-        "Preferred",
-        "Credit Limit",
-        "Outstanding Payable",
-        "Created At"
+    const dataset: ReportExportDataset = {
+      title: "Suppliers",
+      columns: [
+        { key: "supplierCode", label: "Supplier Code" },
+        { key: "name", label: "Name" },
+        { key: "supplierType", label: "Supplier Type" },
+        { key: "businessName", label: "Business Name" },
+        { key: "mobile", label: "Mobile" },
+        { key: "email", label: "Email" },
+        { key: "gstNumber", label: "GST Number" },
+        { key: "taxType", label: "Tax Type" },
+        { key: "status", label: "Status" },
+        { key: "isBlacklisted", label: "Blacklisted" },
+        { key: "isPreferred", label: "Preferred" },
+        { key: "creditLimit", label: "Credit Limit", type: "number" },
+        { key: "outstandingPayable", label: "Outstanding Payable", type: "number" },
+        { key: "createdAt", label: "Created At" }
       ],
-      rows.map((supplier) => {
+      rows: rows.map((supplier) => {
         const summary = this.buildOutstandingSummary(supplier, {
           totalPurchases: "0.00",
           totalPurchaseReturns: "0.00",
@@ -1342,24 +1314,25 @@ class SuppliersService {
           dueInvoicesCount: 0
         });
 
-        return [
-          supplier.supplierCode,
-          supplier.name,
-          supplier.supplierType,
-          supplier.businessName ?? "",
-          supplier.mobile,
-          supplier.email ?? "",
-          supplier.gstNumber ?? "",
-          supplier.taxType,
-          supplier.status,
-          supplier.isBlacklisted ? "yes" : "no",
-          supplier.isPreferred ? "yes" : "no",
-          normalizeDecimalString(supplier.creditLimit),
-          summary.outstandingPayable,
-          supplier.createdAt.toISOString()
-        ];
+        return {
+          supplierCode: supplier.supplierCode,
+          name: supplier.name,
+          supplierType: supplier.supplierType,
+          businessName: supplier.businessName ?? "",
+          mobile: supplier.mobile,
+          email: supplier.email ?? "",
+          gstNumber: supplier.gstNumber ?? "",
+          taxType: supplier.taxType,
+          status: supplier.status,
+          isBlacklisted: supplier.isBlacklisted ? "Yes" : "No",
+          isPreferred: supplier.isPreferred ? "Yes" : "No",
+          creditLimit: normalizeDecimalString(supplier.creditLimit),
+          outstandingPayable: summary.outstandingPayable,
+          createdAt: supplier.createdAt.toISOString()
+        };
       })
-    );
+    };
+    const file = buildReportFile(dataset, query.format, `suppliers-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -1383,7 +1356,7 @@ class SuppliersService {
       userAgent: context.userAgent
     });
 
-    return csv;
+    return file;
   }
 
   public async exportLedger(
@@ -1392,24 +1365,38 @@ class SuppliersService {
     query: LedgerExportQuery,
     context: SupplierRequestContext
   ): Promise<SupplierExportPayload> {
-    this.ensureCsvFormat(query.format);
     const supplier = await this.getSupplierOrThrow(actor.companyId, supplierId);
     const ledgerRows = await this.buildLedgerRows(supplier, query);
 
-    const csv = this.buildCsvFile(
-      `supplier-ledger-${supplier.supplierCode}-${new Date().toISOString().slice(0, 10)}.csv`,
-      ["Date", "Transaction Type", "Reference No", "Description", "Debit", "Credit", "Balance", "Payment Mode", "Remarks"],
-      ledgerRows.map((item) => [
-        item.date.toISOString(),
-        item.transactionType,
-        item.referenceNo ?? "",
-        item.description,
-        item.debit,
-        item.credit,
-        item.balance,
-        item.paymentMode ?? "",
-        item.remarks ?? ""
-      ])
+    const dataset: ReportExportDataset = {
+      title: `Supplier Ledger - ${supplier.name}`,
+      columns: [
+        { key: "date", label: "Date" },
+        { key: "transactionType", label: "Transaction Type" },
+        { key: "referenceNo", label: "Reference No" },
+        { key: "description", label: "Description" },
+        { key: "debit", label: "Debit", type: "number" },
+        { key: "credit", label: "Credit", type: "number" },
+        { key: "balance", label: "Balance", type: "number" },
+        { key: "paymentMode", label: "Payment Mode" },
+        { key: "remarks", label: "Remarks" }
+      ],
+      rows: ledgerRows.map((item) => ({
+        date: item.date.toISOString(),
+        transactionType: item.transactionType,
+        referenceNo: item.referenceNo ?? "",
+        description: item.description,
+        debit: item.debit,
+        credit: item.credit,
+        balance: item.balance,
+        paymentMode: item.paymentMode ?? "",
+        remarks: item.remarks ?? ""
+      }))
+    };
+    const file = buildReportFile(
+      dataset,
+      query.format,
+      `supplier-ledger-${supplier.supplierCode}-${new Date().toISOString().slice(0, 10)}`
     );
 
     await auditLogService.log({
@@ -1428,7 +1415,7 @@ class SuppliersService {
       userAgent: context.userAgent
     });
 
-    return csv;
+    return file;
   }
 }
 

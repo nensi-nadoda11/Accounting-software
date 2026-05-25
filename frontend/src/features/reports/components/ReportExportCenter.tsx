@@ -36,7 +36,6 @@ export const ReportExportCenter = ({
           ))}
         </Select>
         <Select value={format} onChange={(event) => onFormatChange(event.target.value as ReportFormat)}>
-          <option value="csv">CSV</option>
           <option value="xlsx">XLSX</option>
           <option value="pdf">PDF</option>
         </Select>

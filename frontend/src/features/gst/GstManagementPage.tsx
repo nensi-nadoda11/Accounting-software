@@ -248,7 +248,7 @@ export const GstManagementPage = () => {
   const [exportDateTo, setExportDateTo] = useState(getTodayInput());
   const [exportSource, setExportSource] = useState<"sales" | "purchase" | "expense" | "all">("all");
   const [exportLoadingType, setExportLoadingType] = useState<GstExportType | null>(null);
-  const [exportFormat, setExportFormat] = useState<GstExportFormat>("xlsx");
+  const [exportFormat, setExportFormat] = useState<GstExportFormat>("pdf");
 
   const cancelForm = useForm<GstAdjustmentCancelFormInputValues, undefined, GstAdjustmentCancelFormValues>({
     resolver: zodResolver(gstAdjustmentCancelSchema),
@@ -641,7 +641,6 @@ export const GstManagementPage = () => {
           <div className="flex items-center gap-2">
             {canExport ? (
               <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as GstExportFormat)} className="w-28">
-                <option value="csv">CSV</option>
                 <option value="xlsx">XLSX</option>
                 <option value="pdf">PDF</option>
               </Select>

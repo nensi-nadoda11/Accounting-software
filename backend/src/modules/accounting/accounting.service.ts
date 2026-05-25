@@ -3,7 +3,9 @@ import { companyRepository } from "../company/company.repository";
 import { customersRepository } from "../customers/customers.repository";
 import { logger } from "../../config/logger";
 import { db } from "../../db";
-import { buildCsvBuffer, compareDecimals, decimalToScaledBigInt, scaledBigIntToDecimal } from "../inventory/inventory.utils";
+import { compareDecimals, decimalToScaledBigInt, scaledBigIntToDecimal } from "../inventory/inventory.utils";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
 import { suppliersRepository } from "../suppliers/suppliers.repository";
 import { AppError } from "../../utils/app-error";
 import { getPagination } from "../../utils/pagination";
@@ -145,12 +147,6 @@ class AccountingService {
     const match = previousValue?.match(/(\d+)$/);
     const nextNumber = match ? Number(match[1]) + 1 : 1;
     return `${this.normalizePrefix(prefix)}-${String(Number.isFinite(nextNumber) ? nextNumber : 1).padStart(padding, "0")}`;
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
   }
 
   private toDateOnly(value: Date) {
@@ -2986,21 +2982,30 @@ class AccountingService {
   }
 
   public async exportLedger(actor: AccountingActor, accountId: string, query: ExportLedgerQuery, context: AccountingRequestContext): Promise<ExportPayload> {
-    this.ensureCsvFormat(query.format);
     const ledger = await this.getLedger(actor, accountId, query, context);
-    const content = buildCsvBuffer(
-      ["Date", "Journal No", "Voucher", "Description", "Debit", "Credit", "Running Balance", "Balance Side"],
-      ledger.rows.map((row) => [
-        row.entryDate.toISOString().slice(0, 10),
-        row.journalNumber,
-        row.voucherType,
-        row.description ?? "",
-        row.debit,
-        row.credit,
-        row.runningBalance.amount,
-        row.runningBalance.side
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Ledger Export",
+      columns: [
+        { key: "entryDate", label: "Date" },
+        { key: "journalNumber", label: "Journal No" },
+        { key: "voucherType", label: "Voucher" },
+        { key: "description", label: "Description" },
+        { key: "debit", label: "Debit", type: "number" },
+        { key: "credit", label: "Credit", type: "number" },
+        { key: "runningBalance", label: "Running Balance", type: "number" },
+        { key: "balanceSide", label: "Balance Side" }
+      ],
+      rows: ledger.rows.map((row) => ({
+        entryDate: row.entryDate.toISOString().slice(0, 10),
+        journalNumber: row.journalNumber,
+        voucherType: row.voucherType,
+        description: row.description ?? "",
+        debit: row.debit,
+        credit: row.credit,
+        runningBalance: row.runningBalance.amount,
+        balanceSide: row.runningBalance.side
+      }))
+    };
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -3014,11 +3019,7 @@ class AccountingService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `ledger-${accountId}-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return buildReportFile(dataset, query.format, `ledger-${accountId}-${new Date().toISOString().slice(0, 10)}`);
   }
 
   public async exportPartyLedger(
@@ -3028,21 +3029,30 @@ class AccountingService {
     query: ExportLedgerQuery,
     context: AccountingRequestContext
   ): Promise<ExportPayload> {
-    this.ensureCsvFormat(query.format);
     const ledger = await this.getPartyLedger(actor, partyType, partyId, query, context);
-    const content = buildCsvBuffer(
-      ["Date", "Journal No", "Voucher", "Description", "Debit", "Credit", "Running Balance", "Balance Side"],
-      ledger.rows.map((row) => [
-        row.entryDate.toISOString().slice(0, 10),
-        row.journalNumber,
-        row.voucherType,
-        row.description ?? "",
-        row.debit,
-        row.credit,
-        row.runningBalance.amount,
-        row.runningBalance.side
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: `${partyType} Ledger Export`,
+      columns: [
+        { key: "entryDate", label: "Date" },
+        { key: "journalNumber", label: "Journal No" },
+        { key: "voucherType", label: "Voucher" },
+        { key: "description", label: "Description" },
+        { key: "debit", label: "Debit", type: "number" },
+        { key: "credit", label: "Credit", type: "number" },
+        { key: "runningBalance", label: "Running Balance", type: "number" },
+        { key: "balanceSide", label: "Balance Side" }
+      ],
+      rows: ledger.rows.map((row) => ({
+        entryDate: row.entryDate.toISOString().slice(0, 10),
+        journalNumber: row.journalNumber,
+        voucherType: row.voucherType,
+        description: row.description ?? "",
+        debit: row.debit,
+        credit: row.credit,
+        runningBalance: row.runningBalance.amount,
+        balanceSide: row.runningBalance.side
+      }))
+    };
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -3057,29 +3067,38 @@ class AccountingService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `${partyType}-ledger-${partyId}-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return buildReportFile(
+      dataset,
+      query.format,
+      `${partyType}-ledger-${partyId}-${new Date().toISOString().slice(0, 10)}`
+    );
   }
 
   public async exportCashBook(actor: AccountingActor, query: ExportBookQuery, context: AccountingRequestContext): Promise<ExportPayload> {
-    this.ensureCsvFormat(query.format);
     const ledger = await this.getCashBook(actor, query, context);
-    const content = buildCsvBuffer(
-      ["Date", "Journal No", "Voucher", "Description", "Debit", "Credit", "Running Balance", "Balance Side"],
-      ledger.rows.map((row) => [
-        row.entryDate.toISOString().slice(0, 10),
-        row.journalNumber,
-        row.voucherType,
-        row.description ?? "",
-        row.debit,
-        row.credit,
-        row.runningBalance.amount,
-        row.runningBalance.side
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Cash Book",
+      columns: [
+        { key: "entryDate", label: "Date" },
+        { key: "journalNumber", label: "Journal No" },
+        { key: "voucherType", label: "Voucher" },
+        { key: "description", label: "Description" },
+        { key: "debit", label: "Debit", type: "number" },
+        { key: "credit", label: "Credit", type: "number" },
+        { key: "runningBalance", label: "Running Balance", type: "number" },
+        { key: "balanceSide", label: "Balance Side" }
+      ],
+      rows: ledger.rows.map((row) => ({
+        entryDate: row.entryDate.toISOString().slice(0, 10),
+        journalNumber: row.journalNumber,
+        voucherType: row.voucherType,
+        description: row.description ?? "",
+        debit: row.debit,
+        credit: row.credit,
+        runningBalance: row.runningBalance.amount,
+        balanceSide: row.runningBalance.side
+      }))
+    };
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -3093,29 +3112,34 @@ class AccountingService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `cash-book-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return buildReportFile(dataset, query.format, `cash-book-${new Date().toISOString().slice(0, 10)}`);
   }
 
   public async exportBankBook(actor: AccountingActor, query: ExportBookQuery, context: AccountingRequestContext): Promise<ExportPayload> {
-    this.ensureCsvFormat(query.format);
     const ledger = await this.getBankBook(actor, query, context);
-    const content = buildCsvBuffer(
-      ["Date", "Journal No", "Voucher", "Description", "Debit", "Credit", "Running Balance", "Balance Side"],
-      ledger.rows.map((row) => [
-        row.entryDate.toISOString().slice(0, 10),
-        row.journalNumber,
-        row.voucherType,
-        row.description ?? "",
-        row.debit,
-        row.credit,
-        row.runningBalance.amount,
-        row.runningBalance.side
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Bank Book",
+      columns: [
+        { key: "entryDate", label: "Date" },
+        { key: "journalNumber", label: "Journal No" },
+        { key: "voucherType", label: "Voucher" },
+        { key: "description", label: "Description" },
+        { key: "debit", label: "Debit", type: "number" },
+        { key: "credit", label: "Credit", type: "number" },
+        { key: "runningBalance", label: "Running Balance", type: "number" },
+        { key: "balanceSide", label: "Balance Side" }
+      ],
+      rows: ledger.rows.map((row) => ({
+        entryDate: row.entryDate.toISOString().slice(0, 10),
+        journalNumber: row.journalNumber,
+        voucherType: row.voucherType,
+        description: row.description ?? "",
+        debit: row.debit,
+        credit: row.credit,
+        runningBalance: row.runningBalance.amount,
+        balanceSide: row.runningBalance.side
+      }))
+    };
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -3130,30 +3154,40 @@ class AccountingService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `bank-book-${query.bankAccountId ?? "all"}-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return buildReportFile(
+      dataset,
+      query.format,
+      `bank-book-${query.bankAccountId ?? "all"}-${new Date().toISOString().slice(0, 10)}`
+    );
   }
 
   public async exportTrialBalance(actor: AccountingActor, query: ExportTrialBalanceQuery, context: AccountingRequestContext): Promise<ExportPayload> {
-    this.ensureCsvFormat(query.format);
     const report = await this.getTrialBalance(actor, query, context);
-    const content = buildCsvBuffer(
-      ["Code", "Account", "Type", "Opening", "Opening Side", "Debit", "Credit", "Closing", "Closing Side"],
-      report.items.map((row) => [
-        row.accountCode,
-        row.accountName,
-        row.accountType,
-        row.openingBalance.amount,
-        row.openingBalance.side,
-        row.debit,
-        row.credit,
-        row.closingBalance.amount,
-        row.closingBalance.side
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Trial Balance",
+      columns: [
+        { key: "accountCode", label: "Code" },
+        { key: "accountName", label: "Account" },
+        { key: "accountType", label: "Type" },
+        { key: "openingAmount", label: "Opening", type: "number" },
+        { key: "openingSide", label: "Opening Side" },
+        { key: "debit", label: "Debit", type: "number" },
+        { key: "credit", label: "Credit", type: "number" },
+        { key: "closingAmount", label: "Closing", type: "number" },
+        { key: "closingSide", label: "Closing Side" }
+      ],
+      rows: report.items.map((row) => ({
+        accountCode: row.accountCode,
+        accountName: row.accountName,
+        accountType: row.accountType,
+        openingAmount: row.openingBalance.amount,
+        openingSide: row.openingBalance.side,
+        debit: row.debit,
+        credit: row.credit,
+        closingAmount: row.closingBalance.amount,
+        closingSide: row.closingBalance.side
+      }))
+    };
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -3165,20 +3199,26 @@ class AccountingService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `trial-balance-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return buildReportFile(dataset, query.format, `trial-balance-${new Date().toISOString().slice(0, 10)}`);
   }
 
   public async exportProfitLoss(actor: AccountingActor, query: ExportProfitLossQuery, context: AccountingRequestContext): Promise<ExportPayload> {
-    this.ensureCsvFormat(query.format);
     const report = await this.getProfitLoss(actor, query, context);
-    const content = buildCsvBuffer(
-      ["Code", "Account", "Type", "Amount"],
-      report.items.map((row) => [row.accountCode, row.accountName, row.accountType, row.amount])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Profit and Loss",
+      columns: [
+        { key: "accountCode", label: "Code" },
+        { key: "accountName", label: "Account" },
+        { key: "accountType", label: "Type" },
+        { key: "amount", label: "Amount", type: "number" }
+      ],
+      rows: report.items.map((row) => ({
+        accountCode: row.accountCode,
+        accountName: row.accountName,
+        accountType: row.accountType,
+        amount: row.amount
+      }))
+    };
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -3190,24 +3230,44 @@ class AccountingService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `profit-loss-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return buildReportFile(dataset, query.format, `profit-loss-${new Date().toISOString().slice(0, 10)}`);
   }
 
   public async exportBalanceSheet(actor: AccountingActor, query: ExportBalanceSheetQuery, context: AccountingRequestContext): Promise<ExportPayload> {
-    this.ensureCsvFormat(query.format);
     const report = await this.getBalanceSheet(actor, query, context);
-    const content = buildCsvBuffer(
-      ["Section", "Code", "Account", "Amount", "Side"],
-      [
-        ...report.assets.map((row) => ["asset", String(row.accountCode ?? ""), String(row.accountName ?? ""), String(row.amount ?? ""), String(row.side ?? "")]),
-        ...report.liabilities.map((row) => ["liability", String(row.accountCode ?? ""), String(row.accountName ?? ""), String(row.amount ?? ""), String(row.side ?? "")]),
-        ...report.equity.map((row) => ["equity", String(row.accountCode ?? ""), String(row.accountName ?? ""), String(row.amount ?? ""), String(row.side ?? "")])
+    const dataset: ReportExportDataset = {
+      title: "Balance Sheet",
+      columns: [
+        { key: "section", label: "Section" },
+        { key: "accountCode", label: "Code" },
+        { key: "accountName", label: "Account" },
+        { key: "amount", label: "Amount", type: "number" },
+        { key: "side", label: "Side" }
+      ],
+      rows: [
+        ...report.assets.map((row) => ({
+          section: "asset",
+          accountCode: String(row.accountCode ?? ""),
+          accountName: String(row.accountName ?? ""),
+          amount: String(row.amount ?? ""),
+          side: String(row.side ?? "")
+        })),
+        ...report.liabilities.map((row) => ({
+          section: "liability",
+          accountCode: String(row.accountCode ?? ""),
+          accountName: String(row.accountName ?? ""),
+          amount: String(row.amount ?? ""),
+          side: String(row.side ?? "")
+        })),
+        ...report.equity.map((row) => ({
+          section: "equity",
+          accountCode: String(row.accountCode ?? ""),
+          accountName: String(row.accountName ?? ""),
+          amount: String(row.amount ?? ""),
+          side: String(row.side ?? "")
+        }))
       ]
-    );
+    };
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -3219,11 +3279,7 @@ class AccountingService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `balance-sheet-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return buildReportFile(dataset, query.format, `balance-sheet-${new Date().toISOString().slice(0, 10)}`);
   }
 }
 

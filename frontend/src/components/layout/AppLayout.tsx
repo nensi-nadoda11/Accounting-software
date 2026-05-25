@@ -79,7 +79,7 @@ export const AppLayout = () => {
           {nestedSidebarConfig && visibleSidebarTabs.length ? (
             <NestedRouteSidebar
               title={nestedSidebarConfig.title}
-              pathname={location.pathname}
+              currentPath={`${location.pathname}${location.search}`}
               tabs={visibleSidebarTabs}
               open={sidebarOpen}
               onToggle={() => setSidebarOpen((current) => !current)}

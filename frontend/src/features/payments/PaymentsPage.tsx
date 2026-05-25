@@ -181,7 +181,7 @@ export const PaymentsPage = () => {
     dateTo: "",
   });
   const [exporting, setExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<PaymentExportFormat>("xlsx");
+  const [exportFormat, setExportFormat] = useState<PaymentExportFormat>("pdf");
 
   const [detailPayment, setDetailPayment] = useState<Payment | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -534,7 +534,6 @@ export const PaymentsPage = () => {
             activeTab === "list" && canExport ? (
               <div className="flex flex-wrap gap-2">
                 <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PaymentExportFormat)} className="w-28">
-                  <option value="csv">CSV</option>
                   <option value="xlsx">XLSX</option>
                   <option value="pdf">PDF</option>
                 </Select>

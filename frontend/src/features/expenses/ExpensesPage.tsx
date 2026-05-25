@@ -53,10 +53,10 @@ import {
 } from "./expenseSchemas";
 import {
   buildExpenseFormDefaults,
+  downloadLocalPdfTable,
   buildPrintWindow,
   createExpensePayload,
   createRecurringPayload,
-  downloadLocalCsv,
   getCategoryName,
   getMonthStartInput,
   getTodayInput,
@@ -691,8 +691,9 @@ export const ExpensesPage = () => {
 
   const handleExportReports = () => {
     if (activeReportTab === "category-wise") {
-      downloadLocalCsv(
-        "expense-category-wise-report.csv",
+      downloadLocalPdfTable(
+        "expense-category-wise-report.pdf",
+        "Expense Category Wise Report",
         ["Category", "Expense Count", "Taxable Amount", "GST Amount", "Total Amount"],
         categoryWiseReport.map((item) => [item.categoryName, String(item.expenseCount), item.taxableAmount, item.gstAmount, item.totalAmount]),
       );
@@ -700,8 +701,9 @@ export const ExpensesPage = () => {
     }
 
     if (activeReportTab === "monthly") {
-      downloadLocalCsv(
-        "expense-monthly-report.csv",
+      downloadLocalPdfTable(
+        "expense-monthly-report.pdf",
+        "Expense Monthly Report",
         ["Month", "Expense Count", "Taxable Amount", "GST Amount", "Total Amount"],
         monthlyReport.map((item) => [item.month, String(item.expenseCount), item.taxableAmount, item.gstAmount, item.totalAmount]),
       );
@@ -709,16 +711,18 @@ export const ExpensesPage = () => {
     }
 
     if (activeReportTab === "payment-mode") {
-      downloadLocalCsv(
-        "expense-payment-mode-report.csv",
+      downloadLocalPdfTable(
+        "expense-payment-mode-report.pdf",
+        "Expense Payment Mode Report",
         ["Payment Mode", "Expense Count", "Total Amount"],
         paymentModeReport.map((item) => [item.paymentMode, String(item.expenseCount), item.totalAmount]),
       );
       return;
     }
 
-    downloadLocalCsv(
-      "expense-gst-report.csv",
+    downloadLocalPdfTable(
+      "expense-gst-report.pdf",
+      "Expense GST Report",
       ["GST Applicable", "GST Rate", "Expense Count", "Taxable Amount", "CGST", "SGST", "IGST", "GST Amount", "Total Amount"],
       gstReport.map((item) => [
         item.gstApplicable ? "Yes" : "No",

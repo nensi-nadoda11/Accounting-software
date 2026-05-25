@@ -187,12 +187,12 @@ export const accountingApi = {
         params: {
           page: query.page,
           limit: query.limit,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
           ...buildDateRangeParams(query),
         },
         responseType: "blob",
       }),
-      `customer-ledger-${customerId}.csv`,
+      `customer-ledger-${customerId}.${query.format ?? "pdf"}`,
     ),
 
   getSupplierLedger: async (supplierId: string, query: LedgerQuery) =>
@@ -212,12 +212,12 @@ export const accountingApi = {
         params: {
           page: query.page,
           limit: query.limit,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
           ...buildDateRangeParams(query),
         },
         responseType: "blob",
       }),
-      `supplier-ledger-${supplierId}.csv`,
+      `supplier-ledger-${supplierId}.${query.format ?? "pdf"}`,
     ),
 
   exportLedger: async (accountId: string, query: LedgerQuery & { format?: AccountingExportFormat }) =>
@@ -226,12 +226,12 @@ export const accountingApi = {
         params: {
           page: query.page,
           limit: query.limit,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
           ...buildDateRangeParams(query),
         },
         responseType: "blob",
       }),
-      `ledger-${accountId}.csv`,
+      `ledger-${accountId}.${query.format ?? "pdf"}`,
     ),
 
   getCashBook: async (query: BookQuery) =>
@@ -251,12 +251,12 @@ export const accountingApi = {
         params: {
           page: query.page,
           limit: query.limit,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
           ...buildDateRangeParams(query),
         },
         responseType: "blob",
       }),
-      "cash-book.csv",
+      `cash-book.${query.format ?? "pdf"}`,
     ),
 
   getBankBook: async (query: BookQuery) =>
@@ -278,12 +278,12 @@ export const accountingApi = {
           page: query.page,
           limit: query.limit,
           bankAccountId: query.bankAccountId || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
           ...buildDateRangeParams(query),
         },
         responseType: "blob",
       }),
-      `bank-book-${query.bankAccountId || "all"}.csv`,
+      `bank-book-${query.bankAccountId || "all"}.${query.format ?? "pdf"}`,
     ),
 
   getTrialBalance: async (query: TrialBalanceQuery) =>
@@ -301,12 +301,12 @@ export const accountingApi = {
       client.get("/accounting/trial-balance/export", {
         params: {
           financialYearId: query.financialYearId || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
           ...buildDateRangeParams(query),
         },
         responseType: "blob",
       }),
-      "trial-balance.csv",
+      `trial-balance.${query.format ?? "pdf"}`,
     ),
 
   getProfitLoss: async (query: ProfitLossQuery) =>
@@ -324,12 +324,12 @@ export const accountingApi = {
       client.get("/accounting/profit-loss/export", {
         params: {
           financialYearId: query.financialYearId || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
           ...buildDateRangeParams(query),
         },
         responseType: "blob",
       }),
-      "profit-loss.csv",
+      `profit-loss.${query.format ?? "pdf"}`,
     ),
 
   getBalanceSheet: async (query: BalanceSheetQuery) =>
@@ -348,11 +348,11 @@ export const accountingApi = {
         params: {
           asOfDate: query.asOfDate || undefined,
           financialYearId: query.financialYearId || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "balance-sheet.csv",
+      `balance-sheet.${query.format ?? "pdf"}`,
     ),
 
   listEvents: async (query: ListAccountingEventsQuery) =>

@@ -52,7 +52,6 @@ import { ReportExportCenter } from "./components/ReportExportCenter";
 import { ReportFiltersPanel } from "./components/ReportFilters";
 import { ReportSummaryCards } from "./components/ReportSummaryCards";
 import { ReportTable } from "./components/ReportTable";
-import { ReportsTabs, type ReportsTabOption } from "./components/ReportsTabs";
 import { StatusBadge } from "./components/StatusBadge";
 
 type Option = { value: string; label: string };
@@ -96,19 +95,19 @@ type IncomeTabData = {
 
 type AccountingTabData = AccountingReport;
 
-const TABS: ReportsTabOption[] = [
-  { id: "overview", label: "Overview" },
-  { id: "sales", label: "Sales" },
-  { id: "purchases", label: "Purchases" },
-  { id: "customers", label: "Customers" },
-  { id: "suppliers", label: "Suppliers" },
-  { id: "inventory", label: "Inventory" },
-  { id: "expenses", label: "Expenses" },
-  { id: "income", label: "Income" },
-  { id: "payroll", label: "Payroll" },
-  { id: "gst", label: "GST" },
-  { id: "accounting", label: "Accounting" },
-  { id: "exports", label: "Exports" },
+const TABS: ReportsTabId[] = [
+  "overview",
+  "sales",
+  "purchases",
+  "customers",
+  "suppliers",
+  "inventory",
+  "expenses",
+  "income",
+  "payroll",
+  "gst",
+  "accounting",
+  "exports",
 ];
 
 const DEFAULT_FILTERS: ReportFilters = {
@@ -164,7 +163,7 @@ export const ReportsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const requestedTab = searchParams.get("tab") as ReportsTabId | null;
-  const activeTab = TABS.find((item) => item.id === requestedTab)?.id ?? "overview";
+  const activeTab = TABS.find((item) => item === requestedTab) ?? "overview";
 
   const [filters, setFilters] = useState<ReportFilters>(DEFAULT_FILTERS);
   const debouncedFilters = useDebouncedValue(JSON.stringify(filters), 250);
@@ -181,7 +180,7 @@ export const ReportsPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportCenterFormat, setExportCenterFormat] = useState<ReportFormat>("csv");
+  const [exportCenterFormat, setExportCenterFormat] = useState<ReportFormat>("pdf");
   const [exportCenterType, setExportCenterType] = useState<ReportType>("sales.detailed");
 
   const [overviewData, setOverviewData] = useState<ReportsOverviewResponse | null>(null);
@@ -448,7 +447,7 @@ export const ReportsPage = () => {
 
     try {
       setExporting(true);
-      const file = await reportsApi.exportReport(reportType, "csv", filters, reportsApi.toExportPayload(filters));
+      const file = await reportsApi.exportReport(reportType, "pdf", filters, reportsApi.toExportPayload(filters));
       saveDownloadedFile(file.blob, file.fileName);
       toast.success("Report exported");
       const exportsResponse = await reportsApi.listExports(20);
@@ -492,7 +491,6 @@ export const ReportsPage = () => {
   return (
     <div className="space-y-4">
       <PageHeader title="Reports Center" />
-      <ReportsTabs tabs={TABS} activeTab={activeTab} onChange={(tab) => setSearchParams({ tab })} />
       {referencesLoading ? <LoadingState label="Loading report filters..." /> : null}
       {!referencesLoading ? (
         <ReportFiltersPanel

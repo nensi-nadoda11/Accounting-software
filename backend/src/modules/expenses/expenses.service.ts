@@ -7,8 +7,9 @@ import { auditLogService } from "../audit-logs/audit-log.service";
 import { accountingRepository } from "../accounting/accounting.repository";
 import { accountingService } from "../accounting/accounting.service";
 import { companyRepository } from "../company/company.repository";
+import { buildReportFile } from "../reports/reports.export";
+import type { ReportExportDataset } from "../reports/reports.types";
 import {
-  buildCsvBuffer,
   compareDecimals,
   normalizeMoney as normalizeMoneyValue
 } from "../inventory/inventory.utils";
@@ -55,12 +56,6 @@ const INDIAN_GST_STATE_CODE_LENGTH = 2;
 class ExpensesService {
   private buildExpenseAttachmentDownloadPath(expenseId: string, attachmentId: string) {
     return `/api/v1/expenses/${expenseId}/attachments/${attachmentId}/download`;
-  }
-
-  private ensureCsvFormat(format: "csv" | "xlsx" | "pdf") {
-    if (format !== "csv") {
-      throw new AppError("Only CSV export is available right now", 400);
-    }
   }
 
   private buildNextSequenceNumber(previousValue: string | null, prefix: string) {
@@ -868,7 +863,6 @@ class ExpensesService {
     query: ExportExpensesQuery,
     context: ExpenseRequestContext
   ): Promise<ExpenseExportPayload> {
-    this.ensureCsvFormat(query.format);
     const rows = await expensesRepository.listExpensesForExport({
       companyId: actor.companyId,
       search: query.search ?? null,
@@ -881,21 +875,34 @@ class ExpensesService {
       recurringExpenseId: query.recurringExpenseId
     });
 
-    const content = buildCsvBuffer(
-      ["Expense No", "Date", "Category", "Description", "Payee", "Payment Mode", "GST", "Total", "Status", "Reference"],
-      rows.map((row) => [
-        row.expense.expenseNumber,
-        row.expense.expenseDate.toISOString().slice(0, 10),
-        row.categoryName,
-        row.expense.description,
-        row.expense.payeeName ?? "",
-        row.expense.paymentMode,
-        normalizeMoney(row.expense.gstAmount),
-        normalizeMoney(row.expense.totalAmount),
-        row.expense.status,
-        row.expense.referenceNumber ?? ""
-      ])
-    );
+    const dataset: ReportExportDataset = {
+      title: "Expenses",
+      columns: [
+        { key: "expenseNumber", label: "Expense No" },
+        { key: "expenseDate", label: "Date" },
+        { key: "categoryName", label: "Category" },
+        { key: "description", label: "Description" },
+        { key: "payeeName", label: "Payee" },
+        { key: "paymentMode", label: "Payment Mode" },
+        { key: "gstAmount", label: "GST", type: "number" },
+        { key: "totalAmount", label: "Total", type: "number" },
+        { key: "status", label: "Status" },
+        { key: "referenceNumber", label: "Reference" }
+      ],
+      rows: rows.map((row) => ({
+        expenseNumber: row.expense.expenseNumber,
+        expenseDate: row.expense.expenseDate.toISOString().slice(0, 10),
+        categoryName: row.categoryName,
+        description: row.expense.description,
+        payeeName: row.expense.payeeName ?? "",
+        paymentMode: row.expense.paymentMode,
+        gstAmount: normalizeMoney(row.expense.gstAmount),
+        totalAmount: normalizeMoney(row.expense.totalAmount),
+        status: row.expense.status,
+        referenceNumber: row.expense.referenceNumber ?? ""
+      }))
+    };
+    const file = buildReportFile(dataset, query.format, `expenses-${new Date().toISOString().slice(0, 10)}`);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -910,11 +917,7 @@ class ExpensesService {
       userAgent: context.userAgent
     });
 
-    return {
-      fileName: `expenses-${new Date().toISOString().slice(0, 10)}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      content
-    };
+    return file;
   }
 
   public async listCategories(actor: Pick<ExpenseActor, "companyId">, query: ListExpenseCategoriesQuery) {

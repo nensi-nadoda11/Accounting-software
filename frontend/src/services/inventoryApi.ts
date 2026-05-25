@@ -127,11 +127,11 @@ export const inventoryApi = {
           expired: query.expired,
           expiringSoon: query.expiringSoon,
           status: query.status || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "inventory-stock.csv",
+      `inventory-stock.${query.format ?? "pdf"}`,
     ),
 
   listBatches: async (query: InventoryQuery) =>
@@ -206,11 +206,11 @@ export const inventoryApi = {
           referenceType: query.referenceType || undefined,
           dateFrom: query.dateFrom || undefined,
           dateTo: query.dateTo || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "inventory-movements.csv",
+      `inventory-movements.${query.format ?? "pdf"}`,
     ),
 
   listAlerts: async (query: InventoryQuery) =>
@@ -252,10 +252,10 @@ export const inventoryApi = {
           warehouseId: query.warehouseId || undefined,
           categoryId: query.categoryId || undefined,
           productId: query.productId || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
-      "inventory-valuation.csv",
+      `inventory-valuation.${query.format ?? "pdf"}`,
     ),
 };

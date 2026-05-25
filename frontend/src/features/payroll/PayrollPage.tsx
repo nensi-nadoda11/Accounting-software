@@ -268,7 +268,7 @@ export const PayrollPage = () => {
   const [reportSummary, setReportSummary] = useState<Array<{ label: string; value: string | number }>>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [exportingReport, setExportingReport] = useState(false);
-  const [exportFormat, setExportFormat] = useState<PayrollExportFormat>("xlsx");
+  const [exportFormat, setExportFormat] = useState<PayrollExportFormat>("pdf");
 
   const runForm = useForm<z.input<typeof payrollRunFormSchema>, undefined, PayrollRunFormValues>({
     resolver: zodResolver(payrollRunFormSchema),
@@ -914,7 +914,6 @@ export const PayrollPage = () => {
               {(activeTab === "reports" || activeTab === "payroll-runs") && canExport ? (
                 <>
                   <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PayrollExportFormat)} className="w-28">
-                    <option value="csv">CSV</option>
                     <option value="xlsx">XLSX</option>
                     <option value="pdf">PDF</option>
                   </Select>

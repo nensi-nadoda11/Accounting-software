@@ -147,7 +147,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
   const [submittingReturn, setSubmittingReturn] = useState(false);
   const [submittingSend, setSubmittingSend] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<SalesExportFormat>("xlsx");
+  const [exportFormat, setExportFormat] = useState<SalesExportFormat>("pdf");
   const [pageError, setPageError] = useState<string | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -504,7 +504,6 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
                 {canExport ? (
                   <>
                     <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SalesExportFormat)} className="w-28">
-                      <option value="csv">CSV</option>
                       <option value="xlsx">XLSX</option>
                       <option value="pdf">PDF</option>
                     </Select>
@@ -612,7 +611,6 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
                 {canExport ? (
                   <>
                     <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SalesExportFormat)} className="w-28">
-                      <option value="csv">CSV</option>
                       <option value="xlsx">XLSX</option>
                       <option value="pdf">PDF</option>
                     </Select>

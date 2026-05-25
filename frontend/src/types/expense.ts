@@ -213,7 +213,7 @@ export interface ExpenseFormInput {
   status?: Extract<ExpenseStatus, "draft" | "posted">;
 }
 
-export type UpdateExpenseInput = Partial<ExpenseFormInput>;
+export type UpdateExpenseInput = Partial<Omit<ExpenseFormInput, "status">>;
 
 export interface CancelExpenseInput {
   cancellationReason: string;

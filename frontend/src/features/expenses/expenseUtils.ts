@@ -17,6 +17,7 @@ import type {
   RecurringExpense,
   RecurringExpenseFormInput,
   RecurringExpenseFrequency,
+  UpdateExpenseInput,
 } from "../../types/expense";
 import { EXPENSE_PAYMENT_MODE_LABELS, RECURRING_FREQUENCY_LABELS } from "./expenseOptions";
 
@@ -394,6 +395,28 @@ export const createExpensePayload = (values: ExpenseFormInput, status: "draft" |
   chequeStatus: values.paymentMode === "cheque" ? values.chequeStatus ?? "issued" : null,
   notes: trimToNull(values.notes),
   status,
+});
+
+export const createExpenseUpdatePayload = (values: ExpenseFormInput): UpdateExpenseInput => ({
+  expenseDate: values.expenseDate,
+  categoryId: values.categoryId,
+  expenseAccountId: values.expenseAccountId || null,
+  payeeName: trimToNull(values.payeeName),
+  vendorGstNumber: trimToNull(values.vendorGstNumber)?.toUpperCase() ?? null,
+  vendorPanNumber: trimToNull(values.vendorPanNumber)?.toUpperCase() ?? null,
+  hsnSacCode: trimToNull(values.hsnSacCode),
+  description: values.description.trim(),
+  amount: values.amount,
+  gstApplicable: values.gstApplicable,
+  gstRate: values.gstApplicable ? values.gstRate : 0,
+  priceTaxType: values.priceTaxType,
+  paymentMode: values.paymentMode,
+  bankAccountId: values.bankAccountId || null,
+  referenceNumber: trimToNull(values.referenceNumber),
+  chequeNumber: trimToNull(values.chequeNumber),
+  chequeDate: values.chequeDate || null,
+  chequeStatus: values.paymentMode === "cheque" ? values.chequeStatus ?? "issued" : null,
+  notes: trimToNull(values.notes),
 });
 
 export const createRecurringPayload = (values: RecurringExpenseFormInput): RecurringExpenseFormInput => ({

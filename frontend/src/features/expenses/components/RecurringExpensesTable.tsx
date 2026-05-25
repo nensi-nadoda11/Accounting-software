@@ -79,12 +79,14 @@ export const RecurringExpensesTable = ({
                       onClick={() => onEdit(item)}
                       disabled={!canManage}
                     />
-                    <TableActionIconButton
-                      label="Run now"
-                      icon={<Play className="size-4" />}
-                      onClick={() => onRun(item)}
-                      disabled={!canManage || item.status === "cancelled" || item.status === "completed"}
-                    />
+                    {item.status !== "paused" ? (
+                      <TableActionIconButton
+                        label="Run now"
+                        icon={<Play className="size-4" />}
+                        onClick={() => onRun(item)}
+                        disabled={!canManage || item.status === "cancelled" || item.status === "completed"}
+                      />
+                    ) : null}
                     <TableActionIconButton
                       label={item.status === "paused" ? "Activate recurring template" : "Pause recurring template"}
                       icon={item.status === "paused" ? <RefreshCw className="size-4" /> : <Pause className="size-4" />}

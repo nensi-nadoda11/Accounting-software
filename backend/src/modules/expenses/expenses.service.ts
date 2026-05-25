@@ -146,6 +146,19 @@ class ExpensesService {
     return new Date(value.toISOString().slice(0, 10));
   }
 
+  private getResumedRecurringNextRunDate(input: {
+    startDate: Date;
+    nextRunDate: Date;
+    resumeFrom: Date;
+  }) {
+    const startDate = this.toDateOnly(input.startDate);
+    const nextRunDate = this.toDateOnly(input.nextRunDate);
+    const resumeFrom = this.toDateOnly(input.resumeFrom);
+    const minimumAllowedDate = resumeFrom > startDate ? resumeFrom : startDate;
+
+    return nextRunDate < minimumAllowedDate ? minimumAllowedDate : nextRunDate;
+  }
+
   private isDateWithinRange(target: Date, startDate: Date, endDate: Date) {
     const time = this.toDateOnly(target).getTime();
     return time >= this.toDateOnly(startDate).getTime() && time <= this.toDateOnly(endDate).getTime();
@@ -1405,7 +1418,7 @@ class ExpensesService {
         actor.companyId,
         input.expenseAccountId ?? null,
         category.defaultAccountId,
-        (input.createAsStatus ?? "draft") === "posted",
+        true,
         transaction
       );
       if (input.bankAccountId) {
@@ -1431,7 +1444,7 @@ class ExpensesService {
           endDate: input.endDate ?? null,
           nextRunDate: input.nextRunDate,
           autoCreateEnabled: input.autoCreateEnabled ?? true,
-          createAsStatus: input.createAsStatus ?? "draft",
+          createAsStatus: "posted",
           reminderDaysBefore: input.reminderDaysBefore ?? 0,
           status: input.status ?? "active",
           createdBy: actor.id,
@@ -1479,12 +1492,20 @@ class ExpensesService {
 
       const nextStartDate = input.startDate ?? existing.startDate;
       const nextEndDate = input.endDate ?? existing.endDate;
-      const nextRunDate = input.nextRunDate ?? existing.nextRunDate;
       const nextGstApplicable = input.gstApplicable ?? existing.gstApplicable;
       const nextGstRate = input.gstRate ?? Number(existing.gstRate);
       const nextPaymentMode = input.paymentMode ?? existing.paymentMode;
       const nextBankAccountId = input.bankAccountId ?? existing.bankAccountId;
-      const nextCreateAsStatus = input.createAsStatus ?? existing.createAsStatus;
+      const nextCreateAsStatus = "posted";
+      const requestedStatus = input.status ?? existing.status;
+      const isResumingRecurring = existing.status === "paused" && requestedStatus === "active";
+      const nextRunDate = isResumingRecurring
+        ? this.getResumedRecurringNextRunDate({
+            startDate: input.startDate ?? existing.startDate,
+            nextRunDate: input.nextRunDate ?? existing.nextRunDate,
+            resumeFrom: new Date(),
+          })
+        : input.nextRunDate ?? existing.nextRunDate;
 
       this.assertRecurringTemplateState({
         startDate: nextStartDate,
@@ -1500,7 +1521,7 @@ class ExpensesService {
         actor.companyId,
         input.expenseAccountId ?? existing.expenseAccountId,
         category.defaultAccountId,
-        nextCreateAsStatus === "posted",
+        true,
         transaction
       );
       if (nextBankAccountId) {
@@ -1529,7 +1550,7 @@ class ExpensesService {
           autoCreateEnabled: input.autoCreateEnabled ?? existing.autoCreateEnabled,
           createAsStatus: nextCreateAsStatus,
           reminderDaysBefore: input.reminderDaysBefore ?? existing.reminderDaysBefore,
-          status: input.status ?? existing.status,
+          status: requestedStatus,
           updatedBy: actor.id
         },
         transaction
@@ -1561,13 +1582,17 @@ class ExpensesService {
   public async runRecurring(actor: ExpenseActor, recurringExpenseId: string, context: ExpenseRequestContext) {
     const result = await db.transaction(async (transaction) => {
       const recurring = await this.getRecurringOrThrow(actor.companyId, recurringExpenseId, transaction);
+      if (recurring.status === "paused") {
+        throw new AppError("Paused recurring expense must be activated before running", 400);
+      }
+
       if (recurring.status === "cancelled" || recurring.status === "completed") {
         throw new AppError("This recurring expense can no longer be executed", 400);
       }
 
       await expensesRepository.acquireScopedLock(`recurring-expense-run:${recurringExpenseId}`, actor.companyId, transaction);
 
-      const createStatus = recurring.createAsStatus;
+      const createStatus = "posted";
       const expense = await this.createExpenseFromSource(
         actor,
         {
@@ -1646,15 +1671,27 @@ class ExpensesService {
     const results: Array<{ recurringExpenseId: string; expenseId: string }> = [];
 
     for (const recurring of dueItems) {
-      const executed = await this.runRecurring(actor, recurring.id, context);
-      results.push({
-        recurringExpenseId: recurring.id,
-        expenseId: (executed.expense as { expense: { id: string } }).expense.id
-      });
+      try {
+        const executed = await this.runRecurring(actor, recurring.id, context);
+        results.push({
+          recurringExpenseId: recurring.id,
+          expenseId: (executed.expense as { expense: { id: string } }).expense.id
+        });
+      } catch (error) {
+        if (
+          error instanceof AppError &&
+          (error.message === "Paused recurring expense must be activated before running" ||
+            error.message === "This recurring expense can no longer be executed")
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
     }
 
     return {
-      total: dueItems.length,
+      total: results.length,
       executed: results
     };
   }

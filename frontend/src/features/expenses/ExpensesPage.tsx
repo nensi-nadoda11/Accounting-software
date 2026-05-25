@@ -650,6 +650,10 @@ export const ExpensesPage = () => {
   };
 
   const handleRecurringRun = async (item: RecurringExpense) => {
+    if (item.status === "paused") {
+      return;
+    }
+
     try {
       const response = await expensesApi.runRecurring(item.id);
       const createdExpense = response.data.expense.expense;

@@ -11,14 +11,36 @@ const PDF_MUTED = { r: 0.43, g: 0.49, b: 0.58 };
 const PDF_HEADER_FILL = { r: 0.94, g: 0.97, b: 0.99 };
 const PDF_SUMMARY_FILL = { r: 0.96, g: 0.99, b: 0.98 };
 
+const isPhoneColumn = (key?: string) => Boolean(key && /(mobile|phone|contact)/i.test(key));
+const isAmountColumn = (key?: string) =>
+  Boolean(key && /(amount|total|value|balance|paid|due|taxable|gst|sales|purchase|income|expense|debit|credit|net|gross|price)/i.test(key));
+const isCountColumn = (key?: string) => Boolean(key && /(count|qty|quantity|items?)/i.test(key));
+
 const toDisplayValue = (value: string | number | Date | null | undefined, column?: ReportColumn) => {
   if (value === null || value === undefined) {
     return "";
   }
 
+  if (isPhoneColumn(column?.key)) {
+    const digits = String(value).replace(/\D/g, "");
+    if (!digits) {
+      return "";
+    }
+
+    return digits.length > 10 ? digits.slice(-10) : digits;
+  }
+
   if (column?.type === "number") {
     const parsed = typeof value === "number" ? value : Number(value);
-    return Number.isFinite(parsed) ? parsed.toFixed(2) : String(value);
+    if (!Number.isFinite(parsed)) {
+      return String(value);
+    }
+
+    if (isAmountColumn(column.key) || isCountColumn(column.key)) {
+      return String(Math.round(parsed));
+    }
+
+    return Number.isInteger(parsed) ? String(parsed) : String(parsed);
   }
 
   if (column?.type === "date" || column?.type === "datetime") {

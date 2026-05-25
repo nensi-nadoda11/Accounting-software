@@ -165,7 +165,6 @@ export const REPORTS_TABS = [
   { label: "Payroll", href: "/app/reports?tab=payroll", permissions: ["reports.payroll.view"] },
   { label: "GST", href: "/app/reports?tab=gst", permissions: ["reports.gst.view"] },
   { label: "Accounting", href: "/app/reports?tab=accounting", permissions: ["reports.accounting.view"] },
-  { label: "Exports", href: "/app/reports?tab=exports", permissions: ["reports.export"] },
 ] as const satisfies readonly SectionNavItem[];
 
 const DASHBOARD_ROUTES = [{ href: "/app/dashboard", permissions: ["dashboard.view"] }] as const satisfies readonly PermissionAwareRoute[];

@@ -10,7 +10,7 @@ import type {
   PaymentModeExpenseReportResponse,
 } from "./expense";
 import type { GstSummary, HsnSacSummaryRow } from "./gst";
-import type { InventoryPagination, InventoryValuationRow, StockMovement } from "./inventory";
+import type { InventoryPagination, StockMovement } from "./inventory";
 import type {
   DepartmentPayrollReportItem,
   EmployeePayrollReportItem,
@@ -29,8 +29,7 @@ export type ReportsTabId =
   | "income"
   | "payroll"
   | "gst"
-  | "accounting"
-  | "exports";
+  | "accounting";
 
 export type ReportFormat = "csv" | "xlsx" | "pdf";
 
@@ -328,6 +327,18 @@ export interface InventoryLowStockRow {
   stockValue: string;
 }
 
+export interface InventoryValuationReportRow {
+  productId: string;
+  productCode: string;
+  productName: string;
+  sku: string | null;
+  categoryName: string | null;
+  unitName: string | null;
+  unitSymbol: string | null;
+  totalQuantity: string;
+  totalValue: string;
+}
+
 export interface IncomeSummaryReport {
   accountCount: number;
   totalCredits: string;
@@ -377,7 +388,7 @@ export interface ReportsExportsListResponse {
 
 export interface InventoryReport {
   currentStock: InventoryCurrentStockResponse;
-  valuation: InventoryValuationRow[];
+  valuation: InventoryValuationReportRow[];
   expiry: InventoryExpiryResponse;
   movement: StockMovement[];
   lowStock: InventoryLowStockRow[];

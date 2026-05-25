@@ -44,12 +44,18 @@ const toDateOnly = (value: Date) => new Date(Date.UTC(value.getFullYear(), value
 const formatFileBaseName = (reportType: string) =>
   `${reportType.replaceAll(".", "-")}-${new Date().toISOString().slice(0, 10)}`;
 
-const formatDateLabel = (value: Date) =>
-  value.toLocaleDateString("en-IN", {
+const formatDateLabel = (value: Date | string) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric"
   });
+};
 
 const humanizeWords = (value: string) =>
   value
@@ -673,7 +679,6 @@ export class ReportsService {
       metadata.push({ label: "Cancelled", value: "Included" });
     }
 
-    metadata.push({ label: "Rows", value: String(rowCount) });
     metadata.push({ label: "Exported On", value: new Date().toLocaleString("en-IN") });
 
     return metadata;
@@ -946,8 +951,8 @@ export class ReportsService {
 
   public async exportReport(actor: ReportsActor, query: ExportReportQuery, context: ReportsRequestContext): Promise<ReportFilePayload> {
     const mergedQuery = {
-      ...query,
-      ...(query.filters ?? {})
+      ...(query.filters ?? {}),
+      ...query
     } as ExportReportQuery;
 
     try {

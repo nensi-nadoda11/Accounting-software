@@ -13,6 +13,7 @@ import type {
   InventoryCurrentStockResponse,
   InventoryExpiryResponse,
   InventoryLowStockRow,
+  InventoryValuationReportRow,
   PartyLedgerResponse,
   PayrollReport,
   PurchaseDetailedResponse,
@@ -31,7 +32,6 @@ import type {
   SupplierAgingRow,
   SupplierOutstandingRow,
 } from "../types/report";
-import type { InventoryValuationResponse } from "../types/inventory";
 
 const getFileNameFromDisposition = (contentDisposition: string | undefined, fallback: string) => {
   if (!contentDisposition) {
@@ -166,7 +166,7 @@ export const reportsApi = {
 
   getInventoryValuation: async (filters: Partial<ReportFilters>) =>
     (
-      await client.get<ApiResponse<{ items: InventoryValuationResponse["items"] }>>("/reports/inventory/valuation", {
+      await client.get<ApiResponse<{ items: InventoryValuationReportRow[] }>>("/reports/inventory/valuation", {
         params: toBaseParams(filters),
       })
     ).data,

@@ -10,7 +10,7 @@ import { customersApi } from "../../services/customersApi";
 import { expensesApi } from "../../services/expensesApi";
 import { financialYearApi } from "../../services/financialYearApi";
 import { payrollApi } from "../../services/payrollApi";
-import { productsApi } from "../../services/productsApi";
+import { categoriesApi, productsApi } from "../../services/productsApi";
 import { reportsApi } from "../../services/reportsApi";
 import { suppliersApi } from "../../services/suppliersApi";
 import type {
@@ -23,14 +23,13 @@ import type {
   InventoryCurrentStockResponse,
   InventoryExpiryResponse,
   InventoryLowStockRow,
+  InventoryValuationReportRow,
   AccountingReport,
   PartyLedgerResponse,
   PayrollReport,
   PurchaseDetailedResponse,
   PurchaseSummaryReport,
-  ReportExportRecord,
   ReportFilters,
-  ReportFormat,
   ReportType,
   ReportsOverviewResponse,
   ReportsTabId,
@@ -42,13 +41,11 @@ import type {
   SupplierOutstandingRow,
 } from "../../types/report";
 import type { CompanyFinancialYear } from "../../types/company";
-import type { InventoryValuationRow } from "../../types/inventory";
 import { formatDate, formatDateTime, saveDownloadedFile } from "../customers/customerUtils";
 import { useDebouncedValue } from "../customers/useDebouncedValue";
 import { AgingBucketTable } from "./components/AgingBucketTable";
 import { AmountText } from "./components/AmountText";
 import { LoadingState } from "./components/LoadingState";
-import { ReportExportCenter } from "./components/ReportExportCenter";
 import { ReportFiltersPanel } from "./components/ReportFilters";
 import { ReportSummaryCards } from "./components/ReportSummaryCards";
 import { ReportTable } from "./components/ReportTable";
@@ -82,9 +79,8 @@ type SuppliersTabData = {
 
 type InventoryTabData = {
   currentStock: InventoryCurrentStockResponse;
-  valuation: InventoryValuationRow[];
+  valuation: InventoryValuationReportRow[];
   expiry: InventoryExpiryResponse;
-  movement: { items: Array<Record<string, unknown>>; pagination: InventoryCurrentStockResponse["pagination"] };
   lowStock: InventoryLowStockRow[];
 };
 
@@ -107,7 +103,6 @@ const TABS: ReportsTabId[] = [
   "payroll",
   "gst",
   "accounting",
-  "exports",
 ];
 
 const DEFAULT_FILTERS: ReportFilters = {
@@ -145,7 +140,7 @@ const STATUS_OPTIONS: Option[] = [
   { value: "unpaid", label: "Unpaid" },
 ];
 
-const TAB_EXPORT_TYPES: Record<Exclude<ReportsTabId, "overview" | "exports">, ReportType> = {
+const TAB_EXPORT_TYPES: Record<Exclude<ReportsTabId, "overview">, ReportType> = {
   sales: "sales.detailed",
   purchases: "purchases.detailed",
   customers: "customers.outstanding",
@@ -156,6 +151,20 @@ const TAB_EXPORT_TYPES: Record<Exclude<ReportsTabId, "overview" | "exports">, Re
   payroll: "payroll.monthly",
   gst: "gst.summary",
   accounting: "accounting.trial-balance",
+};
+
+const TAB_FILTER_KEYS: Record<ReportsTabId, Array<keyof ReportFilters>> = {
+  overview: [],
+  sales: ["customerId", "productId", "paymentMode"],
+  purchases: ["supplierId", "paymentMode"],
+  customers: ["customerId", "status"],
+  suppliers: ["supplierId", "status"],
+  inventory: ["productId", "categoryId"],
+  expenses: ["categoryId", "paymentMode"],
+  income: [],
+  payroll: ["employeeId", "department", "paymentMode"],
+  gst: ["customerId", "supplierId", "gstRate"],
+  accounting: [],
 };
 
 export const ReportsPage = () => {
@@ -172,7 +181,8 @@ export const ReportsPage = () => {
   const [customerOptions, setCustomerOptions] = useState<Option[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<Option[]>([]);
   const [productOptions, setProductOptions] = useState<Option[]>([]);
-  const [categoryOptions, setCategoryOptions] = useState<Option[]>([]);
+  const [inventoryCategoryOptions, setInventoryCategoryOptions] = useState<Option[]>([]);
+  const [expenseCategoryOptions, setExpenseCategoryOptions] = useState<Option[]>([]);
   const [employeeOptions, setEmployeeOptions] = useState<Option[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<Option[]>([]);
   const [referencesLoading, setReferencesLoading] = useState(true);
@@ -180,8 +190,6 @@ export const ReportsPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportCenterFormat, setExportCenterFormat] = useState<ReportFormat>("pdf");
-  const [exportCenterType, setExportCenterType] = useState<ReportType>("sales.detailed");
 
   const [overviewData, setOverviewData] = useState<ReportsOverviewResponse | null>(null);
   const [salesData, setSalesData] = useState<SalesTabData | null>(null);
@@ -194,7 +202,6 @@ export const ReportsPage = () => {
   const [payrollData, setPayrollData] = useState<PayrollReport | null>(null);
   const [gstData, setGstData] = useState<GstReport | null>(null);
   const [accountingData, setAccountingData] = useState<AccountingTabData | null>(null);
-  const [exportsData, setExportsData] = useState<ReportExportRecord[]>([]);
 
   useEffect(() => {
     if (requestedTab !== activeTab) {
@@ -210,11 +217,12 @@ export const ReportsPage = () => {
     const loadReferences = async () => {
       try {
         setReferencesLoading(true);
-        const [years, customers, suppliers, products, categories, employees] = await Promise.allSettled([
+        const [years, customers, suppliers, products, productCategories, expenseCategories, employees] = await Promise.allSettled([
           financialYearApi.list(),
           customersApi.list({ page: 1, limit: 100, status: "active" }),
           suppliersApi.list({ page: 1, limit: 100, status: "active" }),
           productsApi.list({ page: 1, limit: 100, status: "active" }),
+          categoriesApi.list({ page: 1, limit: 100, status: "active" }),
           expensesApi.listCategories({ status: "active" }),
           payrollApi.listEmployees({ page: 1, limit: 100, status: "active" }),
         ]);
@@ -232,8 +240,15 @@ export const ReportsPage = () => {
         setProductOptions(
           products.status === "fulfilled" ? products.value.data.items.map((item) => ({ value: item.id, label: item.name })) : [],
         );
-        setCategoryOptions(
-          categories.status === "fulfilled" ? categories.value.data.items.map((item) => ({ value: item.id, label: item.name })) : [],
+        setInventoryCategoryOptions(
+          productCategories.status === "fulfilled"
+            ? productCategories.value.data.items.map((item) => ({ value: item.id, label: item.name }))
+            : [],
+        );
+        setExpenseCategoryOptions(
+          expenseCategories.status === "fulfilled"
+            ? expenseCategories.value.data.items.map((item) => ({ value: item.id, label: item.name }))
+            : [],
         );
         setEmployeeOptions(employeeItems.map((item) => ({ value: item.id, label: item.fullName })));
         setDepartmentOptions(
@@ -256,6 +271,30 @@ export const ReportsPage = () => {
   }, [toast]);
 
   const parsedFilters = useMemo(() => JSON.parse(debouncedFilters) as ReportFilters, [debouncedFilters]);
+  const categoryOptions = activeTab === "inventory" ? inventoryCategoryOptions : expenseCategoryOptions;
+
+  useEffect(() => {
+    const allowedKeys = new Set<keyof ReportFilters>(["dateFrom", "dateTo", "financialYearId", "page", "limit", ...TAB_FILTER_KEYS[activeTab]]);
+
+    setFilters((current) => {
+      let changed = false;
+      const next = { ...current } as ReportFilters;
+
+      (Object.keys(current) as Array<keyof ReportFilters>).forEach((key) => {
+        if (allowedKeys.has(key)) {
+          return;
+        }
+
+        const emptyValue = typeof current[key] === "number" ? DEFAULT_FILTERS[key] : "";
+        if (next[key] !== emptyValue) {
+          (next as unknown as Record<string, string | number>)[key] = emptyValue as string | number;
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [activeTab]);
 
   useEffect(() => {
     if (referencesLoading) {
@@ -270,7 +309,6 @@ export const ReportsPage = () => {
         if (activeTab === "overview") {
           const response = await reportsApi.getOverview(parsedFilters);
           setOverviewData(response.data);
-          setExportsData(response.data.recentExports);
           return;
         }
 
@@ -328,20 +366,32 @@ export const ReportsPage = () => {
         }
 
         if (activeTab === "inventory") {
-          const [currentStock, valuation, expiry, movement, lowStock] = await Promise.all([
+          const [currentStock, valuation, expiry, lowStock] = await Promise.allSettled([
             reportsApi.getInventoryCurrentStock(parsedFilters),
             reportsApi.getInventoryValuation(parsedFilters),
             reportsApi.getInventoryExpiry(parsedFilters),
-            reportsApi.getInventoryMovement(parsedFilters),
             reportsApi.getInventoryLowStock(parsedFilters),
           ]);
-          setInventoryData({
-            currentStock: currentStock.data,
-            valuation: valuation.data.items,
-            expiry: expiry.data,
-            movement: movement.data,
-            lowStock: lowStock.data.items,
-          });
+
+          const nextInventoryData: InventoryTabData = {
+            currentStock:
+              currentStock.status === "fulfilled"
+                ? currentStock.value.data
+                : { items: [], pagination: { page: 1, limit: filters.limit, total: 0, totalPages: 1 } },
+            valuation: valuation.status === "fulfilled" ? valuation.value.data.items : [],
+            expiry:
+              expiry.status === "fulfilled"
+                ? expiry.value.data
+                : { items: [], pagination: { page: 1, limit: filters.limit, total: 0, totalPages: 1 } },
+            lowStock: lowStock.status === "fulfilled" ? lowStock.value.data.items : [],
+          };
+
+          const inventoryFailures = [currentStock, valuation, expiry, lowStock].filter((result) => result.status === "rejected");
+          if (inventoryFailures.length === 4) {
+            throw inventoryFailures[0].reason;
+          }
+
+          setInventoryData(nextInventoryData);
           return;
         }
 
@@ -369,16 +419,45 @@ export const ReportsPage = () => {
         }
 
         if (activeTab === "payroll") {
-          const [monthly, employee, department] = await Promise.all([
-            reportsApi.getPayrollMonthly(parsedFilters),
-            reportsApi.getPayrollEmployee(parsedFilters),
-            reportsApi.getPayrollDepartment(parsedFilters),
+          const [monthly, employee, department] = await Promise.allSettled([
+            payrollApi.getMonthlyReport({
+              page: parsedFilters.page,
+              limit: parsedFilters.limit,
+              dateFrom: parsedFilters.dateFrom,
+              dateTo: parsedFilters.dateTo,
+              department: parsedFilters.department || undefined,
+              employeeId: parsedFilters.employeeId || undefined,
+            }),
+            payrollApi.getEmployeeReport({
+              page: parsedFilters.page,
+              limit: parsedFilters.limit,
+              dateFrom: parsedFilters.dateFrom,
+              dateTo: parsedFilters.dateTo,
+              department: parsedFilters.department || undefined,
+              employeeId: parsedFilters.employeeId || undefined,
+            }),
+            payrollApi.getDepartmentReport({
+              page: parsedFilters.page,
+              limit: parsedFilters.limit,
+              dateFrom: parsedFilters.dateFrom,
+              dateTo: parsedFilters.dateTo,
+              department: parsedFilters.department || undefined,
+              employeeId: parsedFilters.employeeId || undefined,
+            }),
           ]);
-          setPayrollData({
-            monthly: monthly.data.items,
-            employee: employee.data.items,
-            department: department.data.items,
-          });
+
+          const nextPayrollData: PayrollReport = {
+            monthly: monthly.status === "fulfilled" ? monthly.value.data.items : [],
+            employee: employee.status === "fulfilled" ? employee.value.data.items : [],
+            department: department.status === "fulfilled" ? department.value.data.items : [],
+          };
+
+          const payrollFailures = [monthly, employee, department].filter((result) => result.status === "rejected");
+          if (payrollFailures.length === 3) {
+            throw payrollFailures[0].reason;
+          }
+
+          setPayrollData(nextPayrollData);
           return;
         }
 
@@ -412,10 +491,6 @@ export const ReportsPage = () => {
           return;
         }
 
-        if (activeTab === "exports") {
-          const response = await reportsApi.listExports(20);
-          setExportsData(response.data.items);
-        }
       } catch (loadError) {
         setError(getErrorMessage(loadError, "Failed to load reports"));
       } finally {
@@ -439,7 +514,7 @@ export const ReportsPage = () => {
   const handleReset = () => setFilters(DEFAULT_FILTERS);
 
   const handleQuickExport = async () => {
-    if (activeTab === "overview" || activeTab === "exports") {
+    if (activeTab === "overview") {
       return;
     }
 
@@ -450,25 +525,8 @@ export const ReportsPage = () => {
       const file = await reportsApi.exportReport(reportType, "pdf", filters, reportsApi.toExportPayload(filters));
       saveDownloadedFile(file.blob, file.fileName);
       toast.success("Report exported");
-      const exportsResponse = await reportsApi.listExports(20);
-      setExportsData(exportsResponse.data.items);
     } catch (exportError) {
       toast.error(getErrorMessage(exportError, "Failed to export report"));
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleExportCenter = async () => {
-    try {
-      setExporting(true);
-      const file = await reportsApi.exportReport(exportCenterType, exportCenterFormat, filters, reportsApi.toExportPayload(filters));
-      saveDownloadedFile(file.blob, file.fileName);
-      toast.success("Export generated");
-      const response = await reportsApi.listExports(20);
-      setExportsData(response.data.items);
-    } catch (exportError) {
-      toast.error(getErrorMessage(exportError, "Failed to generate export"));
     } finally {
       setExporting(false);
     }
@@ -497,7 +555,7 @@ export const ReportsPage = () => {
           filters={filters}
           onChange={handleFilterChange}
           onReset={handleReset}
-          onExport={activeTab === "overview" || activeTab === "exports" ? undefined : handleQuickExport}
+          onExport={activeTab === "overview" ? undefined : handleQuickExport}
           exportLoading={exporting}
           visibility={filterVisibility}
           financialYears={financialYearOptions}
@@ -526,13 +584,6 @@ export const ReportsPage = () => {
         payrollData,
         gstData,
         accountingData,
-        exportsData,
-        exportCenterFormat,
-        exportCenterType,
-        onExportCenterFormatChange: setExportCenterFormat,
-        onExportCenterTypeChange: setExportCenterType,
-        onExportCenter: handleExportCenter,
-        exporting,
         onPageChange: (page) => setFilters((current) => ({ ...current, page })),
       }) : null}
     </div>
@@ -552,13 +603,6 @@ const renderTab = ({
   payrollData,
   gstData,
   accountingData,
-  exportsData,
-  exportCenterFormat,
-  exportCenterType,
-  onExportCenterFormatChange,
-  onExportCenterTypeChange,
-  onExportCenter,
-  exporting,
   onPageChange,
 }: {
   activeTab: ReportsTabId;
@@ -573,13 +617,6 @@ const renderTab = ({
   payrollData: PayrollReport | null;
   gstData: GstReport | null;
   accountingData: AccountingTabData | null;
-  exportsData: ReportExportRecord[];
-  exportCenterFormat: ReportFormat;
-  exportCenterType: ReportType;
-  onExportCenterFormatChange: (value: ReportFormat) => void;
-  onExportCenterTypeChange: (value: ReportType) => void;
-  onExportCenter: () => void;
-  exporting: boolean;
   onPageChange: (page: number) => void;
 }) => {
   if (activeTab === "overview" && overviewData) {
@@ -736,9 +773,9 @@ const renderTab = ({
         />
         <div className="grid gap-4 xl:grid-cols-2">
           <ReportTable items={inventoryData.valuation} columns={[
-            { key: "productName", label: "Product", render: (item) => item.product.name },
-            { key: "quantity", label: "Quantity", render: (item) => item.quantity },
-            { key: "stockValue", label: "Value", render: (item) => <AmountText value={item.stockValue} /> },
+            { key: "productName", label: "Product", render: (item) => item.productName },
+            { key: "quantity", label: "Quantity", render: (item) => item.totalQuantity },
+            { key: "stockValue", label: "Value", render: (item) => <AmountText value={item.totalValue} /> },
           ]} />
           <ReportTable items={inventoryData.lowStock} columns={[
             { key: "productName", label: "Low Stock Product", render: (item) => item.productName },
@@ -888,20 +925,6 @@ const renderTab = ({
           ]} />
         </div>
       </div>
-    );
-  }
-
-  if (activeTab === "exports") {
-    return (
-      <ReportExportCenter
-        reportType={exportCenterType}
-        format={exportCenterFormat}
-        onReportTypeChange={onExportCenterTypeChange}
-        onFormatChange={onExportCenterFormatChange}
-        onExport={onExportCenter}
-        exporting={exporting}
-        exports={exportsData}
-      />
     );
   }
 

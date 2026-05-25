@@ -10,26 +10,13 @@ type ValidationSchemas = {
   params?: ZodTypeAny;
 };
 
-type MutableRecord = Record<string, unknown>;
-
-const setRequestValue = (request: Request, key: "body" | "params", value: unknown) => {
+const setRequestValue = (request: Request, key: "body" | "query" | "params", value: unknown) => {
   Object.defineProperty(request, key, {
     configurable: true,
     enumerable: true,
     writable: true,
     value
   });
-};
-
-const isMutableRecord = (value: unknown): value is MutableRecord =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
-
-const syncObjectValues = (target: MutableRecord, source: MutableRecord) => {
-  Object.keys(target).forEach((key) => {
-    delete target[key];
-  });
-
-  Object.assign(target, source);
 };
 
 export const validateRequest = (schemas: ValidationSchemas) => {
@@ -42,10 +29,7 @@ export const validateRequest = (schemas: ValidationSchemas) => {
       if (schemas.query) {
         const parsedQuery = schemas.query.parse(request.query);
         response.locals.validatedQuery = parsedQuery;
-
-        if (isMutableRecord(request.query) && isMutableRecord(parsedQuery)) {
-          syncObjectValues(request.query as MutableRecord, parsedQuery);
-        }
+        setRequestValue(request, "query", parsedQuery);
       }
 
       if (schemas.params) {

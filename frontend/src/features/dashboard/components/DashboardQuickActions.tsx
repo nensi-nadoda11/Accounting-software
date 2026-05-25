@@ -27,9 +27,9 @@ type Props = {
 };
 
 export const DashboardQuickActions = ({ actions }: Props) => (
-  <Card>
+  <Card className="flex h-full flex-col">
     <CardHeader title="Quick Actions" />
-    <CardContent className="grid grid-cols-2 gap-3 p-4">
+    <CardContent className="grid flex-1 grid-cols-2 gap-3 p-4">
       {actions.map((action) => {
         const Icon = iconMap[action.icon as keyof typeof iconMap] ?? ReceiptText;
 

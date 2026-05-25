@@ -21,20 +21,21 @@ const iconByKind = {
 } as const;
 
 export const DashboardAlertsPanel = ({ alerts }: Props) => (
-  <Card>
+  <Card className="flex h-full min-h-0 flex-col">
     <CardHeader title="Alerts" />
-    <CardContent className="space-y-3 p-4">
+    <CardContent className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4">
       {alerts.length === 0 ? (
         <EmptyState title="No active alerts" />
       ) : (
-        alerts.slice(0, 6).map((alert) => {
+        <div className="space-y-3">
+          {alerts.map((alert) => {
           const Icon = iconByKind[alert.kind];
 
           return (
             <Link
               key={alert.id}
               to={alert.actionUrl ?? "/app/system/notifications"}
-              className="flex items-start gap-3 rounded-2xl border border-slate-200 p-3 transition hover:border-slate-300"
+              className="flex items-start gap-3 overflow-hidden rounded-2xl border border-slate-200 p-3 transition hover:border-slate-300"
             >
               <div
                 className={`mt-0.5 flex size-9 items-center justify-center rounded-xl ${
@@ -49,15 +50,16 @@ export const DashboardAlertsPanel = ({ alerts }: Props) => (
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">{alert.title}</p>
+                  <p className="break-words text-sm font-semibold text-slate-900">{alert.title}</p>
                   {alert.amount ? <AmountText value={alert.amount} className="text-xs" tone="default" /> : null}
                 </div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{alert.description}</p>
+                <p className="mt-1 break-words text-xs leading-5 text-slate-500">{alert.description}</p>
                 {alert.dueDate ? <p className="mt-1 text-[11px] font-medium text-slate-400">Due {alert.dueDate}</p> : null}
               </div>
             </Link>
           );
-        })
+          })}
+        </div>
       )}
     </CardContent>
   </Card>

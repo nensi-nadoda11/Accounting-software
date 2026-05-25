@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 
 import { Button } from "../../components/ui/Button";
 import { ErrorState } from "../../components/ui/ErrorState";
@@ -11,11 +11,9 @@ import type {
   DashboardChartKey,
   DashboardChartResponse,
   DashboardFilters,
-  DashboardRecentActivitiesResponse,
   DashboardRoleDashboard,
   DashboardSummary,
-  DashboardTasksResponse,
-  DashboardTopProductsResponse
+  DashboardTasksResponse
 } from "../../types/dashboard";
 import { DashboardAccountingSnapshot } from "./components/DashboardAccountingSnapshot";
 import { DashboardAlertsPanel } from "./components/DashboardAlertsPanel";
@@ -26,9 +24,7 @@ import { DashboardInventorySnapshot } from "./components/DashboardInventorySnaps
 import { DashboardPayrollSnapshot } from "./components/DashboardPayrollSnapshot";
 import { DashboardPendingTasks } from "./components/DashboardPendingTasks";
 import { DashboardQuickActions } from "./components/DashboardQuickActions";
-import { DashboardRecentActivities } from "./components/DashboardRecentActivities";
 import { DashboardSummaryCards } from "./components/DashboardSummaryCards";
-import { DashboardTopProducts } from "./components/DashboardTopProducts";
 
 type Loadable<T> = {
   data: T | null;
@@ -58,15 +54,12 @@ export const DashboardPage = () => {
   const [roleDashboard, setRoleDashboard] = useState<Loadable<DashboardRoleDashboard>>(createLoadable());
   const [alerts, setAlerts] = useState<Loadable<DashboardAlertsResponse>>(createLoadable());
   const [tasks, setTasks] = useState<Loadable<DashboardTasksResponse>>(createLoadable());
-  const [topProducts, setTopProducts] = useState<Loadable<DashboardTopProductsResponse>>(createLoadable());
-  const [activities, setActivities] = useState<Loadable<DashboardRecentActivitiesResponse>>(createLoadable());
   const [charts, setCharts] = useState<Record<DashboardChartKey, Loadable<DashboardChartResponse>>>({
     sales: createLoadable(),
     purchases: createLoadable(),
     expenses: createLoadable(),
     payments: createLoadable()
   });
-  const [activityPage, setActivityPage] = useState(1);
   const [filtersPending, setFiltersPending] = useState(false);
 
   const visibleActions = useMemo(
@@ -74,19 +67,17 @@ export const DashboardPage = () => {
     [auth, roleDashboard.data?.quickActions]
   );
 
-  const loadCore = async () => {
+  const loadCore = useEffectEvent(async () => {
     setSummary((current) => ({ ...current, loading: true, error: null }));
     setRoleDashboard((current) => ({ ...current, loading: true, error: null }));
     setAlerts((current) => ({ ...current, loading: true, error: null }));
     setTasks((current) => ({ ...current, loading: true, error: null }));
-    setTopProducts((current) => ({ ...current, loading: true, error: null }));
 
-    const [summaryResponse, roleResponse, alertsResponse, tasksResponse, topProductsResponse] = await Promise.allSettled([
+    const [summaryResponse, roleResponse, alertsResponse, tasksResponse] = await Promise.allSettled([
       dashboardApi.getSummary(),
       dashboardApi.getRoleDashboard(),
       dashboardApi.getAlerts(),
-      dashboardApi.getPendingTasks(),
-      dashboardApi.getTopProducts(filters)
+      dashboardApi.getPendingTasks()
     ]);
 
     const message = "Dashboard widgets could not be loaded.";
@@ -114,26 +105,9 @@ export const DashboardPage = () => {
         ? { data: tasksResponse.value.data, loading: false, error: null }
         : { ...current, loading: false, error: message }
     );
+  });
 
-    setTopProducts((current) =>
-      topProductsResponse.status === "fulfilled"
-        ? { data: topProductsResponse.value.data, loading: false, error: null }
-        : { ...current, loading: false, error: message }
-    );
-  };
-
-  const loadActivities = async (page: number) => {
-    setActivities((current) => ({ ...current, loading: true, error: null }));
-
-    try {
-      const response = await dashboardApi.getRecentActivities(page, 5);
-      setActivities({ data: response.data, loading: false, error: null });
-    } catch {
-      setActivities((current) => ({ ...current, loading: false, error: "Recent activity could not be loaded." }));
-    }
-  };
-
-  const loadChart = async (chartKey: DashboardChartKey) => {
+  const loadChart = useEffectEvent(async (chartKey: DashboardChartKey) => {
     setCharts((current) => ({
       ...current,
       [chartKey]: { ...current[chartKey], loading: true, error: null }
@@ -151,19 +125,15 @@ export const DashboardPage = () => {
         [chartKey]: { ...current[chartKey], loading: false, error: "Chart could not be loaded." }
       }));
     }
-  };
+  });
 
-  const loadCharts = async () => {
+  const loadCharts = useEffectEvent(async () => {
     await Promise.all(chartConfig.map((chart) => loadChart(chart.key)));
-  };
+  });
 
   useEffect(() => {
     void loadCore();
-  }, [filters]);
-
-  useEffect(() => {
-    void loadActivities(activityPage);
-  }, [activityPage]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -175,7 +145,6 @@ export const DashboardPage = () => {
 
   const handleApplyFilters = async () => {
     setFiltersPending(true);
-    setActivityPage(1);
     setFilters(draftFilters);
     setFiltersPending(false);
   };
@@ -218,21 +187,10 @@ export const DashboardPage = () => {
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_1fr_1fr]">
+      <div className="grid items-stretch gap-4 xl:grid-cols-[1.1fr_1fr_1fr]">
         <DashboardQuickActions actions={visibleActions} />
         <DashboardAlertsPanel alerts={alerts.data?.items ?? []} />
         <DashboardPendingTasks items={tasks.data?.items ?? []} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-        <DashboardRecentActivities
-          data={activities.data}
-          loading={activities.loading}
-          error={activities.error}
-          onRetry={() => void loadActivities(activityPage)}
-          onPageChange={setActivityPage}
-        />
-        <DashboardTopProducts items={topProducts.data?.items ?? []} />
       </div>
 
       {roleDashboard.data ? (

@@ -42,9 +42,9 @@ export const TopNav = () => {
     <div className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3 sm:px-6 lg:px-8">
         <Link to={homeHref} className="mr-4 whitespace-nowrap text-lg font-semibold text-slate-900">
-          LedgerFlow
+          {auth.company?.name ?? "LedgerFlow"}
         </Link>
-        <nav className="flex flex-1 overflow-x-auto">
+        <nav className="flex flex-1 justify-center">
           {navItems.map((item) => (
             <Link
               key={item.menu}
@@ -68,7 +68,7 @@ export const TopNav = () => {
               <button
                 type="button"
                 onClick={() => setProfileOpen((current) => !current)}
-                className="flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                className="flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                 aria-label="Open profile menu"
               >
                 <UserRound className="size-5" />

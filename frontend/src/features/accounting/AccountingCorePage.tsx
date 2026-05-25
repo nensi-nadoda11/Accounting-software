@@ -942,10 +942,9 @@ export const AccountingCorePage = () => {
     return <EmptyState title="No accounting core tabs are available for your permissions." />;
   }
 
-  return (
+return (
     <>
       <AccountingPage
-        title="Accounting Core"
         tabs={visibleTabs.map((tab) => ({ id: tab.id, label: tab.label }))}
         activeTab={activeTab}
         onTabChange={(tab) =>

@@ -1,9 +1,11 @@
+import { CalendarRange } from "lucide-react";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 
 import { Button } from "../../components/ui/Button";
 import { ErrorState } from "../../components/ui/ErrorState";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { cn } from "../../lib/utils";
 import { useAuth } from "../../providers/useAuth";
 import { dashboardApi } from "../../services/dashboardApi";
 import type {
@@ -11,6 +13,7 @@ import type {
   DashboardChartKey,
   DashboardChartResponse,
   DashboardFilters,
+  DashboardRange,
   DashboardRoleDashboard,
   DashboardSummary,
   DashboardTasksResponse
@@ -18,7 +21,6 @@ import type {
 import { DashboardAccountingSnapshot } from "./components/DashboardAccountingSnapshot";
 import { DashboardAlertsPanel } from "./components/DashboardAlertsPanel";
 import { DashboardChartCard } from "./components/DashboardChartCard";
-import { DashboardFilters as DashboardFiltersPanel } from "./components/DashboardFilters";
 import { DashboardGstSnapshot } from "./components/DashboardGstSnapshot";
 import { DashboardInventorySnapshot } from "./components/DashboardInventorySnapshot";
 import { DashboardPayrollSnapshot } from "./components/DashboardPayrollSnapshot";
@@ -39,6 +41,12 @@ const createLoadable = <T,>(data: T | null = null): Loadable<T> => ({
 });
 
 const initialFilters: DashboardFilters = { range: "monthly" };
+const RANGE_OPTIONS: Array<{ label: string; value: DashboardRange }> = [
+  { label: "Daily", value: "daily" },
+  { label: "Weekly", value: "weekly" },
+  { label: "Monthly", value: "monthly" },
+  { label: "Custom", value: "custom" }
+];
 const chartConfig: Array<{ key: DashboardChartKey; title: string; color: string }> = [
   { key: "sales", title: "Sales Trend", color: "#0f9f8a" },
   { key: "purchases", title: "Purchase Trend", color: "#3b82f6" },
@@ -167,9 +175,49 @@ export const DashboardPage = () => {
   }
 
   return (
-    <div className="space-y-5">
-      <PageHeader title="Dashboard" />
-      <DashboardFiltersPanel value={draftFilters} onChange={setDraftFilters} onApply={() => void handleApplyFilters()} pending={filtersPending} />
+    <div className="space-y-4">
+      <PageHeader
+        title="Dashboard"
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {RANGE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setDraftFilters({ ...draftFilters, range: option.value })}
+                className={cn(
+                  "rounded-xl border px-3 py-1.5 text-sm font-medium transition",
+                  draftFilters.range === option.value
+                    ? "app-accent-surface text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+            {draftFilters.range === "custom" && draftFilters.dateFrom && draftFilters.dateTo ? (
+              <>
+                <input
+                  type="date"
+                  value={draftFilters.dateFrom}
+                  onChange={(event) => setDraftFilters({ ...draftFilters, dateFrom: event.target.value })}
+                  className="app-input-focus rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none"
+                />
+                <input
+                  type="date"
+                  value={draftFilters.dateTo}
+                  onChange={(event) => setDraftFilters({ ...draftFilters, dateTo: event.target.value })}
+                  className="app-input-focus rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none"
+                />
+              </>
+            ) : null}
+            <Button variant="secondary" onClick={() => void handleApplyFilters()} loading={filtersPending}>
+              <CalendarRange className="mr-2 size-4" />
+              Refresh
+            </Button>
+          </div>
+        }
+      />
 
       <DashboardSummaryCards summary={summary.data} loading={summary.loading && !summary.data} />
 

@@ -14,28 +14,28 @@ export const AccountingTabs = <TTab extends string>({
   activeTab: TTab;
   onChange: (tab: TTab) => void;
 }) => {
-  const compactTabs = tabs.length >= 8;
-
   return (
-    <div className="w-full overflow-hidden">
-      <div
-        className="grid w-full items-stretch gap-1 rounded-2xl border border-slate-200 bg-white p-2"
-        style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
-      >
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          onClick={() => onChange(tab.id)}
-          className={cn(
-            "min-w-0 whitespace-nowrap rounded-xl font-medium tracking-tight transition",
-            compactTabs ? "min-h-10 px-2 py-2 text-[11px] sm:text-xs lg:text-[13px]" : "min-h-11 px-4 py-2 text-sm",
-            activeTab === tab.id ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-          )}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div className="border-b border-slate-200 bg-white/90">
+      <div className="flex gap-5 overflow-x-auto px-1">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onChange(tab.id)}
+              className={cn(
+                "relative whitespace-nowrap pb-3 pt-4 font-medium transition text-[13px] lg:text-sm",
+                active
+                  ? "text-slate-900"
+                  : "text-slate-500 hover:text-slate-800",
+              )}
+            >
+              {tab.label}
+              {active ? <span className="app-accent-bg absolute inset-x-0 bottom-0 h-0.5 rounded-full" /> : null}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

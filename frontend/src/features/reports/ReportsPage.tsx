@@ -41,7 +41,11 @@ import type {
   SupplierOutstandingRow,
 } from "../../types/report";
 import type { CompanyFinancialYear } from "../../types/company";
-import { formatDate, formatDateTime, saveDownloadedFile } from "../customers/customerUtils";
+import {
+  formatDate,
+  formatDateTime,
+  saveDownloadedFile,
+} from "../customers/customerUtils";
 import { useDebouncedValue } from "../customers/useDebouncedValue";
 import { AgingBucketTable } from "./components/AgingBucketTable";
 import { AmountText } from "./components/AmountText";
@@ -106,7 +110,9 @@ const TABS: ReportsTabId[] = [
 ];
 
 const DEFAULT_FILTERS: ReportFilters = {
-  dateFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
+  dateFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    .toISOString()
+    .slice(0, 10),
   dateTo: new Date().toISOString().slice(0, 10),
   financialYearId: "",
   customerId: "",
@@ -140,7 +146,10 @@ const STATUS_OPTIONS: Option[] = [
   { value: "unpaid", label: "Unpaid" },
 ];
 
-const TAB_EXPORT_TYPES: Record<Exclude<ReportsTabId, "overview">, ReportType> = {
+const TAB_EXPORT_TYPES: Record<
+  Exclude<ReportsTabId, "overview">,
+  ReportType
+> = {
   sales: "sales.detailed",
   purchases: "purchases.detailed",
   customers: "customers.outstanding",
@@ -177,12 +186,18 @@ export const ReportsPage = () => {
   const [filters, setFilters] = useState<ReportFilters>(DEFAULT_FILTERS);
   const debouncedFilters = useDebouncedValue(JSON.stringify(filters), 250);
 
-  const [financialYears, setFinancialYears] = useState<CompanyFinancialYear[]>([]);
+  const [financialYears, setFinancialYears] = useState<CompanyFinancialYear[]>(
+    [],
+  );
   const [customerOptions, setCustomerOptions] = useState<Option[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<Option[]>([]);
   const [productOptions, setProductOptions] = useState<Option[]>([]);
-  const [inventoryCategoryOptions, setInventoryCategoryOptions] = useState<Option[]>([]);
-  const [expenseCategoryOptions, setExpenseCategoryOptions] = useState<Option[]>([]);
+  const [inventoryCategoryOptions, setInventoryCategoryOptions] = useState<
+    Option[]
+  >([]);
+  const [expenseCategoryOptions, setExpenseCategoryOptions] = useState<
+    Option[]
+  >([]);
   const [employeeOptions, setEmployeeOptions] = useState<Option[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<Option[]>([]);
   const [referencesLoading, setReferencesLoading] = useState(true);
@@ -191,25 +206,38 @@ export const ReportsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const [overviewData, setOverviewData] = useState<ReportsOverviewResponse | null>(null);
+  const [overviewData, setOverviewData] =
+    useState<ReportsOverviewResponse | null>(null);
   const [salesData, setSalesData] = useState<SalesTabData | null>(null);
-  const [purchasesData, setPurchasesData] = useState<PurchasesTabData | null>(null);
-  const [customersData, setCustomersData] = useState<CustomersTabData | null>(null);
-  const [suppliersData, setSuppliersData] = useState<SuppliersTabData | null>(null);
-  const [inventoryData, setInventoryData] = useState<InventoryTabData | null>(null);
+  const [purchasesData, setPurchasesData] = useState<PurchasesTabData | null>(
+    null,
+  );
+  const [customersData, setCustomersData] = useState<CustomersTabData | null>(
+    null,
+  );
+  const [suppliersData, setSuppliersData] = useState<SuppliersTabData | null>(
+    null,
+  );
+  const [inventoryData, setInventoryData] = useState<InventoryTabData | null>(
+    null,
+  );
   const [expenseData, setExpenseData] = useState<ExpenseReport | null>(null);
   const [incomeData, setIncomeData] = useState<IncomeTabData | null>(null);
   const [payrollData, setPayrollData] = useState<PayrollReport | null>(null);
   const [gstData, setGstData] = useState<GstReport | null>(null);
-  const [accountingData, setAccountingData] = useState<AccountingTabData | null>(null);
+  const [accountingData, setAccountingData] =
+    useState<AccountingTabData | null>(null);
 
   useEffect(() => {
     if (requestedTab !== activeTab) {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.set("tab", activeTab);
-        return next;
-      }, { replace: true });
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.set("tab", activeTab);
+          return next;
+        },
+        { replace: true },
+      );
     }
   }, [activeTab, requestedTab, setSearchParams]);
 
@@ -217,7 +245,15 @@ export const ReportsPage = () => {
     const loadReferences = async () => {
       try {
         setReferencesLoading(true);
-        const [years, customers, suppliers, products, productCategories, expenseCategories, employees] = await Promise.allSettled([
+        const [
+          years,
+          customers,
+          suppliers,
+          products,
+          productCategories,
+          expenseCategories,
+          employees,
+        ] = await Promise.allSettled([
           financialYearApi.list(),
           customersApi.list({ page: 1, limit: 100, status: "active" }),
           suppliersApi.list({ page: 1, limit: 100, status: "active" }),
@@ -227,41 +263,80 @@ export const ReportsPage = () => {
           payrollApi.listEmployees({ page: 1, limit: 100, status: "active" }),
         ]);
 
-        const yearItems = years.status === "fulfilled" ? years.value.data.items : [];
-        const employeeItems = employees.status === "fulfilled" ? employees.value.data.items : [];
+        const yearItems =
+          years.status === "fulfilled" ? years.value.data.items : [];
+        const employeeItems =
+          employees.status === "fulfilled" ? employees.value.data.items : [];
 
         setFinancialYears(yearItems);
         setCustomerOptions(
-          customers.status === "fulfilled" ? customers.value.data.items.map((item) => ({ value: item.id, label: item.name })) : [],
+          customers.status === "fulfilled"
+            ? customers.value.data.items.map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))
+            : [],
         );
         setSupplierOptions(
-          suppliers.status === "fulfilled" ? suppliers.value.data.items.map((item) => ({ value: item.id, label: item.name })) : [],
+          suppliers.status === "fulfilled"
+            ? suppliers.value.data.items.map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))
+            : [],
         );
         setProductOptions(
-          products.status === "fulfilled" ? products.value.data.items.map((item) => ({ value: item.id, label: item.name })) : [],
+          products.status === "fulfilled"
+            ? products.value.data.items.map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))
+            : [],
         );
         setInventoryCategoryOptions(
           productCategories.status === "fulfilled"
-            ? productCategories.value.data.items.map((item) => ({ value: item.id, label: item.name }))
+            ? productCategories.value.data.items.map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))
             : [],
         );
         setExpenseCategoryOptions(
           expenseCategories.status === "fulfilled"
-            ? expenseCategories.value.data.items.map((item) => ({ value: item.id, label: item.name }))
+            ? expenseCategories.value.data.items.map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))
             : [],
         );
-        setEmployeeOptions(employeeItems.map((item) => ({ value: item.id, label: item.fullName })));
+        setEmployeeOptions(
+          employeeItems.map((item) => ({
+            value: item.id,
+            label: item.fullName,
+          })),
+        );
         setDepartmentOptions(
-          Array.from(new Set(employeeItems.map((item) => item.department).filter((value): value is string => Boolean(value))))
+          Array.from(
+            new Set(
+              employeeItems
+                .map((item) => item.department)
+                .filter((value): value is string => Boolean(value)),
+            ),
+          )
             .sort((left, right) => left.localeCompare(right))
             .map((value) => ({ value, label: value })),
         );
         setFilters((current) => ({
           ...current,
-          financialYearId: current.financialYearId || yearItems.find((item) => item.isActive)?.id || "",
+          financialYearId:
+            current.financialYearId ||
+            yearItems.find((item) => item.isActive)?.id ||
+            "",
         }));
       } catch (referenceError) {
-        toast.error(getErrorMessage(referenceError, "Failed to load report references"));
+        toast.error(
+          getErrorMessage(referenceError, "Failed to load report references"),
+        );
       } finally {
         setReferencesLoading(false);
       }
@@ -270,11 +345,24 @@ export const ReportsPage = () => {
     void loadReferences();
   }, [toast]);
 
-  const parsedFilters = useMemo(() => JSON.parse(debouncedFilters) as ReportFilters, [debouncedFilters]);
-  const categoryOptions = activeTab === "inventory" ? inventoryCategoryOptions : expenseCategoryOptions;
+  const parsedFilters = useMemo(
+    () => JSON.parse(debouncedFilters) as ReportFilters,
+    [debouncedFilters],
+  );
+  const categoryOptions =
+    activeTab === "inventory"
+      ? inventoryCategoryOptions
+      : expenseCategoryOptions;
 
   useEffect(() => {
-    const allowedKeys = new Set<keyof ReportFilters>(["dateFrom", "dateTo", "financialYearId", "page", "limit", ...TAB_FILTER_KEYS[activeTab]]);
+    const allowedKeys = new Set<keyof ReportFilters>([
+      "dateFrom",
+      "dateTo",
+      "financialYearId",
+      "page",
+      "limit",
+      ...TAB_FILTER_KEYS[activeTab],
+    ]);
 
     setFilters((current) => {
       let changed = false;
@@ -285,9 +373,11 @@ export const ReportsPage = () => {
           return;
         }
 
-        const emptyValue = typeof current[key] === "number" ? DEFAULT_FILTERS[key] : "";
+        const emptyValue =
+          typeof current[key] === "number" ? DEFAULT_FILTERS[key] : "";
         if (next[key] !== emptyValue) {
-          (next as unknown as Record<string, string | number>)[key] = emptyValue as string | number;
+          (next as unknown as Record<string, string | number>)[key] =
+            emptyValue as string | number;
           changed = true;
         }
       });
@@ -313,12 +403,13 @@ export const ReportsPage = () => {
         }
 
         if (activeTab === "sales") {
-          const [summary, detailed, topCustomers, topProducts] = await Promise.all([
-            reportsApi.getSalesSummary(parsedFilters),
-            reportsApi.getSalesDetailed(parsedFilters),
-            reportsApi.getSalesTopCustomers({ ...parsedFilters, limit: 10 }),
-            reportsApi.getSalesTopProducts({ ...parsedFilters, limit: 10 }),
-          ]);
+          const [summary, detailed, topCustomers, topProducts] =
+            await Promise.all([
+              reportsApi.getSalesSummary(parsedFilters),
+              reportsApi.getSalesDetailed(parsedFilters),
+              reportsApi.getSalesTopCustomers({ ...parsedFilters, limit: 10 }),
+              reportsApi.getSalesTopProducts({ ...parsedFilters, limit: 10 }),
+            ]);
           setSalesData({
             summary: summary.data,
             detailed: detailed.data,
@@ -339,7 +430,9 @@ export const ReportsPage = () => {
 
         if (activeTab === "customers") {
           const [ledger, outstanding, aging] = await Promise.all([
-            parsedFilters.customerId ? reportsApi.getCustomersLedger(parsedFilters) : Promise.resolve(null),
+            parsedFilters.customerId
+              ? reportsApi.getCustomersLedger(parsedFilters)
+              : Promise.resolve(null),
             reportsApi.getCustomersOutstanding(parsedFilters),
             reportsApi.getCustomersAging(parsedFilters),
           ]);
@@ -353,7 +446,9 @@ export const ReportsPage = () => {
 
         if (activeTab === "suppliers") {
           const [ledger, outstanding, aging] = await Promise.all([
-            parsedFilters.supplierId ? reportsApi.getSuppliersLedger(parsedFilters) : Promise.resolve(null),
+            parsedFilters.supplierId
+              ? reportsApi.getSuppliersLedger(parsedFilters)
+              : Promise.resolve(null),
             reportsApi.getSuppliersOutstanding(parsedFilters),
             reportsApi.getSuppliersAging(parsedFilters),
           ]);
@@ -366,27 +461,53 @@ export const ReportsPage = () => {
         }
 
         if (activeTab === "inventory") {
-          const [currentStock, valuation, expiry, lowStock] = await Promise.allSettled([
-            reportsApi.getInventoryCurrentStock(parsedFilters),
-            reportsApi.getInventoryValuation(parsedFilters),
-            reportsApi.getInventoryExpiry(parsedFilters),
-            reportsApi.getInventoryLowStock(parsedFilters),
-          ]);
+          const [currentStock, valuation, expiry, lowStock] =
+            await Promise.allSettled([
+              reportsApi.getInventoryCurrentStock(parsedFilters),
+              reportsApi.getInventoryValuation(parsedFilters),
+              reportsApi.getInventoryExpiry(parsedFilters),
+              reportsApi.getInventoryLowStock(parsedFilters),
+            ]);
 
           const nextInventoryData: InventoryTabData = {
             currentStock:
               currentStock.status === "fulfilled"
                 ? currentStock.value.data
-                : { items: [], pagination: { page: 1, limit: filters.limit, total: 0, totalPages: 1 } },
-            valuation: valuation.status === "fulfilled" ? valuation.value.data.items : [],
+                : {
+                    items: [],
+                    pagination: {
+                      page: 1,
+                      limit: filters.limit,
+                      total: 0,
+                      totalPages: 1,
+                    },
+                  },
+            valuation:
+              valuation.status === "fulfilled"
+                ? valuation.value.data.items
+                : [],
             expiry:
               expiry.status === "fulfilled"
                 ? expiry.value.data
-                : { items: [], pagination: { page: 1, limit: filters.limit, total: 0, totalPages: 1 } },
-            lowStock: lowStock.status === "fulfilled" ? lowStock.value.data.items : [],
+                : {
+                    items: [],
+                    pagination: {
+                      page: 1,
+                      limit: filters.limit,
+                      total: 0,
+                      totalPages: 1,
+                    },
+                  },
+            lowStock:
+              lowStock.status === "fulfilled" ? lowStock.value.data.items : [],
           };
 
-          const inventoryFailures = [currentStock, valuation, expiry, lowStock].filter((result) => result.status === "rejected");
+          const inventoryFailures = [
+            currentStock,
+            valuation,
+            expiry,
+            lowStock,
+          ].filter((result) => result.status === "rejected");
           if (inventoryFailures.length === 4) {
             throw inventoryFailures[0].reason;
           }
@@ -447,12 +568,19 @@ export const ReportsPage = () => {
           ]);
 
           const nextPayrollData: PayrollReport = {
-            monthly: monthly.status === "fulfilled" ? monthly.value.data.items : [],
-            employee: employee.status === "fulfilled" ? employee.value.data.items : [],
-            department: department.status === "fulfilled" ? department.value.data.items : [],
+            monthly:
+              monthly.status === "fulfilled" ? monthly.value.data.items : [],
+            employee:
+              employee.status === "fulfilled" ? employee.value.data.items : [],
+            department:
+              department.status === "fulfilled"
+                ? department.value.data.items
+                : [],
           };
 
-          const payrollFailures = [monthly, employee, department].filter((result) => result.status === "rejected");
+          const payrollFailures = [monthly, employee, department].filter(
+            (result) => result.status === "rejected",
+          );
           if (payrollFailures.length === 3) {
             throw payrollFailures[0].reason;
           }
@@ -474,13 +602,14 @@ export const ReportsPage = () => {
         }
 
         if (activeTab === "accounting") {
-          const [trialBalance, profitLoss, balanceSheet, cashBook, bankBook] = await Promise.all([
-            reportsApi.getTrialBalance(parsedFilters),
-            reportsApi.getProfitLoss(parsedFilters),
-            reportsApi.getBalanceSheet(parsedFilters),
-            reportsApi.getCashBook(parsedFilters),
-            reportsApi.getBankBook(parsedFilters),
-          ]);
+          const [trialBalance, profitLoss, balanceSheet, cashBook, bankBook] =
+            await Promise.all([
+              reportsApi.getTrialBalance(parsedFilters),
+              reportsApi.getProfitLoss(parsedFilters),
+              reportsApi.getBalanceSheet(parsedFilters),
+              reportsApi.getCashBook(parsedFilters),
+              reportsApi.getBankBook(parsedFilters),
+            ]);
           setAccountingData({
             trialBalance: trialBalance.data,
             profitLoss: profitLoss.data,
@@ -490,7 +619,6 @@ export const ReportsPage = () => {
           });
           return;
         }
-
       } catch (loadError) {
         setError(getErrorMessage(loadError, "Failed to load reports"));
       } finally {
@@ -501,12 +629,19 @@ export const ReportsPage = () => {
     void loadActiveTab();
   }, [activeTab, parsedFilters, referencesLoading]);
 
-  const financialYearOptions = financialYears.map((item) => ({ value: item.id, label: item.name }));
+  const financialYearOptions = financialYears.map((item) => ({
+    value: item.id,
+    label: item.name,
+  }));
 
-  const handleFilterChange = <K extends keyof ReportFilters>(key: K, value: ReportFilters[K]) => {
+  const handleFilterChange = <K extends keyof ReportFilters>(
+    key: K,
+    value: ReportFilters[K],
+  ) => {
     setFilters((current) => ({
       ...current,
-      page: key === "page" ? (typeof value === "number" ? value : current.page) : 1,
+      page:
+        key === "page" ? (typeof value === "number" ? value : current.page) : 1,
       [key]: value,
     }));
   };
@@ -522,7 +657,12 @@ export const ReportsPage = () => {
 
     try {
       setExporting(true);
-      const file = await reportsApi.exportReport(reportType, "pdf", filters, reportsApi.toExportPayload(filters));
+      const file = await reportsApi.exportReport(
+        reportType,
+        "pdf",
+        filters,
+        reportsApi.toExportPayload(filters),
+      );
       saveDownloadedFile(file.blob, file.fileName);
       toast.success("Report exported");
     } catch (exportError) {
@@ -533,15 +673,28 @@ export const ReportsPage = () => {
   };
 
   const filterVisibility = useMemo(() => {
-    if (activeTab === "sales") return { customer: true, product: true, paymentMode: true, export: true };
-    if (activeTab === "purchases") return { supplier: true, paymentMode: true, export: true };
-    if (activeTab === "customers") return { customer: true, status: true, export: true };
-    if (activeTab === "suppliers") return { supplier: true, status: true, export: true };
-    if (activeTab === "inventory") return { product: true, category: true, export: true };
-    if (activeTab === "expenses") return { category: true, paymentMode: true, export: true };
+    if (activeTab === "sales")
+      return { customer: true, product: true, paymentMode: true, export: true };
+    if (activeTab === "purchases")
+      return { supplier: true, paymentMode: true, export: true };
+    if (activeTab === "customers")
+      return { customer: true, status: true, export: true };
+    if (activeTab === "suppliers")
+      return { supplier: true, status: true, export: true };
+    if (activeTab === "inventory")
+      return { product: true, category: true, export: true };
+    if (activeTab === "expenses")
+      return { category: true, paymentMode: true, export: true };
     if (activeTab === "income") return { export: true };
-    if (activeTab === "payroll") return { employee: true, department: true, paymentMode: true, export: true };
-    if (activeTab === "gst") return { customer: true, supplier: true, gstRate: true, export: true };
+    if (activeTab === "payroll")
+      return {
+        employee: true,
+        department: true,
+        paymentMode: true,
+        export: true,
+      };
+    if (activeTab === "gst")
+      return { customer: true, supplier: true, gstRate: true, export: true };
     if (activeTab === "accounting") return { export: true };
     return {};
   }, [activeTab]);
@@ -549,7 +702,9 @@ export const ReportsPage = () => {
   return (
     <div className="space-y-4">
       <PageHeader title="Reports Center" />
-      {referencesLoading ? <LoadingState label="Loading report filters..." /> : null}
+      {referencesLoading ? (
+        <LoadingState label="Loading report filters..." />
+      ) : null}
       {!referencesLoading ? (
         <ReportFiltersPanel
           filters={filters}
@@ -571,21 +726,24 @@ export const ReportsPage = () => {
       ) : null}
       {loading ? <LoadingState label="Loading reports..." /> : null}
       {error && !loading ? <EmptyState title={error} /> : null}
-      {!loading && !error ? renderTab({
-        activeTab,
-        overviewData,
-        salesData,
-        purchasesData,
-        customersData,
-        suppliersData,
-        inventoryData,
-        expenseData,
-        incomeData,
-        payrollData,
-        gstData,
-        accountingData,
-        onPageChange: (page) => setFilters((current) => ({ ...current, page })),
-      }) : null}
+      {!loading && !error
+        ? renderTab({
+            activeTab,
+            overviewData,
+            salesData,
+            purchasesData,
+            customersData,
+            suppliersData,
+            inventoryData,
+            expenseData,
+            incomeData,
+            payrollData,
+            gstData,
+            accountingData,
+            onPageChange: (page) =>
+              setFilters((current) => ({ ...current, page })),
+          })
+        : null}
     </div>
   );
 };
@@ -628,8 +786,16 @@ const renderTab = ({
           columns={[
             { key: "reportType", label: "Report" },
             { key: "exportFormat", label: "Format" },
-            { key: "status", label: "Status", render: (item) => <StatusBadge status={item.status} /> },
-            { key: "createdAt", label: "Created", render: (item) => formatDateTime(item.createdAt) },
+            {
+              key: "status",
+              label: "Status",
+              render: (item) => <StatusBadge status={item.status} />,
+            },
+            {
+              key: "createdAt",
+              label: "Created",
+              render: (item) => formatDateTime(item.createdAt),
+            },
           ]}
           emptyText="No recent exports"
         />
@@ -640,36 +806,74 @@ const renderTab = ({
   if (activeTab === "sales" && salesData) {
     return (
       <div className="space-y-4">
-        <ReportSummaryCards items={[
-          { label: "Gross Sales", value: salesData.summary.grossSales },
-          { label: "Collected", value: salesData.summary.collectedAmount },
-          { label: "Outstanding", value: salesData.summary.outstandingAmount, tone: "warning" },
-          { label: "GST", value: salesData.summary.gstAmount },
-        ]} />
+        <ReportSummaryCards
+          items={[
+            { label: "Gross Sales", value: salesData.summary.grossSales },
+            { label: "Collected", value: salesData.summary.collectedAmount },
+            {
+              label: "Outstanding",
+              value: salesData.summary.outstandingAmount,
+              tone: "warning",
+            },
+            { label: "GST", value: salesData.summary.gstAmount },
+          ]}
+        />
         <ReportTable
           items={salesData.detailed.items}
           pagination={salesData.detailed.pagination}
           onPageChange={onPageChange}
           columns={[
             { key: "invoiceNumber", label: "Invoice" },
-            { key: "invoiceDate", label: "Date", render: (item) => formatDate(item.invoiceDate) },
+            {
+              key: "invoiceDate",
+              label: "Date",
+              render: (item) => formatDate(item.invoiceDate),
+            },
             { key: "customerName", label: "Customer" },
-            { key: "invoiceStatus", label: "Status", render: (item) => <StatusBadge status={item.invoiceStatus} /> },
-            { key: "grandTotal", label: "Total", render: (item) => <AmountText value={item.grandTotal} /> },
-            { key: "dueAmount", label: "Due", render: (item) => <AmountText value={item.dueAmount} tone="warning" /> },
+            {
+              key: "invoiceStatus",
+              label: "Status",
+              render: (item) => <StatusBadge status={item.invoiceStatus} />,
+            },
+            {
+              key: "grandTotal",
+              label: "Total",
+              render: (item) => <AmountText value={item.grandTotal} />,
+            },
+            {
+              key: "dueAmount",
+              label: "Due",
+              render: (item) => (
+                <AmountText value={item.dueAmount} tone="warning" />
+              ),
+            },
           ]}
         />
         <div className="grid gap-4 xl:grid-cols-2">
-          <ReportTable items={salesData.topCustomers} columns={[
-            { key: "customerName", label: "Top Customers" },
-            { key: "invoiceCount", label: "Invoices" },
-            { key: "totalSales", label: "Sales", render: (item) => <AmountText value={item.totalSales} /> },
-          ]} />
-          <ReportTable items={salesData.topProducts} columns={[
-            { key: "productName", label: "Top Products" },
-            { key: "quantitySold", label: "Qty" },
-            { key: "netSales", label: "Sales", render: (item) => <AmountText value={item.netSales} /> },
-          ]} />
+          <ReportTable
+            items={salesData.topCustomers}
+            columns={[
+              { key: "customerName", label: "Top Customers" },
+              { key: "invoiceCount", label: "Invoices" },
+              {
+                key: "totalSales",
+                label: "Sales",
+                render: (item) => <AmountText value={item.totalSales} />,
+              },
+            ]}
+          />
+          <ReportTable
+            items={salesData.topProducts}
+            columns={[
+              { key: "productName", label: "Top Products" },
+              { key: "quantitySold", label: "Qty" },
+              {
+                key: "netSales",
+                label: "Sales",
+                render: (item) => <AmountText value={item.netSales} />,
+              },
+            ]}
+          />
         </div>
       </div>
     );
@@ -678,23 +882,50 @@ const renderTab = ({
   if (activeTab === "purchases" && purchasesData) {
     return (
       <div className="space-y-4">
-        <ReportSummaryCards items={[
-          { label: "Gross Purchases", value: purchasesData.summary.grossPurchases },
-          { label: "Paid", value: purchasesData.summary.paidAmount },
-          { label: "Outstanding", value: purchasesData.summary.outstandingAmount, tone: "warning" },
-          { label: "GST", value: purchasesData.summary.gstAmount },
-        ]} />
+        <ReportSummaryCards
+          items={[
+            {
+              label: "Gross Purchases",
+              value: purchasesData.summary.grossPurchases,
+            },
+            { label: "Paid", value: purchasesData.summary.paidAmount },
+            {
+              label: "Outstanding",
+              value: purchasesData.summary.outstandingAmount,
+              tone: "warning",
+            },
+            { label: "GST", value: purchasesData.summary.gstAmount },
+          ]}
+        />
         <ReportTable
           items={purchasesData.detailed.items}
           pagination={purchasesData.detailed.pagination}
           onPageChange={onPageChange}
           columns={[
             { key: "purchaseNumber", label: "Purchase" },
-            { key: "invoiceDate", label: "Date", render: (item) => formatDate(item.invoiceDate) },
+            {
+              key: "invoiceDate",
+              label: "Date",
+              render: (item) => formatDate(item.invoiceDate),
+            },
             { key: "supplierName", label: "Supplier" },
-            { key: "purchaseStatus", label: "Status", render: (item) => <StatusBadge status={item.purchaseStatus} /> },
-            { key: "grandTotal", label: "Total", render: (item) => <AmountText value={item.grandTotal} /> },
-            { key: "dueAmount", label: "Due", render: (item) => <AmountText value={item.dueAmount} tone="warning" /> },
+            {
+              key: "purchaseStatus",
+              label: "Status",
+              render: (item) => <StatusBadge status={item.purchaseStatus} />,
+            },
+            {
+              key: "grandTotal",
+              label: "Total",
+              render: (item) => <AmountText value={item.grandTotal} />,
+            },
+            {
+              key: "dueAmount",
+              label: "Due",
+              render: (item) => (
+                <AmountText value={item.dueAmount} tone="warning" />
+              ),
+            },
           ]}
         />
       </div>
@@ -704,24 +935,49 @@ const renderTab = ({
   if (activeTab === "customers" && customersData) {
     return (
       <div className="space-y-4">
-        <ReportTable items={customersData.outstanding} columns={[
-          { key: "customerCode", label: "Code" },
-          { key: "customerName", label: "Customer" },
-          { key: "invoiceCount", label: "Invoices" },
-          { key: "outstandingAmount", label: "Outstanding", render: (item) => <AmountText value={item.outstandingAmount} tone="warning" /> },
-        ]} />
-        <AgingBucketTable items={customersData.aging} nameKey="customerName" codeKey="customerCode" />
+        <ReportTable
+          items={customersData.outstanding}
+          columns={[
+            { key: "customerCode", label: "Code" },
+            { key: "customerName", label: "Customer" },
+            { key: "invoiceCount", label: "Invoices" },
+            {
+              key: "outstandingAmount",
+              label: "Outstanding",
+              render: (item) => (
+                <AmountText value={item.outstandingAmount} tone="warning" />
+              ),
+            },
+          ]}
+        />
+        <AgingBucketTable
+          items={customersData.aging}
+          nameKey="customerName"
+          codeKey="customerCode"
+        />
         {customersData.ledger ? (
           <ReportTable
             items={customersData.ledger.items}
             pagination={customersData.ledger.pagination}
             onPageChange={onPageChange}
             columns={[
-              { key: "date", label: "Date", render: (item) => formatDate(item.date) },
+              {
+                key: "date",
+                label: "Date",
+                render: (item) => formatDate(item.date),
+              },
               { key: "transactionType", label: "Type" },
               { key: "referenceNo", label: "Reference" },
-              { key: "debit", label: "Debit", render: (item) => <AmountText value={item.debit} /> },
-              { key: "credit", label: "Credit", render: (item) => <AmountText value={item.credit} /> },
+              {
+                key: "debit",
+                label: "Debit",
+                render: (item) => <AmountText value={item.debit} />,
+              },
+              {
+                key: "credit",
+                label: "Credit",
+                render: (item) => <AmountText value={item.credit} />,
+              },
             ]}
           />
         ) : null}
@@ -732,24 +988,49 @@ const renderTab = ({
   if (activeTab === "suppliers" && suppliersData) {
     return (
       <div className="space-y-4">
-        <ReportTable items={suppliersData.outstanding} columns={[
-          { key: "supplierCode", label: "Code" },
-          { key: "supplierName", label: "Supplier" },
-          { key: "invoiceCount", label: "Invoices" },
-          { key: "outstandingAmount", label: "Payable", render: (item) => <AmountText value={item.outstandingAmount} tone="warning" /> },
-        ]} />
-        <AgingBucketTable items={suppliersData.aging} nameKey="supplierName" codeKey="supplierCode" />
+        <ReportTable
+          items={suppliersData.outstanding}
+          columns={[
+            { key: "supplierCode", label: "Code" },
+            { key: "supplierName", label: "Supplier" },
+            { key: "invoiceCount", label: "Invoices" },
+            {
+              key: "outstandingAmount",
+              label: "Payable",
+              render: (item) => (
+                <AmountText value={item.outstandingAmount} tone="warning" />
+              ),
+            },
+          ]}
+        />
+        <AgingBucketTable
+          items={suppliersData.aging}
+          nameKey="supplierName"
+          codeKey="supplierCode"
+        />
         {suppliersData.ledger ? (
           <ReportTable
             items={suppliersData.ledger.items}
             pagination={suppliersData.ledger.pagination}
             onPageChange={onPageChange}
             columns={[
-              { key: "date", label: "Date", render: (item) => formatDate(item.date) },
+              {
+                key: "date",
+                label: "Date",
+                render: (item) => formatDate(item.date),
+              },
               { key: "transactionType", label: "Type" },
               { key: "referenceNo", label: "Reference" },
-              { key: "debit", label: "Debit", render: (item) => <AmountText value={item.debit} /> },
-              { key: "credit", label: "Credit", render: (item) => <AmountText value={item.credit} /> },
+              {
+                key: "debit",
+                label: "Debit",
+                render: (item) => <AmountText value={item.debit} />,
+              },
+              {
+                key: "credit",
+                label: "Credit",
+                render: (item) => <AmountText value={item.credit} />,
+              },
             ]}
           />
         ) : null}
@@ -765,30 +1046,75 @@ const renderTab = ({
           pagination={inventoryData.currentStock.pagination}
           onPageChange={onPageChange}
           columns={[
-            { key: "productName", label: "Product", render: (item) => item.product.name },
-            { key: "warehouse", label: "Warehouse", render: (item) => item.warehouseName },
-            { key: "quantity", label: "Available", render: (item) => item.balance.availableQuantity },
-            { key: "stockValue", label: "Value", render: (item) => <AmountText value={item.balance.stockValue} /> },
+            {
+              key: "productName",
+              label: "Product",
+              render: (item) => item.product.name,
+            },
+            {
+              key: "warehouse",
+              label: "Warehouse",
+              render: (item) => item.warehouseName,
+            },
+            {
+              key: "quantity",
+              label: "Available",
+              render: (item) => item.balance.availableQuantity,
+            },
+            {
+              key: "stockValue",
+              label: "Value",
+              render: (item) => <AmountText value={item.balance.stockValue} />,
+            },
           ]}
         />
         <div className="grid gap-4 xl:grid-cols-2">
-          <ReportTable items={inventoryData.valuation} columns={[
-            { key: "productName", label: "Product", render: (item) => item.productName },
-            { key: "quantity", label: "Quantity", render: (item) => item.totalQuantity },
-            { key: "stockValue", label: "Value", render: (item) => <AmountText value={item.totalValue} /> },
-          ]} />
-          <ReportTable items={inventoryData.lowStock} columns={[
-            { key: "productName", label: "Low Stock Product", render: (item) => item.productName },
-            { key: "availableQuantity", label: "Available" },
-            { key: "reorderLevel", label: "Reorder" },
-          ]} />
+          <ReportTable
+            items={inventoryData.valuation}
+            columns={[
+              {
+                key: "productName",
+                label: "Product",
+                render: (item) => item.productName,
+              },
+              {
+                key: "quantity",
+                label: "Quantity",
+                render: (item) => item.totalQuantity,
+              },
+              {
+                key: "stockValue",
+                label: "Value",
+                render: (item) => <AmountText value={item.totalValue} />,
+              },
+            ]}
+          />
+          <ReportTable
+            items={inventoryData.lowStock}
+            columns={[
+              {
+                key: "productName",
+                label: "Low Stock Product",
+                render: (item) => item.productName,
+              },
+              { key: "availableQuantity", label: "Available" },
+              { key: "reorderLevel", label: "Reorder" },
+            ]}
+          />
         </div>
-        <ReportTable items={inventoryData.expiry.items} columns={[
-          { key: "productName", label: "Expiry Product" },
-          { key: "batchNumber", label: "Batch" },
-          { key: "expiryDate", label: "Expiry", render: (item) => formatDate(item.expiryDate) },
-          { key: "availableQuantity", label: "Qty" },
-        ]} />
+        <ReportTable
+          items={inventoryData.expiry.items}
+          columns={[
+            { key: "productName", label: "Expiry Product" },
+            { key: "batchNumber", label: "Batch" },
+            {
+              key: "expiryDate",
+              label: "Expiry",
+              render: (item) => formatDate(item.expiryDate),
+            },
+            { key: "availableQuantity", label: "Qty" },
+          ]}
+        />
       </div>
     );
   }
@@ -796,22 +1122,43 @@ const renderTab = ({
   if (activeTab === "expenses" && expenseData) {
     return (
       <div className="space-y-4">
-        <ReportTable items={expenseData.categoryWise.items} columns={[
-          { key: "categoryName", label: "Category" },
-          { key: "expenseCount", label: "Count" },
-          { key: "totalAmount", label: "Amount", render: (item) => <AmountText value={item.totalAmount} /> },
-        ]} />
+        <ReportTable
+          items={expenseData.categoryWise.items}
+          columns={[
+            { key: "categoryName", label: "Category" },
+            { key: "expenseCount", label: "Count" },
+            {
+              key: "totalAmount",
+              label: "Amount",
+              render: (item) => <AmountText value={item.totalAmount} />,
+            },
+          ]}
+        />
         <div className="grid gap-4 xl:grid-cols-2">
-          <ReportTable items={expenseData.monthly.items} columns={[
-            { key: "month", label: "Month" },
-            { key: "expenseCount", label: "Count" },
-            { key: "totalAmount", label: "Amount", render: (item) => <AmountText value={item.totalAmount} /> },
-          ]} />
-          <ReportTable items={expenseData.paymentMode.items} columns={[
-            { key: "paymentMode", label: "Payment Mode" },
-            { key: "expenseCount", label: "Count" },
-            { key: "totalAmount", label: "Amount", render: (item) => <AmountText value={item.totalAmount} /> },
-          ]} />
+          <ReportTable
+            items={expenseData.monthly.items}
+            columns={[
+              { key: "month", label: "Month" },
+              { key: "expenseCount", label: "Count" },
+              {
+                key: "totalAmount",
+                label: "Amount",
+                render: (item) => <AmountText value={item.totalAmount} />,
+              },
+            ]}
+          />
+          <ReportTable
+            items={expenseData.paymentMode.items}
+            columns={[
+              { key: "paymentMode", label: "Payment Mode" },
+              { key: "expenseCount", label: "Count" },
+              {
+                key: "totalAmount",
+                label: "Amount",
+                render: (item) => <AmountText value={item.totalAmount} />,
+              },
+            ]}
+          />
         </div>
       </div>
     );
@@ -820,17 +1167,30 @@ const renderTab = ({
   if (activeTab === "income" && incomeData) {
     return (
       <div className="space-y-4">
-        <ReportSummaryCards items={[
-          { label: "Net Income", value: incomeData.summary.netIncome },
-          { label: "Credits", value: incomeData.summary.totalCredits },
-          { label: "Debits", value: incomeData.summary.totalDebits },
-          { label: "Accounts", value: incomeData.summary.accountCount },
-        ]} />
-        <ReportTable items={incomeData.monthly.items} columns={[
-          { key: "month", label: "Month" },
-          { key: "netIncome", label: "Net Income", render: (item) => <AmountText value={item.netIncome} /> },
-          { key: "totalCredits", label: "Credits", render: (item) => <AmountText value={item.totalCredits} /> },
-        ]} />
+        <ReportSummaryCards
+          items={[
+            { label: "Net Income", value: incomeData.summary.netIncome },
+            { label: "Credits", value: incomeData.summary.totalCredits },
+            { label: "Debits", value: incomeData.summary.totalDebits },
+            { label: "Accounts", value: incomeData.summary.accountCount },
+          ]}
+        />
+        <ReportTable
+          items={incomeData.monthly.items}
+          columns={[
+            { key: "month", label: "Month" },
+            {
+              key: "netIncome",
+              label: "Net Income",
+              render: (item) => <AmountText value={item.netIncome} />,
+            },
+            {
+              key: "totalCredits",
+              label: "Credits",
+              render: (item) => <AmountText value={item.totalCredits} />,
+            },
+          ]}
+        />
       </div>
     );
   }
@@ -838,22 +1198,43 @@ const renderTab = ({
   if (activeTab === "payroll" && payrollData) {
     return (
       <div className="space-y-4">
-        <ReportTable items={payrollData.monthly} columns={[
-          { key: "payrollMonth", label: "Month" },
-          { key: "totalEmployees", label: "Employees" },
-          { key: "netPayableTotal", label: "Net Payable", render: (item) => <AmountText value={item.netPayableTotal} /> },
-        ]} />
-        <div className="grid gap-4 xl:grid-cols-2">
-          <ReportTable items={payrollData.employee} columns={[
-            { key: "fullName", label: "Employee" },
-            { key: "department", label: "Department" },
-            { key: "netSalaryTotal", label: "Net Salary", render: (item) => <AmountText value={item.netSalaryTotal} /> },
-          ]} />
-          <ReportTable items={payrollData.department} columns={[
-            { key: "department", label: "Department" },
+        <ReportTable
+          items={payrollData.monthly}
+          columns={[
+            { key: "payrollMonth", label: "Month" },
             { key: "totalEmployees", label: "Employees" },
-            { key: "netSalaryTotal", label: "Net Salary", render: (item) => <AmountText value={item.netSalaryTotal} /> },
-          ]} />
+            {
+              key: "netPayableTotal",
+              label: "Net Payable",
+              render: (item) => <AmountText value={item.netPayableTotal} />,
+            },
+          ]}
+        />
+        <div className="grid gap-4 xl:grid-cols-2">
+          <ReportTable
+            items={payrollData.employee}
+            columns={[
+              { key: "fullName", label: "Employee" },
+              { key: "department", label: "Department" },
+              {
+                key: "netSalaryTotal",
+                label: "Net Salary",
+                render: (item) => <AmountText value={item.netSalaryTotal} />,
+              },
+            ]}
+          />
+          <ReportTable
+            items={payrollData.department}
+            columns={[
+              { key: "department", label: "Department" },
+              { key: "totalEmployees", label: "Employees" },
+              {
+                key: "netSalaryTotal",
+                label: "Net Salary",
+                render: (item) => <AmountText value={item.netSalaryTotal} />,
+              },
+            ]}
+          />
         </div>
       </div>
     );
@@ -862,18 +1243,31 @@ const renderTab = ({
   if (activeTab === "gst" && gstData) {
     return (
       <div className="space-y-4">
-        <ReportSummaryCards items={[
-          { label: "Output GST", value: gstData.summary.outputGst },
-          { label: "Claimed ITC Used", value: gstData.summary.inputGst },
-          { label: "Net Payable", value: gstData.summary.netGstPayable, tone: "warning" },
-          { label: "Net Credit", value: gstData.summary.netGstCredit },
-        ]} />
-        <ReportTable items={gstData.hsn} columns={[
-          { key: "hsnSacCode", label: "HSN/SAC" },
-          { key: "description", label: "Description" },
-          { key: "quantity", label: "Qty" },
-          { key: "totalTax", label: "Tax", render: (item) => <AmountText value={item.totalTax} /> },
-        ]} />
+        <ReportSummaryCards
+          items={[
+            { label: "Output GST", value: gstData.summary.outputGst },
+            { label: "Claimed ITC Used", value: gstData.summary.inputGst },
+            {
+              label: "Net Payable",
+              value: gstData.summary.netGstPayable,
+              tone: "warning",
+            },
+            { label: "Net Credit", value: gstData.summary.netGstCredit },
+          ]}
+        />
+        <ReportTable
+          items={gstData.hsn}
+          columns={[
+            { key: "hsnSacCode", label: "HSN/SAC" },
+            { key: "description", label: "Description" },
+            { key: "quantity", label: "Qty" },
+            {
+              key: "totalTax",
+              label: "Tax",
+              render: (item) => <AmountText value={item.totalTax} />,
+            },
+          ]}
+        />
       </div>
     );
   }
@@ -881,48 +1275,120 @@ const renderTab = ({
   if (activeTab === "accounting" && accountingData) {
     return (
       <div className="space-y-4">
-        <ReportTable items={accountingData.trialBalance.items} columns={[
-          { key: "accountCode", label: "Code" },
-          { key: "accountName", label: "Account" },
-          { key: "debit", label: "Debit", render: (item) => <AmountText value={item.debit} /> },
-          { key: "credit", label: "Credit", render: (item) => <AmountText value={item.credit} /> },
-        ]} />
+        <ReportTable
+          items={accountingData.trialBalance.items}
+          columns={[
+            { key: "accountCode", label: "Code" },
+            { key: "accountName", label: "Account" },
+            {
+              key: "debit",
+              label: "Debit",
+              render: (item) => <AmountText value={item.debit} />,
+            },
+            {
+              key: "credit",
+              label: "Credit",
+              render: (item) => <AmountText value={item.credit} />,
+            },
+          ]}
+        />
         <div className="grid gap-4 xl:grid-cols-2">
           <Card>
             <CardContent className="space-y-3 p-4">
-              <p className="text-sm font-semibold text-slate-900">Profit &amp; Loss</p>
-              <ReportSummaryCards items={[
-                { label: "Income", value: accountingData.profitLoss.totals.totalIncome },
-                { label: "Expense", value: accountingData.profitLoss.totals.totalExpense },
-                { label: "Net P/L", value: accountingData.profitLoss.totals.netProfitLoss },
-              ]} />
+              <p className="text-sm font-semibold text-slate-900">
+                Profit &amp; Loss
+              </p>
+              <ReportSummaryCards
+                items={[
+                  {
+                    label: "Income",
+                    value: accountingData.profitLoss.totals.totalIncome,
+                  },
+                  {
+                    label: "Expense",
+                    value: accountingData.profitLoss.totals.totalExpense,
+                  },
+                  {
+                    label: "Net P/L",
+                    value: accountingData.profitLoss.totals.netProfitLoss,
+                  },
+                ]}
+              />
             </CardContent>
           </Card>
           <Card>
             <CardContent className="space-y-3 p-4">
-              <p className="text-sm font-semibold text-slate-900">Balance Sheet</p>
-              <ReportSummaryCards items={[
-                { label: "Assets", value: accountingData.balanceSheet.totals.assets },
-                { label: "Liabilities", value: accountingData.balanceSheet.totals.liabilities },
-                { label: "Equity", value: accountingData.balanceSheet.totals.equity },
-                { label: "Right Side", value: accountingData.balanceSheet.totals.rightSide },
-              ]} />
+              <p className="text-sm font-semibold text-slate-900">
+                Balance Sheet
+              </p>
+              <ReportSummaryCards
+                items={[
+                  {
+                    label: "Assets",
+                    value: accountingData.balanceSheet.totals.assets,
+                  },
+                  {
+                    label: "Liabilities",
+                    value: accountingData.balanceSheet.totals.liabilities,
+                  },
+                  {
+                    label: "Equity",
+                    value: accountingData.balanceSheet.totals.equity,
+                  },
+                  {
+                    label: "Right Side",
+                    value: accountingData.balanceSheet.totals.rightSide,
+                  },
+                ]}
+              />
             </CardContent>
           </Card>
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
-          <ReportTable items={accountingData.cashBook.rows} columns={[
-            { key: "entryDate", label: "Cash Date", render: (item) => formatDate(item.entryDate) },
-            { key: "journalNumber", label: "Journal" },
-            { key: "debit", label: "Debit", render: (item) => <AmountText value={item.debit} /> },
-            { key: "credit", label: "Credit", render: (item) => <AmountText value={item.credit} /> },
-          ]} />
-          <ReportTable items={accountingData.bankBook.rows} columns={[
-            { key: "entryDate", label: "Bank Date", render: (item) => formatDate(item.entryDate) },
-            { key: "journalNumber", label: "Journal" },
-            { key: "debit", label: "Debit", render: (item) => <AmountText value={item.debit} /> },
-            { key: "credit", label: "Credit", render: (item) => <AmountText value={item.credit} /> },
-          ]} />
+          <ReportTable
+            fixedHeight
+            items={accountingData.cashBook.rows}
+            columns={[
+              {
+                key: "entryDate",
+                label: "Cash Date",
+                render: (item) => formatDate(item.entryDate),
+              },
+              { key: "journalNumber", label: "Journal" },
+              {
+                key: "debit",
+                label: "Debit",
+                render: (item) => <AmountText value={item.debit} />,
+              },
+              {
+                key: "credit",
+                label: "Credit",
+                render: (item) => <AmountText value={item.credit} />,
+              },
+            ]}
+          />
+          <ReportTable
+            fixedHeight
+            items={accountingData.bankBook.rows}
+            columns={[
+              {
+                key: "entryDate",
+                label: "Bank Date",
+                render: (item) => formatDate(item.entryDate),
+              },
+              { key: "journalNumber", label: "Journal" },
+              {
+                key: "debit",
+                label: "Debit",
+                render: (item) => <AmountText value={item.debit} />,
+              },
+              {
+                key: "credit",
+                label: "Credit",
+                render: (item) => <AmountText value={item.credit} />,
+              },
+            ]}
+          />
         </div>
       </div>
     );
@@ -930,4 +1396,3 @@ const renderTab = ({
 
   return <EmptyState title="No report data available" />;
 };
-

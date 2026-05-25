@@ -52,7 +52,6 @@ export const SETTINGS_TABS = [
   { label: "Preferences", href: "/app/settings/company/preferences", permissions: ["settings.manage"] },
   { label: "Users", href: "/app/settings/users", permissions: ["user.view", "user.manage"] },
   { label: "Invites", href: "/app/settings/invites", permissions: ["user.view", "user.manage"] },
-  { label: "Roles & Permissions", href: "/app/settings/roles-permissions", permissions: ["user.view", "user.manage"] },
   { label: "Profile", href: "/app/settings/profile" },
   { label: "Security", href: "/app/settings/security" },
 ] as const satisfies readonly SectionNavItem[];

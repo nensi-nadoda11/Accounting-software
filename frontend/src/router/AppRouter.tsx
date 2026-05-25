@@ -48,7 +48,6 @@ const ProductsPage = lazyNamed<Record<string, never>>(() => import("../features/
 const SettingsFinalPage = lazyNamed<Record<string, never>>(() => import("../features/settings-final/SettingsFinalPage"), "SettingsFinalPage");
 const InvitesPage = lazyNamed<Record<string, never>>(() => import("../features/settings/InvitesPage"), "InvitesPage");
 const ProfilePage = lazyNamed<Record<string, never>>(() => import("../features/settings/ProfilePage"), "ProfilePage");
-const RolesPermissionsPage = lazyNamed<Record<string, never>>(() => import("../features/settings/RolesPermissionsPage"), "RolesPermissionsPage");
 const SecurityPage = lazyNamed<Record<string, never>>(() => import("../features/settings/SecurityPage"), "SecurityPage");
 const SuppliersPage = lazyNamed<Record<string, never>>(() => import("../features/suppliers/SuppliersPage"), "SuppliersPage");
 const UsersPage = lazyNamed<Record<string, never>>(() => import("../features/settings/UsersPage"), "UsersPage");
@@ -430,14 +429,7 @@ export const AppRouter = () => (
               </PermissionRoute>
             }
           />
-          <Route
-            path="settings/roles-permissions"
-            element={
-              <PermissionRoute permissions={["user.view", "user.manage"]}>
-                <RolesPermissionsPage />
-              </PermissionRoute>
-            }
-          />
+          <Route path="settings/roles-permissions" element={<Navigate to="/app/settings/users" replace />} />
           <Route path="settings/profile" element={<ProfilePage />} />
           <Route path="settings/security" element={<SecurityPage />} />
         </Route>

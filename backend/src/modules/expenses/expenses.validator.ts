@@ -316,7 +316,7 @@ const recurringExpenseBaseSchema = expenseBaseSchema
     endDate: optionalDate,
     nextRunDate: z.coerce.date(),
     autoCreateEnabled: z.coerce.boolean().optional().default(true),
-    createAsStatus: z.enum(RECURRING_EXPENSE_CREATE_STATUSES).optional().default("draft"),
+    createAsStatus: z.enum(RECURRING_EXPENSE_CREATE_STATUSES).optional().default("posted"),
     reminderDaysBefore: z.coerce.number().int().min(0).optional().default(0),
     status: z.enum(RECURRING_EXPENSE_STATUSES).optional().default("active")
   })

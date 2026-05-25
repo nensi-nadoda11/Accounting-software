@@ -67,7 +67,7 @@ router.get(
 
 router.get(
   "/categories",
-  requirePermission(["expense.view"]),
+  requirePermission(["expense.view", "expense.category.manage"]),
   validateRequest({ query: listExpenseCategoriesQuerySchema }),
   asyncHandler(expensesController.listCategories)
 );
@@ -95,7 +95,7 @@ router.delete(
 
 router.get(
   "/recurring",
-  requirePermission(["expense.view"]),
+  requirePermission(["expense.view", "expense.recurring.manage"]),
   validateRequest({ query: listRecurringExpensesQuerySchema }),
   asyncHandler(expensesController.listRecurring)
 );

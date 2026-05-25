@@ -200,8 +200,8 @@ export const ExpensesPage = () => {
   }>({
     status: "",
     frequency: "",
-    dateFrom: getMonthStartInput(),
-    dateTo: getTodayInput(),
+    dateFrom: "",
+    dateTo: "",
   });
   const [recurringData, setRecurringData] = useState<RecurringExpenseListResponse | null>(null);
   const [recurringLoading, setRecurringLoading] = useState(false);
@@ -536,16 +536,11 @@ export const ExpensesPage = () => {
 
         toast.success(status === "posted" ? "Expense updated and posted" : "Expense draft updated");
         syncExpenseEverywhere(finalExpense);
-        if (status === "posted") {
-          closeExpenseDrawer();
-          setDetailExpenseId(finalExpense.id);
-          setDetailExpense(finalExpense);
-        } else {
-          setEditingExpense(finalExpense);
-        }
+        closeExpenseDrawer();
       } else {
         const response = await expensesApi.create(createExpensePayload(values, status));
-        let createdExpense = response.data.expense;
+        const createdExpense = response.data.expense;
+        let attachmentUploadFailed = false;
 
         if (newExpenseAttachmentFiles.length) {
           setFormUploadingFiles(newExpenseAttachmentFiles.map((item) => ({ ...item, progress: 0 })));
@@ -558,23 +553,20 @@ export const ExpensesPage = () => {
                 setFormUploadingFiles((current) => current.map((item) => ({ ...item, progress })));
               },
             );
-            const refreshedExpense = await expensesApi.get(createdExpense.id);
-            createdExpense = refreshedExpense.data.expense;
+          } catch (error) {
+            attachmentUploadFailed = true;
+            toast.error(getErrorMessage(error, "Expense saved, but attachment upload failed"));
           } finally {
             setFormUploadingFiles([]);
           }
         }
 
-        toast.success(status === "posted" ? "Expense created and posted" : "Expense draft created");
-        refreshExpenses();
-        if (status === "posted") {
-          closeExpenseDrawer();
-          setDetailExpenseId(createdExpense.id);
-          setDetailExpense(createdExpense);
-        } else {
-          setEditingExpense(createdExpense);
-          setNewExpenseAttachmentFiles([]);
+        if (!attachmentUploadFailed) {
+          toast.success(status === "posted" ? "Expense created and posted" : "Expense draft created");
         }
+
+        refreshExpenses();
+        closeExpenseDrawer();
       }
     } finally {
       setExpenseSubmitState(null);
@@ -659,8 +651,28 @@ export const ExpensesPage = () => {
 
   const handleRecurringRun = async (item: RecurringExpense) => {
     try {
-      await expensesApi.runRecurring(item.id);
-      toast.success("Recurring expense executed");
+      const response = await expensesApi.runRecurring(item.id);
+      const createdExpense = response.data.expense.expense;
+
+      setExpensesSearch("");
+      setExpensesPage(1);
+      setExpensesFilters((current) => ({
+        ...current,
+        categoryId: "",
+        paymentMode: "",
+        status: "",
+        gstApplicable: "",
+        dateFrom: "",
+        dateTo: "",
+        recurringExpenseId: item.id,
+      }));
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("tab", "expenses");
+        return next;
+      });
+
+      toast.success(`Recurring expense executed. Generated expense ${createdExpense.expenseNumber} is now shown in Expenses.`);
       refreshRecurring();
       refreshExpenses();
     } catch (error) {

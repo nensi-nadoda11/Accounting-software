@@ -29,7 +29,7 @@ const decimalField = (min: number, max?: number) =>
   z.coerce
     .number({ message: "Enter a valid number" })
     .refine((value) => Number.isFinite(value), "Enter a valid number")
-    .min(min, min > 0 ? `Must be greater than ${min}` : `Must be at least ${min}`)
+    .min(min, min > 0 ? "Amount must be greater than 0" : `Must be at least ${min}`)
     .refine((value) => (max === undefined ? true : value <= max), max === undefined ? undefined : `Must be ${max} or less`);
 
 export const expenseFormSchema = z
@@ -188,6 +188,22 @@ export const recurringExpenseSchema = z
     status: z.enum(["active", "paused", "completed", "cancelled"]).optional().default("active"),
   })
   .superRefine((value, ctx) => {
+    const startDate = new Date(value.startDate);
+    const nextRunDate = new Date(value.nextRunDate);
+    const endDate = value.endDate ? new Date(value.endDate) : null;
+
+    if (Number.isNaN(startDate.getTime())) {
+      ctx.addIssue({ code: "custom", path: ["startDate"], message: "Start date is invalid" });
+    }
+
+    if (Number.isNaN(nextRunDate.getTime())) {
+      ctx.addIssue({ code: "custom", path: ["nextRunDate"], message: "Next run date is invalid" });
+    }
+
+    if (endDate && Number.isNaN(endDate.getTime())) {
+      ctx.addIssue({ code: "custom", path: ["endDate"], message: "End date is invalid" });
+    }
+
     if (value.gstApplicable && ![0, 0.25, 3, 5, 12, 18, 28].includes(value.gstRate)) {
       ctx.addIssue({ code: "custom", path: ["gstRate"], message: "GST rate must be one of 0, 0.25, 3, 5, 12, 18, 28" });
     }
@@ -200,15 +216,11 @@ export const recurringExpenseSchema = z
       ctx.addIssue({ code: "custom", path: ["bankAccountId"], message: "Bank account is required" });
     }
 
-    const startDate = new Date(value.startDate);
-    const nextRunDate = new Date(value.nextRunDate);
-    const endDate = value.endDate ? new Date(value.endDate) : null;
-
-    if (endDate && endDate < startDate) {
+    if (endDate && !Number.isNaN(startDate.getTime()) && endDate < startDate) {
       ctx.addIssue({ code: "custom", path: ["endDate"], message: "End date must be on or after start date" });
     }
 
-    if (nextRunDate < startDate) {
+    if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(nextRunDate.getTime()) && nextRunDate < startDate) {
       ctx.addIssue({ code: "custom", path: ["nextRunDate"], message: "Next run date must be on or after start date" });
     }
   })

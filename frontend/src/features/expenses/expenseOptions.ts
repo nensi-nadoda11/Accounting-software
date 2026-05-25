@@ -12,7 +12,6 @@ import type {
 
 export const EXPENSE_TABS = [
   { id: "expenses", label: "Expenses" },
-  { id: "add", label: "Add Expense" },
   { id: "categories", label: "Categories" },
   { id: "recurring", label: "Recurring" },
   { id: "reports", label: "Reports" },

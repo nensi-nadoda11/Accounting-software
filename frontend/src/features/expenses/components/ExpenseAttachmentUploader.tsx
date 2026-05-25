@@ -16,20 +16,28 @@ type UploadingFile = {
 export const ExpenseAttachmentUploader = ({
   attachments,
   uploadingFiles,
+  pendingFiles,
   disabled,
+  readOnly,
   onUpload,
   onRemove,
+  onRemovePending,
 }: {
   attachments: ExpenseAttachment[];
   uploadingFiles: UploadingFile[];
+  pendingFiles?: UploadingFile[];
   disabled?: boolean;
-  onUpload: (files: File[]) => void;
-  onRemove: (attachment: ExpenseAttachment) => void;
+  readOnly?: boolean;
+  onUpload?: (files: File[]) => void;
+  onRemove?: (attachment: ExpenseAttachment) => void;
+  onRemovePending?: (fileId: string) => void;
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const accept = "image/jpeg,image/png,image/webp,application/pdf";
+  const canUpload = Boolean(onUpload) && !readOnly;
+  const canRemove = Boolean(onRemove) && !readOnly;
 
   const previewItems = useMemo(
     () =>
@@ -78,7 +86,7 @@ export const ExpenseAttachmentUploader = ({
   }, [previewItems]);
 
   const handleFiles = (list: FileList | null) => {
-    if (!list?.length) {
+    if (!list?.length || !onUpload) {
       return;
     }
 
@@ -116,28 +124,58 @@ export const ExpenseAttachmentUploader = ({
         }}
       />
 
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => inputRef.current?.click()}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-          handleFiles(event.dataTransfer.files);
-        }}
-        className={cn(
-          "flex w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50/40 disabled:cursor-not-allowed disabled:opacity-60",
-          dragActive && "border-emerald-500 bg-emerald-50",
-        )}
-      >
-        <UploadCloud className="mr-2 size-4" />
-        Upload receipts
-      </button>
+      {canUpload ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragActive(true);
+          }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragActive(false);
+            handleFiles(event.dataTransfer.files);
+          }}
+          className={cn(
+            "flex w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50/40 disabled:cursor-not-allowed disabled:opacity-60",
+            dragActive && "border-emerald-500 bg-emerald-50",
+          )}
+        >
+          <UploadCloud className="mr-2 size-4" />
+          Upload receipts
+        </button>
+      ) : null}
+
+      {pendingFiles?.length ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {pendingFiles.map((item) => (
+            <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-800">{item.file.name}</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatBytes(item.file.size)}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">Pending</span>
+                  {onRemovePending ? (
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-700"
+                      onClick={() => onRemovePending(item.id)}
+                      aria-label={`Remove ${item.file.name}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {uploadingFiles.length ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -177,24 +215,30 @@ export const ExpenseAttachmentUploader = ({
                 )}
               </button>
               <div className="flex items-start justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-800">{attachment.originalName}</p>
-                  <p className="mt-1 text-xs text-slate-500">{formatBytes(attachment.sizeBytes)}</p>
-                </div>
                 <button
                   type="button"
-                  className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-700"
-                  onClick={() => onRemove(attachment)}
-                  aria-label={`Remove ${attachment.originalName}`}
-                  disabled={disabled}
+                  className="min-w-0 text-left"
+                  onClick={() => void openAttachment(attachment, previewUrls[attachment.id])}
                 >
-                  <Trash2 className="size-4" />
+                  <p className="truncate text-sm font-medium text-slate-800">{attachment.originalName}</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatBytes(attachment.sizeBytes)}</p>
                 </button>
+                {canRemove ? (
+                  <button
+                    type="button"
+                    className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-700"
+                    onClick={() => onRemove?.(attachment)}
+                    aria-label={`Remove ${attachment.originalName}`}
+                    disabled={disabled}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}
         </div>
-      ) : uploadingFiles.length ? null : (
+      ) : uploadingFiles.length || pendingFiles?.length ? null : (
         <EmptyState title="No attachments yet." />
       )}
     </div>

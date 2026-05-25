@@ -317,7 +317,8 @@ const recurringExpenseBaseSchema = expenseBaseSchema
     nextRunDate: z.coerce.date(),
     autoCreateEnabled: z.coerce.boolean().optional().default(true),
     createAsStatus: z.enum(RECURRING_EXPENSE_CREATE_STATUSES).optional().default("draft"),
-    reminderDaysBefore: z.coerce.number().int().min(0).optional().default(0)
+    reminderDaysBefore: z.coerce.number().int().min(0).optional().default(0),
+    status: z.enum(RECURRING_EXPENSE_STATUSES).optional().default("active")
   })
   .strict();
 
@@ -351,9 +352,6 @@ export const updateRecurringExpenseSchema = recurringExpenseBaseSchema
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field must be provided"
-  })
-  .extend({
-    status: z.enum(RECURRING_EXPENSE_STATUSES).optional()
   });
 
 export const listRecurringExpensesQuerySchema = z

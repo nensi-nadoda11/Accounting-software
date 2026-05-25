@@ -1328,7 +1328,7 @@ class ExpensesService {
           autoCreateEnabled: input.autoCreateEnabled ?? true,
           createAsStatus: input.createAsStatus ?? "draft",
           reminderDaysBefore: input.reminderDaysBefore ?? 0,
-          status: "active",
+          status: input.status ?? "active",
           createdBy: actor.id,
           updatedBy: actor.id
         },

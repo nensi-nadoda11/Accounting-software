@@ -1,4 +1,4 @@
-import { CheckCircle2, Eye, FileText, Paperclip, Pencil, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, FileText, Pencil, Trash2, XCircle } from "lucide-react";
 
 import { AmountText } from "../../../components/ui/AmountText";
 import { EmptyState } from "../../../components/ui/EmptyState";
@@ -19,7 +19,6 @@ export const ExpensesTable = ({
   onPost,
   onCancel,
   onDelete,
-  onAttachments,
   onPrint,
   canUpdate,
   canPost,
@@ -33,7 +32,6 @@ export const ExpensesTable = ({
   onPost: (expenseId: string) => void;
   onCancel: (expenseId: string) => void;
   onDelete: (expenseId: string) => void;
-  onAttachments: (expenseId: string) => void;
   onPrint: (expenseId: string) => void;
   canUpdate: boolean;
   canPost: boolean;
@@ -89,29 +87,33 @@ export const ExpensesTable = ({
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       <TableActionIconButton label="View expense" icon={<Eye className="size-4" />} onClick={() => onView(item.id)} />
-                      <TableActionIconButton label="Edit draft" icon={<Pencil className="size-4" />} onClick={() => onEdit(item.id)} disabled={!canUpdate || !isDraft} />
-                      <TableActionIconButton
-                        label="Post expense"
-                        icon={<CheckCircle2 className="size-4" />}
-                        onClick={() => onPost(item.id)}
-                        disabled={!canPost || !isDraft}
-                      />
-                      <TableActionIconButton
-                        label="Cancel expense"
-                        icon={<XCircle className="size-4" />}
-                        onClick={() => onCancel(item.id)}
-                        disabled={!canPost || !isPosted}
-                        tone="danger"
-                      />
-                      <TableActionIconButton label="Attachments" icon={<Paperclip className="size-4" />} onClick={() => onAttachments(item.id)} />
+                      {canUpdate && isDraft ? (
+                        <TableActionIconButton label="Edit draft" icon={<Pencil className="size-4" />} onClick={() => onEdit(item.id)} />
+                      ) : null}
+                      {canPost && isDraft ? (
+                        <TableActionIconButton
+                          label="Post expense"
+                          icon={<CheckCircle2 className="size-4" />}
+                          onClick={() => onPost(item.id)}
+                        />
+                      ) : null}
+                      {canPost && isPosted ? (
+                        <TableActionIconButton
+                          label="Cancel expense"
+                          icon={<XCircle className="size-4" />}
+                          onClick={() => onCancel(item.id)}
+                          tone="danger"
+                        />
+                      ) : null}
                       <TableActionIconButton label="Print / PDF" icon={<FileText className="size-4" />} onClick={() => onPrint(item.id)} />
-                      <TableActionIconButton
-                        label="Delete draft"
-                        icon={<Trash2 className="size-4" />}
-                        onClick={() => onDelete(item.id)}
-                        disabled={!canDelete || !isDraft}
-                        tone="danger"
-                      />
+                      {canDelete && isDraft ? (
+                        <TableActionIconButton
+                          label="Delete draft"
+                          icon={<Trash2 className="size-4" />}
+                          onClick={() => onDelete(item.id)}
+                          tone="danger"
+                        />
+                      ) : null}
                     </div>
                   </td>
                 </tr>

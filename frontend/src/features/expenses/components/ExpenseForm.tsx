@@ -36,7 +36,7 @@ export const ExpenseForm = ({
   editing,
   loadingState,
   onSubmit,
-  onBackToList,
+  onClose,
 }: {
   initialValues: ExpenseFormInput;
   categories: ExpenseCategory[];
@@ -49,7 +49,7 @@ export const ExpenseForm = ({
   editing: boolean;
   loadingState: "draft" | "posted" | null;
   onSubmit: (values: ExpenseFormInput, status: "draft" | "posted") => Promise<void>;
-  onBackToList: () => void;
+  onClose: () => void;
 }) => {
   const toast = useToast();
   const [submitIntent, setSubmitIntent] = useState<"draft" | "posted">("draft");
@@ -259,9 +259,9 @@ export const ExpenseForm = ({
       ) : null}
 
       <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onBackToList}>
+        <Button type="button" variant="secondary" onClick={onClose}>
           <ArrowLeft className="mr-2 size-4" />
-          Back to List
+          Close
         </Button>
         <Button
           type="button"

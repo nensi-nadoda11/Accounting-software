@@ -5,15 +5,9 @@ import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { LoadingState } from "../../../components/ui/LoadingState";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
-import type { Expense, ExpenseAttachment } from "../../../types/expense";
+import type { Expense } from "../../../types/expense";
 import { EXPENSE_PAYMENT_MODE_LABELS, EXPENSE_STATUS_LABELS } from "../expenseOptions";
 import { ExpenseAttachmentUploader } from "./ExpenseAttachmentUploader";
-
-type UploadingFile = {
-  id: string;
-  file: File;
-  progress: number;
-};
 
 export const ExpenseDetailDrawer = ({
   open,
@@ -21,50 +15,50 @@ export const ExpenseDetailDrawer = ({
   loading,
   canUpdate,
   canPost,
-  uploadingFiles,
   onClose,
   onEdit,
   onPost,
   onCancel,
-  onUploadAttachments,
-  onRemoveAttachment,
 }: {
   open: boolean;
   expense: Expense | null;
   loading: boolean;
   canUpdate: boolean;
   canPost: boolean;
-  uploadingFiles: UploadingFile[];
   onClose: () => void;
   onEdit: (expense: Expense) => void;
   onPost: (expense: Expense) => void;
   onCancel: (expense: Expense) => void;
-  onUploadAttachments: (files: File[]) => void;
-  onRemoveAttachment: (attachment: ExpenseAttachment) => void;
 }) => (
   <SideSheet
     open={open}
     onClose={onClose}
     title={expense ? expense.expenseNumber : "Expense Details"}
     className="max-w-4xl"
-    footer={
+  footer={
       expense ? (
         <>
           <Button type="button" variant="secondary" onClick={onClose}>
             Close
           </Button>
-          <Button type="button" variant="secondary" onClick={() => onEdit(expense)} disabled={!canUpdate || expense.status !== "draft"}>
-            <Pencil className="mr-2 size-4" />
-            Edit Draft
-          </Button>
-          <Button type="button" onClick={() => onPost(expense)} disabled={!canPost || expense.status !== "draft"}>
-            <CheckCircle2 className="mr-2 size-4" />
-            Post
-          </Button>
-          <Button type="button" variant="danger" onClick={() => onCancel(expense)} disabled={!canPost || expense.status !== "posted"}>
-            <XCircle className="mr-2 size-4" />
-            Cancel
-          </Button>
+          {canUpdate && expense.status === "draft" ? (
+            <Button type="button" variant="secondary" onClick={() => onEdit(expense)}>
+              <Pencil className="mr-2 size-4" />
+              Edit Draft
+            </Button>
+          ) : null}
+          {canPost && expense.status === "draft" ? (
+            <Button type="button" onClick={() => onPost(expense)}>
+              <CheckCircle2 className="mr-2 size-4" />
+              Post
+            </Button>
+          ) : null}
+          {canPost && expense.status === "posted" ? (
+            <Button type="button" variant="danger" onClick={() => onCancel(expense)}>
+              <XCircle className="mr-2 size-4" />
+              Cancel
+            </Button>
+          ) : null}
         </>
       ) : undefined
     }
@@ -120,10 +114,8 @@ export const ExpenseDetailDrawer = ({
           <CardContent>
             <ExpenseAttachmentUploader
               attachments={expense.attachments}
-              uploadingFiles={uploadingFiles}
-              onUpload={onUploadAttachments}
-              onRemove={onRemoveAttachment}
-              disabled={expense.status === "posted" && !canUpdate}
+              uploadingFiles={[]}
+              readOnly
             />
           </CardContent>
         </Card>

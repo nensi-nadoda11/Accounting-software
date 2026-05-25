@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import { Button } from "../../../components/ui/Button";
+import { FormError } from "../../../components/ui/FormError";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { SideSheet } from "../../../components/ui/SideSheet";
@@ -46,6 +47,7 @@ export const RecurringExpenseDrawer = ({
   onSubmit: (values: RecurringExpenseValues) => Promise<void>;
 }) => {
   const toast = useToast();
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const form = useForm<RecurringExpenseInputValues, undefined, RecurringExpenseValues>({
     resolver: zodResolver(recurringExpenseSchema),
     defaultValues: buildRecurringFormDefaults(recurring, taxSettings),
@@ -53,6 +55,7 @@ export const RecurringExpenseDrawer = ({
 
   useEffect(() => {
     form.reset(buildRecurringFormDefaults(recurring, taxSettings));
+    setSubmitError(null);
   }, [form, open, recurring, taxSettings]);
 
   const paymentMode = form.watch("paymentMode");
@@ -65,15 +68,50 @@ export const RecurringExpenseDrawer = ({
     }
   }, [form, gstApplicable]);
 
-  const handleSubmit = form.handleSubmit(async (values) => {
-    try {
-      await onSubmit(values);
-    } catch (error) {
-      if (!applyExpenseFieldErrors(error, form.setError)) {
-        toast.error(getErrorMessage(error, "Failed to save recurring expense"));
-      }
+  useEffect(() => {
+    if (!requiresBankAccount) {
+      form.setValue("bankAccountId", null, { shouldDirty: true, shouldValidate: true });
     }
-  });
+  }, [form, requiresBankAccount]);
+
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      setSubmitError(null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  const errorSummary = useMemo(() => {
+    const fieldErrors = Object.values(form.formState.errors)
+      .map((item) => item?.message)
+      .filter((value): value is string => Boolean(value));
+
+    if (submitError) {
+      return submitError;
+    }
+
+    return fieldErrors[0] ?? null;
+  }, [form.formState.errors, submitError]);
+
+  const handleSubmit = form.handleSubmit(
+    async (values) => {
+      try {
+        setSubmitError(null);
+        await onSubmit(values);
+      } catch (error) {
+        if (!applyExpenseFieldErrors(error, form.setError)) {
+          const message = getErrorMessage(error, "Failed to save recurring expense");
+          setSubmitError(message);
+          toast.error(message);
+        }
+      }
+    },
+    () => {
+      const firstError = Object.values(form.formState.errors).find((item) => item?.message)?.message;
+      setSubmitError(firstError ?? "Please correct the highlighted fields.");
+    },
+  );
 
   return (
     <SideSheet
@@ -93,6 +131,7 @@ export const RecurringExpenseDrawer = ({
       }
     >
       <div className="grid gap-4">
+        <FormError error={errorSummary ?? undefined} />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Input label="Template Name" {...form.register("templateName")} error={form.formState.errors.templateName?.message} />
           <Select label="Category" {...form.register("categoryId")} error={form.formState.errors.categoryId?.message}>

@@ -12,6 +12,7 @@ import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Select } from "../../components/ui/Select";
+import { SideSheet } from "../../components/ui/SideSheet";
 import { Textarea } from "../../components/ui/Textarea";
 import { getErrorMessage } from "../../lib/errors";
 import { useAuth } from "../../providers/useAuth";
@@ -96,10 +97,6 @@ export const ExpensesPage = () => {
   const visibleTabs = useMemo(
     () =>
       EXPENSE_TABS.filter((tab) => {
-        if (tab.id === "add") {
-          return canCreate || canUpdate;
-        }
-
         if (tab.id === "categories") {
           return canView || canManageCategories;
         }
@@ -158,14 +155,15 @@ export const ExpensesPage = () => {
   const [expensesRefreshKey, setExpensesRefreshKey] = useState(0);
   const [exportingList, setExportingList] = useState(false);
 
+  const [expenseDrawerOpen, setExpenseDrawerOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseSubmitState, setExpenseSubmitState] = useState<"draft" | "posted" | null>(null);
   const [formUploadingFiles, setFormUploadingFiles] = useState<UploadingFile[]>([]);
+  const [newExpenseAttachmentFiles, setNewExpenseAttachmentFiles] = useState<UploadingFile[]>([]);
 
   const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
   const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailUploadingFiles, setDetailUploadingFiles] = useState<UploadingFile[]>([]);
 
   const [postExpenseId, setPostExpenseId] = useState<string | null>(null);
   const [postingExpense, setPostingExpense] = useState(false);
@@ -446,14 +444,33 @@ export const ExpensesPage = () => {
     try {
       const response = await expensesApi.get(expenseId);
       setEditingExpense(response.data.expense);
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.set("tab", "add");
-        return next;
-      });
+      setFormUploadingFiles([]);
+      setExpenseDrawerOpen(true);
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to load expense draft"));
     }
+  };
+
+  const closeExpenseDrawer = () => {
+    setExpenseDrawerOpen(false);
+    setEditingExpense(null);
+    setFormUploadingFiles([]);
+    setNewExpenseAttachmentFiles([]);
+  };
+
+  const addPendingExpenseAttachments = (files: File[]) => {
+    setNewExpenseAttachmentFiles((current) => [
+      ...current,
+      ...files.map((file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
+        file,
+        progress: 0,
+      })),
+    ]);
+  };
+
+  const removePendingExpenseAttachment = (fileId: string) => {
+    setNewExpenseAttachmentFiles((current) => current.filter((item) => item.id !== fileId));
   };
 
   const syncExpenseEverywhere = (expense: Expense) => {
@@ -519,33 +536,43 @@ export const ExpensesPage = () => {
         toast.success(status === "posted" ? "Expense updated and posted" : "Expense draft updated");
         syncExpenseEverywhere(finalExpense);
         if (status === "posted") {
-          setEditingExpense(null);
+          closeExpenseDrawer();
           setDetailExpenseId(finalExpense.id);
           setDetailExpense(finalExpense);
-          setSearchParams((current) => {
-            const next = new URLSearchParams(current);
-            next.set("tab", "expenses");
-            return next;
-          });
         } else {
           setEditingExpense(finalExpense);
         }
       } else {
         const response = await expensesApi.create(createExpensePayload(values, status));
-        const createdExpense = response.data.expense;
+        let createdExpense = response.data.expense;
+
+        if (newExpenseAttachmentFiles.length) {
+          setFormUploadingFiles(newExpenseAttachmentFiles.map((item) => ({ ...item, progress: 0 })));
+
+          try {
+            await expensesApi.uploadAttachments(
+              createdExpense.id,
+              newExpenseAttachmentFiles.map((item) => item.file),
+              (progress) => {
+                setFormUploadingFiles((current) => current.map((item) => ({ ...item, progress })));
+              },
+            );
+            const refreshedExpense = await expensesApi.get(createdExpense.id);
+            createdExpense = refreshedExpense.data.expense;
+          } finally {
+            setFormUploadingFiles([]);
+          }
+        }
+
         toast.success(status === "posted" ? "Expense created and posted" : "Expense draft created");
         refreshExpenses();
         if (status === "posted") {
-          setEditingExpense(null);
+          closeExpenseDrawer();
           setDetailExpenseId(createdExpense.id);
           setDetailExpense(createdExpense);
-          setSearchParams((current) => {
-            const next = new URLSearchParams(current);
-            next.set("tab", "expenses");
-            return next;
-          });
         } else {
           setEditingExpense(createdExpense);
+          setNewExpenseAttachmentFiles([]);
         }
       }
     } finally {
@@ -575,12 +602,7 @@ export const ExpensesPage = () => {
       toast.success("Expense deleted");
       setDeleteExpenseId(null);
       if (editingExpense?.id === expenseId) {
-        setEditingExpense(null);
-        setSearchParams((current) => {
-          const next = new URLSearchParams(current);
-          next.set("tab", "expenses");
-          return next;
-        });
+        closeExpenseDrawer();
       }
       if (detailExpense?.id === expenseId) {
         setDetailExpense(null);
@@ -745,11 +767,9 @@ export const ExpensesPage = () => {
                 type="button"
                 onClick={() => {
                   setEditingExpense(null);
-                  setSearchParams((current) => {
-                    const next = new URLSearchParams(current);
-                    next.set("tab", "add");
-                    return next;
-                  });
+                  setFormUploadingFiles([]);
+                  setNewExpenseAttachmentFiles([]);
+                  setExpenseDrawerOpen(true);
                 }}
               >
                 <Plus className="mr-2 size-4" />
@@ -908,50 +928,9 @@ export const ExpensesPage = () => {
                 cancelForm.reset({ cancellationReason: "" });
               }}
               onDelete={setDeleteExpenseId}
-              onAttachments={(expenseId) => {
-                setDetailExpenseId(expenseId);
-                setDetailExpense(null);
-              }}
               onPrint={(expenseId) => void handlePrintExpense(expenseId)}
             />
           </div>
-        ) : null}
-
-        {activeTab === "add" ? (
-          canCreate || editingExpense ? (
-            <ExpenseForm
-              initialValues={currentExpenseDefaults}
-              categories={categoryLookup}
-              accounts={expenseAccounts}
-              bankAccounts={bankAccounts}
-              taxSettings={taxSettings}
-              companyGstNumber={auth.company?.gstNumber}
-              companyState={auth.company?.state}
-              editing={Boolean(editingExpense)}
-              loadingState={expenseSubmitState}
-              attachmentsContent={
-                editingExpense ? (
-                  <ExpenseAttachmentUploader
-                    attachments={editingExpense.attachments}
-                    uploadingFiles={formUploadingFiles}
-                    onUpload={(files) => void handleUploadForTarget(editingExpense.id, files, setFormUploadingFiles)}
-                    onRemove={(attachment) => void handleRemoveAttachment(editingExpense.id, attachment.id)}
-                  />
-                ) : undefined
-              }
-              onSubmit={handleExpenseSubmit}
-              onBackToList={() => {
-                setEditingExpense(null);
-                setSearchParams((current) => {
-                  const next = new URLSearchParams(current);
-                  next.set("tab", "expenses");
-                  return next;
-                });
-              }}
-            />
-          ) : (
-            <EmptyState title={referencesLoading ? "Loading form..." : "You do not have access to create expenses."} />
-          )
         ) : null}
 
         {activeTab === "categories" ? (
@@ -1049,42 +1028,66 @@ export const ExpensesPage = () => {
         loading={detailLoading}
         canUpdate={canUpdate}
         canPost={canPost}
-        uploadingFiles={detailUploadingFiles}
         onClose={() => {
           setDetailExpenseId(null);
           setDetailExpense(null);
-          setDetailUploadingFiles([]);
         }}
         onEdit={(expense) => {
           setDetailExpenseId(null);
           setDetailExpense(null);
           setEditingExpense(expense);
-          setSearchParams((current) => {
-            const next = new URLSearchParams(current);
-            next.set("tab", "add");
-            return next;
-          });
+          setFormUploadingFiles([]);
+          setExpenseDrawerOpen(true);
         }}
         onPost={(expense) => setPostExpenseId(expense.id)}
         onCancel={(expense) => {
           setCancelExpenseTarget(expense);
           cancelForm.reset({ cancellationReason: "" });
         }}
-        onUploadAttachments={(files) => {
-          if (!detailExpense) {
-            return;
-          }
-
-          void handleUploadForTarget(detailExpense.id, files, setDetailUploadingFiles);
-        }}
-        onRemoveAttachment={(attachment) => {
-          if (!detailExpense) {
-            return;
-          }
-
-          void handleRemoveAttachment(detailExpense.id, attachment.id);
-        }}
       />
+
+      <SideSheet
+        open={expenseDrawerOpen}
+        onClose={closeExpenseDrawer}
+        title={editingExpense ? "Edit Expense Draft" : "Add Expense"}
+        className="max-w-5xl"
+      >
+        {canCreate || editingExpense ? (
+          <ExpenseForm
+            initialValues={currentExpenseDefaults}
+            categories={categoryLookup}
+            accounts={expenseAccounts}
+            bankAccounts={bankAccounts}
+            taxSettings={taxSettings}
+            companyGstNumber={auth.company?.gstNumber}
+            companyState={auth.company?.state}
+            editing={Boolean(editingExpense)}
+            loadingState={expenseSubmitState}
+            attachmentsContent={
+              !editingExpense ? (
+                <ExpenseAttachmentUploader
+                  attachments={[]}
+                  uploadingFiles={formUploadingFiles}
+                  pendingFiles={newExpenseAttachmentFiles}
+                  onUpload={addPendingExpenseAttachments}
+                  onRemovePending={removePendingExpenseAttachment}
+                />
+              ) : editingExpense.status === "draft" ? (
+                <ExpenseAttachmentUploader
+                  attachments={editingExpense.attachments}
+                  uploadingFiles={formUploadingFiles}
+                  onUpload={(files) => void handleUploadForTarget(editingExpense.id, files, setFormUploadingFiles)}
+                  onRemove={(attachment) => void handleRemoveAttachment(editingExpense.id, attachment.id)}
+                />
+              ) : null
+            }
+            onSubmit={handleExpenseSubmit}
+            onClose={closeExpenseDrawer}
+          />
+        ) : (
+          <EmptyState title={referencesLoading ? "Loading form..." : "You do not have access to create expenses."} />
+        )}
+      </SideSheet>
 
       <ExpenseCategoryDrawer
         open={categoryDrawerOpen}

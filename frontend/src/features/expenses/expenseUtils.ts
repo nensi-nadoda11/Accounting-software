@@ -126,6 +126,42 @@ export const applyExpenseFieldErrors = <TFieldValues extends FieldValues>(
     handled = true;
   }
 
+  const message = data?.message?.trim() ?? "";
+  const normalizedMessage = message.toLowerCase();
+
+  if (!handled && message) {
+    const assign = (field: string) => {
+      setError(field as Path<TFieldValues>, { type: "server", message });
+      handled = true;
+    };
+
+    if (normalizedMessage.includes("bank account")) {
+      assign("bankAccountId");
+    } else if (normalizedMessage.includes("expense account") || normalizedMessage.includes("expense ledger")) {
+      assign("expenseAccountId");
+    } else if (normalizedMessage.includes("category")) {
+      assign("categoryId");
+    } else if (normalizedMessage.includes("next run date")) {
+      assign("nextRunDate");
+    } else if (normalizedMessage.includes("start date")) {
+      assign("startDate");
+    } else if (normalizedMessage.includes("end date")) {
+      assign("endDate");
+    } else if (normalizedMessage.includes("expense date") || normalizedMessage.includes("period is locked") || normalizedMessage.includes("financial year is locked")) {
+      assign("expenseDate");
+    } else if (normalizedMessage.includes("reference number")) {
+      assign("referenceNumber");
+    } else if (normalizedMessage.includes("cheque number")) {
+      assign("chequeNumber");
+    } else if (normalizedMessage.includes("cheque date")) {
+      assign("chequeDate");
+    } else if (normalizedMessage.includes("template name")) {
+      assign("templateName");
+    } else if (normalizedMessage.includes("description")) {
+      assign("description");
+    }
+  }
+
   return handled;
 };
 

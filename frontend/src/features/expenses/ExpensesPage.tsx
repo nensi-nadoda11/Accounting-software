@@ -57,6 +57,7 @@ import {
   downloadLocalPdfTable,
   buildPrintWindow,
   createExpensePayload,
+  createExpenseUpdatePayload,
   createRecurringPayload,
   getCategoryName,
   getMonthStartInput,
@@ -524,7 +525,7 @@ export const ExpensesPage = () => {
     try {
       setExpenseSubmitState(status);
       if (editingExpense) {
-        const updatePayload = createExpensePayload(values, "draft");
+        const updatePayload = createExpenseUpdatePayload(values);
         const updateResponse = await expensesApi.update(editingExpense.id, updatePayload);
         let finalExpense = updateResponse.data.expense;
 

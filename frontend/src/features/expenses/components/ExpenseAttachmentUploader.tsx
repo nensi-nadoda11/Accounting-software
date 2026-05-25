@@ -1,7 +1,9 @@
-import { Paperclip, Trash2, UploadCloud } from "lucide-react";
+import { ExternalLink, Paperclip, Trash2, UploadCloud } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { Modal } from "../../../components/ui/Modal";
 import { cn } from "../../../lib/utils";
 import { expensesApi } from "../../../services/expensesApi";
 import type { ExpenseAttachment } from "../../../types/expense";
@@ -12,6 +14,8 @@ type UploadingFile = {
   file: File;
   progress: number;
 };
+
+type AttachmentPreviewKind = "image" | "pdf" | "file";
 
 export const ExpenseAttachmentUploader = ({
   attachments,
@@ -35,6 +39,10 @@ export const ExpenseAttachmentUploader = ({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [activeImageAttachment, setActiveImageAttachment] = useState<{
+    attachment: ExpenseAttachment;
+    previewUrl: string;
+  } | null>(null);
   const accept = "image/jpeg,image/png,image/webp,application/pdf";
   const canUpload = Boolean(onUpload) && !readOnly;
   const canRemove = Boolean(onRemove) && !readOnly;
@@ -43,7 +51,7 @@ export const ExpenseAttachmentUploader = ({
     () =>
       attachments.map((attachment) => ({
         attachment,
-        kind: isPreviewableImage(attachment) ? "image" : isPreviewablePdf(attachment) ? "pdf" : "file",
+        kind: (isPreviewableImage(attachment) ? "image" : isPreviewablePdf(attachment) ? "pdf" : "file") as AttachmentPreviewKind,
       })),
     [attachments],
   );
@@ -93,18 +101,50 @@ export const ExpenseAttachmentUploader = ({
     onUpload(Array.from(list));
   };
 
-  const openAttachment = async (attachment: ExpenseAttachment, previewUrl?: string) => {
+  const openBlobInNewTab = (blob: Blob, fileName: string, popup?: Window | null) => {
+    const objectUrl = URL.createObjectURL(blob);
+    if (popup) {
+      popup.location.href = objectUrl;
+    } else {
+      const nextPopup = window.open(objectUrl, "_blank", "noopener,noreferrer");
+
+      if (!nextPopup) {
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = fileName;
+        anchor.click();
+      }
+    }
+
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  };
+
+  const openAttachment = async (attachment: ExpenseAttachment, kind: AttachmentPreviewKind, previewUrl?: string) => {
+    let popup: Window | null = null;
+
     try {
+      if (kind === "image" && previewUrl) {
+        setActiveImageAttachment({ attachment, previewUrl });
+        return;
+      }
+
+      if (kind !== "image") {
+        popup = window.open("", "_blank");
+      }
+
       if (previewUrl) {
-        window.open(previewUrl, "_blank", "noopener,noreferrer");
+        if (popup) {
+          popup.location.href = previewUrl;
+        } else {
+          window.open(previewUrl, "_blank", "noopener,noreferrer");
+        }
         return;
       }
 
       const file = await expensesApi.downloadAttachment(attachment.fileUrl, attachment.originalName);
-      const objectUrl = URL.createObjectURL(file.blob);
-      window.open(objectUrl, "_blank", "noopener,noreferrer");
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      openBlobInNewTab(file.blob, attachment.originalName, popup);
     } catch {
+      popup?.close();
       // Keep the uploader responsive even if a preview file can no longer be read.
     }
   };
@@ -203,7 +243,7 @@ export const ExpenseAttachmentUploader = ({
               <button
                 type="button"
                 className="flex h-36 w-full items-center justify-center bg-slate-50"
-                onClick={() => void openAttachment(attachment, previewUrls[attachment.id])}
+                onClick={() => void openAttachment(attachment, kind, previewUrls[attachment.id])}
               >
                 {kind === "image" && previewUrls[attachment.id] ? (
                   <img src={previewUrls[attachment.id]} alt={attachment.originalName} className="h-full w-full object-cover" />
@@ -218,7 +258,7 @@ export const ExpenseAttachmentUploader = ({
                 <button
                   type="button"
                   className="min-w-0 text-left"
-                  onClick={() => void openAttachment(attachment, previewUrls[attachment.id])}
+                  onClick={() => void openAttachment(attachment, kind, previewUrls[attachment.id])}
                 >
                   <p className="truncate text-sm font-medium text-slate-800">{attachment.originalName}</p>
                   <p className="mt-1 text-xs text-slate-500">{formatBytes(attachment.sizeBytes)}</p>
@@ -241,6 +281,39 @@ export const ExpenseAttachmentUploader = ({
       ) : uploadingFiles.length || pendingFiles?.length ? null : (
         <EmptyState title="No attachments yet." />
       )}
+
+      <Modal
+        open={Boolean(activeImageAttachment)}
+        onClose={() => setActiveImageAttachment(null)}
+        title={activeImageAttachment?.attachment.originalName ?? "Image Preview"}
+        className="max-w-6xl"
+        footer={
+          activeImageAttachment ? (
+            <>
+              <Button type="button" variant="secondary" onClick={() => setActiveImageAttachment(null)}>
+                Close
+              </Button>
+              <Button
+                type="button"
+                onClick={() => window.open(activeImageAttachment.previewUrl, "_blank", "noopener,noreferrer")}
+              >
+                <ExternalLink className="mr-2 size-4" />
+                Open in New Tab
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        {activeImageAttachment ? (
+          <div className="flex justify-center bg-slate-950">
+            <img
+              src={activeImageAttachment.previewUrl}
+              alt={activeImageAttachment.attachment.originalName}
+              className="max-h-[78vh] w-auto max-w-full rounded-2xl object-contain"
+            />
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import type { AxiosResponse } from "axios";
 
-import { client } from "../lib/api/client";
+import { API_BASE_URL, client } from "../lib/api/client";
 import type { ApiResponse } from "../types/api";
 import type {
   CancelExpenseInput,
@@ -39,6 +39,32 @@ const getFileNameFromDisposition = (contentDisposition: string | undefined, fall
 
   const match = contentDisposition.match(/filename="?([^"]+)"?/i);
   return match?.[1] ?? fallback;
+};
+
+const normalizeAttachmentRequestUrl = (attachmentUrl: string) => {
+  const normalized = attachmentUrl.trim();
+  if (!normalized) {
+    return normalized;
+  }
+
+  const baseUrl = new URL(API_BASE_URL);
+  const basePath = baseUrl.pathname.replace(/\/+$/, "");
+
+  try {
+    const resolved = new URL(normalized, API_BASE_URL);
+    if (resolved.origin === baseUrl.origin && resolved.pathname.startsWith(basePath)) {
+      const relativePath = resolved.pathname.slice(basePath.length) || "/";
+      return `${relativePath}${resolved.search}${resolved.hash}`;
+    }
+
+    return resolved.toString();
+  } catch {
+    if (normalized.startsWith(`${basePath}/`)) {
+      return normalized.slice(basePath.length);
+    }
+
+    return normalized;
+  }
 };
 
 const extractDownload = async (
@@ -164,7 +190,7 @@ export const expensesApi = {
 
   downloadAttachment: async (attachmentUrl: string, fallbackFileName: string) =>
     extractDownload(
-      client.get(attachmentUrl, {
+      client.get(normalizeAttachmentRequestUrl(attachmentUrl), {
         responseType: "blob",
       }),
       fallbackFileName,

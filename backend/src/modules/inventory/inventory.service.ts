@@ -503,6 +503,7 @@ class InventoryService {
       referenceId: string | null;
       referenceNumber: string | null;
       allowNegativeStock: boolean;
+      movementValue?: string | undefined;
       damagedIncrement?: string | undefined;
       expiredIncrement?: string | undefined;
     },
@@ -606,7 +607,7 @@ class InventoryService {
     }
 
     const quantityForValue = isPositiveDecimal(payload.inQuantity, 3) ? payload.inQuantity : payload.outQuantity;
-    const movementValue = multiplyQtyRate(quantityForValue, payload.rate);
+    const movementValue = payload.movementValue ? normalizeMoney(payload.movementValue) : multiplyQtyRate(quantityForValue, payload.rate);
     const movement = await inventoryRepository.createStockMovement(
       {
         companyId: actor.companyId,
@@ -1640,6 +1641,7 @@ class InventoryService {
         expiryDate?: Date | null | undefined;
         quantity: string;
         rate: string;
+        movementValue?: string | undefined;
       }>;
     },
     executor: Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -1693,6 +1695,7 @@ class InventoryService {
           referenceType: input.referenceType,
           referenceId: input.referenceId,
           referenceNumber: input.referenceNumber,
+          movementValue: item.movementValue,
           allowNegativeStock: false
         },
         executor
@@ -1722,6 +1725,7 @@ class InventoryService {
         batchId?: string | null | undefined;
         quantity: string;
         rate: string;
+        movementValue?: string | undefined;
       }>;
     },
     executor: Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -1765,6 +1769,7 @@ class InventoryService {
           referenceType: input.referenceType,
           referenceId: input.referenceId,
           referenceNumber: input.referenceNumber,
+          movementValue: item.movementValue,
           allowNegativeStock: productRow.product.negativeStockAllowed
         },
         executor

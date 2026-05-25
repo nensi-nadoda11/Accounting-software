@@ -27,16 +27,20 @@ export const PurchaseTotalsPanel = ({
 }: {
   totals: PurchasePreviewTotals;
 }) => (
-  <Card className="lg:sticky lg:top-6">
+  <Card className="h-fit lg:sticky lg:top-6">
     <CardHeader
-      title="Totals"
+      title="Summary"
       action={<StatusBadge status={totals.paymentStatus} label={PURCHASE_PAYMENT_STATUS_LABELS[totals.paymentStatus]} />}
     />
-    <CardContent className="space-y-3">
+    <CardContent className="space-y-2">
       {rows.map((row) => (
         <div
           key={row.key}
-          className={`flex items-center justify-between text-sm ${row.key === "grandTotal" ? "border-t border-slate-200 pt-3 font-semibold" : "text-slate-600"}`}
+          className={`flex items-center justify-between text-sm ${
+            row.key === "grandTotal"
+              ? "mt-3 border-t border-slate-200 pt-4 text-base font-semibold text-slate-900"
+              : "text-slate-600"
+          }`}
         >
           <span>{row.label}</span>
           <AmountText

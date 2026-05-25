@@ -511,6 +511,14 @@ export const PurchaseForm = ({
     }
   };
 
+  const applyDefaultWarehouseToItems = useCallback((warehouseId: string | null) => {
+    values.items.forEach((item, index) => {
+      if (item.productType === "goods") {
+        form.setValue(`items.${index}.warehouseId`, warehouseId, { shouldDirty: true, shouldValidate: true });
+      }
+    });
+  }, [form, values.items]);
+
   const currentPaymentMode = (form.watch("paymentMode") as PurchasePaymentMode | null | undefined) ?? null;
   const handleSupplierCreated = async (values: SupplierFormInput, setError: UseFormSetError<SupplierFormValues>) => {
     try {
@@ -608,55 +616,94 @@ export const PurchaseForm = ({
       </div>
 
       <Card>
-        <CardHeader title="Header" />
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="flex flex-col gap-2">
-            <AsyncLookupSelect
-              label="Supplier"
-              value={supplierLookupValue}
-              loading={supplierLoading}
-              options={supplierLookup}
-              placeholder="Search supplier"
-              error={form.formState.errors.supplierId?.message}
-              noResultsLabel={supplierLookupMessage ?? "No matching active suppliers found"}
-              onSearch={loadSuppliers}
-              onSelect={(option) => void handleSupplierSelect(option)}
-              onClear={() => {
-                stopSupplierLookup();
-                setSupplierLookupValue(null);
-                setSupplierDetail(null);
-                form.setValue("supplierId", "", { shouldDirty: true, shouldValidate: true });
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-slate-700">
+                Supplier <span className="text-rose-500">*</span>
+              </span>
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <AsyncLookupSelect
+                    value={supplierLookupValue}
+                    loading={supplierLoading}
+                    options={supplierLookup}
+                    placeholder="Search supplier"
+                    error={form.formState.errors.supplierId?.message}
+                    noResultsLabel={supplierLookupMessage ?? "No matching active suppliers found"}
+                    onSearch={loadSuppliers}
+                    onSelect={(option) => void handleSupplierSelect(option)}
+                    onClear={() => {
+                      stopSupplierLookup();
+                      setSupplierLookupValue(null);
+                      setSupplierDetail(null);
+                      form.setValue("supplierId", "", { shouldDirty: true, shouldValidate: true });
+                    }}
+                  />
+                </div>
+                {canCreateSupplier ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-11 min-w-11 px-3 text-emerald-700 hover:text-emerald-800"
+                    onClick={() => setSupplierDrawerOpen(true)}
+                    aria-label="Add supplier"
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <Input
+              label="Supplier Invoice No."
+              placeholder="Enter invoice no."
+              {...form.register("supplierInvoiceNumber")}
+              error={form.formState.errors.supplierInvoiceNumber?.message}
+            />
+            <Input
+              type="date"
+              label="Invoice Date"
+              {...form.register("invoiceDate")}
+              error={form.formState.errors.invoiceDate?.message}
+            />
+            <Input type="date" label="Due Date" {...form.register("dueDate")} error={form.formState.errors.dueDate?.message} />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)]">
+            <WarehouseLookupSelect
+              label="Default Warehouse"
+              value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
+              warehouses={warehouses}
+              error={form.formState.errors.warehouseId?.message}
+              placeholder="Select warehouse"
+              onChange={(value) => {
+                form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true });
+                applyDefaultWarehouseToItems(value);
               }}
             />
-            {canCreateSupplier ? (
-              <div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-auto px-0 text-emerald-700 hover:bg-transparent hover:text-emerald-800"
-                  onClick={() => setSupplierDrawerOpen(true)}
-                >
-                  <Plus className="mr-2 size-4" />
-                  Add Supplier
-                </Button>
-              </div>
-            ) : null}
+            <Textarea
+              label="Terms"
+              rows={2}
+              className="min-h-[96px]"
+              placeholder="Enter terms and conditions"
+              {...form.register("termsConditions")}
+              error={form.formState.errors.termsConditions?.message}
+            />
+            <Textarea
+              label="Notes"
+              rows={2}
+              className="min-h-[96px]"
+              placeholder="Add notes (optional)"
+              {...form.register("notes")}
+              error={form.formState.errors.notes?.message}
+            />
           </div>
-          <Input label="Supplier Invoice No" {...form.register("supplierInvoiceNumber")} error={form.formState.errors.supplierInvoiceNumber?.message} />
-          <Input type="date" label="Invoice Date" {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
-          <Input type="date" label="Due Date" {...form.register("dueDate")} error={form.formState.errors.dueDate?.message} />
-          <WarehouseLookupSelect
-            value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
-            warehouses={warehouses}
-            error={form.formState.errors.warehouseId?.message}
-            onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
-          />
-          <Textarea label="Notes" rows={3} {...form.register("notes")} error={form.formState.errors.notes?.message} />
-          <Textarea label="Terms" rows={3} {...form.register("termsConditions")} error={form.formState.errors.termsConditions?.message} />
         </CardContent>
       </Card>
 
-      <PurchaseItemsTable
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-5">
+          <PurchaseItemsTable
         form={form}
         fields={fields}
         warehouses={warehouses}
@@ -688,22 +735,26 @@ export const PurchaseForm = ({
             meta: product.unit.symbol,
           };
         }}
-      />
+          />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-5">
           <Card>
             <CardHeader title="Payment" />
-            <CardContent className="grid gap-4 md:grid-cols-2">
+            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <Input type="number" min="0" step="0.01" label="Paid Amount" {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
               <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
-                <option value="">Select Payment Mode</option>
+                <option value="">Select payment mode</option>
                 {PURCHASE_PAYMENT_MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </Select>
+              <Input
+                label="Reference"
+                placeholder="Enter reference (optional)"
+                {...form.register("paymentReference")}
+                error={form.formState.errors.paymentReference?.message}
+              />
               {isBankPaymentMode(currentPaymentMode) ? (
                 <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
                   <option value="">Select Bank Account</option>
@@ -713,10 +764,7 @@ export const PurchaseForm = ({
                     </option>
                   ))}
                 </Select>
-              ) : (
-                <div />
-              )}
-              <Input label="Payment Reference" {...form.register("paymentReference")} error={form.formState.errors.paymentReference?.message} />
+              ) : null}
             </CardContent>
           </Card>
         </div>

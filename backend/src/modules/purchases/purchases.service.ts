@@ -855,6 +855,7 @@ class PurchasesService {
           manufacturingDate: row.item.manufacturingDate,
           expiryDate: row.item.expiryDate,
           quantity: addDecimals(row.item.quantity, row.item.freeQuantity, 3),
+          movementValue: normalizeMoney(row.item.taxableAmount),
           rate:
             compareDecimals(addDecimals(row.item.quantity, row.item.freeQuantity, 3), "0.000", 3) > 0
               ? divideMoneyByQuantity(row.item.taxableAmount, addDecimals(row.item.quantity, row.item.freeQuantity, 3))
@@ -1465,6 +1466,7 @@ class PurchasesService {
             warehouseId: row.item.warehouseId,
             batchId: row.item.batchId,
             quantity: addDecimals(row.item.quantity, row.item.freeQuantity, 3),
+            movementValue: normalizeMoney(row.item.taxableAmount),
             rate:
               compareDecimals(addDecimals(row.item.quantity, row.item.freeQuantity, 3), "0.000", 3) > 0
                 ? divideMoneyByQuantity(row.item.taxableAmount, addDecimals(row.item.quantity, row.item.freeQuantity, 3))
@@ -2001,6 +2003,7 @@ class PurchasesService {
             warehouseId: line.source.item.warehouseId ?? warehouseId,
             batchId: line.source.item.batchId,
             quantity: line.quantity,
+            movementValue: line.taxableAmount,
             rate: line.returnRate
           }))
         },

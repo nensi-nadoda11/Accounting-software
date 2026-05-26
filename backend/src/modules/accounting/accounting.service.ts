@@ -3075,29 +3075,76 @@ class AccountingService {
   }
 
   public async exportCashBook(actor: AccountingActor, query: ExportBookQuery, context: AccountingRequestContext): Promise<ExportPayload> {
-    const ledger = await this.getCashBook(actor, query, context);
+    const dateFrom = this.toDate(query.dateFrom, "dateFrom");
+    const dateTo = this.toDate(query.dateTo, "dateTo");
+    const cashAccount = await this.getSystemAccount(actor.companyId, "cash");
+    const [company, rows, openingTotals] = await Promise.all([
+      companyRepository.findCompanyById(actor.companyId),
+      accountingRepository.listBookRows(actor.companyId, "cash", dateFrom, dateTo),
+      accountingRepository.getBookTotalsBeforeDate(actor.companyId, "cash", dateFrom)
+    ]);
+    const openingBalance = calculateAccountBalanceByNormalSide(cashAccount.normalBalance, openingTotals.debit, openingTotals.credit);
+    const runningBalances = calculateRunningBalance(
+      openingBalance,
+      cashAccount.normalBalance,
+      rows.map((row) => ({
+        debit: normalizeMoney(row.line.debit),
+        credit: normalizeMoney(row.line.credit)
+      }))
+    );
+    const closingBalance = runningBalances.at(-1) ?? openingBalance;
+    const openingSplit = splitBalanceBySide(openingBalance, cashAccount.normalBalance);
+    const closingSplit = splitBalanceBySide(closingBalance, cashAccount.normalBalance);
+    const totalDebit = sumDebits(
+      rows.map((row) => ({
+        debit: normalizeMoney(row.line.debit),
+        credit: "0.00"
+      }))
+    );
+    const totalCredit = sumCredits(
+      rows.map((row) => ({
+        debit: "0.00",
+        credit: normalizeMoney(row.line.credit)
+      }))
+    );
     const dataset: ReportExportDataset = {
       title: "Cash Book",
+      subtitle: company?.legalName || company?.name || "Company",
+      metadata: [
+        { label: "Account", value: `${cashAccount.accountCode} - ${cashAccount.accountName}` },
+        { label: "Date From", value: dateFrom.toISOString().slice(0, 10) },
+        { label: "Date To", value: dateTo.toISOString().slice(0, 10) },
+        { label: "Entries", value: String(rows.length) }
+      ],
+      summary: [
+        { label: "Opening Balance", value: `${openingSplit.amount} ${openingSplit.side}` },
+        { label: "Total Debit", value: totalDebit },
+        { label: "Total Credit", value: totalCredit },
+        { label: "Closing Balance", value: `${closingSplit.amount} ${closingSplit.side}` }
+      ],
       columns: [
-        { key: "entryDate", label: "Date" },
+        { key: "entryDate", label: "Date", type: "date" },
         { key: "journalNumber", label: "Journal No" },
         { key: "voucherType", label: "Voucher" },
+        { key: "referenceNumber", label: "Reference" },
         { key: "description", label: "Description" },
         { key: "debit", label: "Debit", type: "number" },
         { key: "credit", label: "Credit", type: "number" },
         { key: "runningBalance", label: "Running Balance", type: "number" },
         { key: "balanceSide", label: "Balance Side" }
       ],
-      rows: ledger.rows.map((row) => ({
-        entryDate: row.entryDate.toISOString().slice(0, 10),
-        journalNumber: row.journalNumber,
-        voucherType: row.voucherType,
-        description: row.description ?? "",
-        debit: row.debit,
-        credit: row.credit,
-        runningBalance: row.runningBalance.amount,
-        balanceSide: row.runningBalance.side
-      }))
+      rows: rows.map((row, index) => ({
+        entryDate: row.journal.entryDate,
+        journalNumber: row.journal.journalNumber,
+        voucherType: row.journal.voucherType,
+        referenceNumber: row.journal.referenceNumber ?? row.journal.referenceType ?? "-",
+        description: row.line.description ?? row.journal.description ?? "",
+        debit: normalizeMoney(row.line.debit),
+        credit: normalizeMoney(row.line.credit),
+        runningBalance: splitBalanceBySide(runningBalances[index], cashAccount.normalBalance).amount,
+        balanceSide: splitBalanceBySide(runningBalances[index], cashAccount.normalBalance).side
+      })),
+      notes: rows.length ? undefined : "No cash book rows found for the selected period."
     };
 
     await auditLogService.log({

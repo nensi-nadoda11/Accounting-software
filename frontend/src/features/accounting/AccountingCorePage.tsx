@@ -160,7 +160,7 @@ export const AccountingCorePage = () => {
   const [accountsSearch, setAccountsSearch] = useState("");
   const debouncedAccountsSearch = useDebouncedValue(accountsSearch, 350);
   const [accountsPage, setAccountsPage] = useState(1);
-  const [accountsHierarchy, setAccountsHierarchy] = useState(false);
+  const [accountsHierarchy] = useState(false);
   const [accountTypeFilter, setAccountTypeFilter] = useState<AccountType | "">("");
   const [accountStatusFilter, setAccountStatusFilter] = useState<"active" | "inactive" | "">("");
   const [accountParentFilter, setAccountParentFilter] = useState("");
@@ -191,7 +191,6 @@ export const AccountingCorePage = () => {
   const [journalsPage, setJournalsPage] = useState(1);
   const [journalVoucherFilter, setJournalVoucherFilter] = useState<JournalVoucherType | "">("");
   const [journalStatusFilter, setJournalStatusFilter] = useState<JournalStatus | "">("");
-  const [journalReferenceTypeFilter, setJournalReferenceTypeFilter] = useState("");
   const [journalDateFrom, setJournalDateFrom] = useState(getMonthStartInput());
   const [journalDateTo, setJournalDateTo] = useState(getTodayInput());
   const [journalRefreshKey, setJournalRefreshKey] = useState(0);
@@ -453,7 +452,6 @@ export const AccountingCorePage = () => {
           search: debouncedJournalsSearch || undefined,
           voucherType: journalVoucherFilter || undefined,
           status: journalStatusFilter || undefined,
-          referenceType: journalReferenceTypeFilter || undefined,
           dateFrom: journalDateFrom,
           dateTo: journalDateTo,
         });
@@ -467,7 +465,7 @@ export const AccountingCorePage = () => {
     };
 
     void loadJournals();
-  }, [activeTab, journalsPage, debouncedJournalsSearch, journalVoucherFilter, journalStatusFilter, journalReferenceTypeFilter, journalDateFrom, journalDateTo, journalRefreshKey, toast]);
+  }, [activeTab, journalsPage, debouncedJournalsSearch, journalVoucherFilter, journalStatusFilter, journalDateFrom, journalDateTo, journalRefreshKey, toast]);
 
   useEffect(() => {
     if (activeTab !== "ledger") {
@@ -979,25 +977,7 @@ return (
                     </option>
                   ))}
                 </Select>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={accountsHierarchy ? "secondary" : "primary"}
-                    className="flex-1"
-                    onClick={() => { setAccountsHierarchy(false); setAccountsPage(1); }}
-                  >
-                    List
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={accountsHierarchy ? "primary" : "secondary"}
-                    className="flex-1"
-                    onClick={() => { setAccountsHierarchy(true); setAccountsPage(1); }}
-                  >
-                    Hierarchy
-                  </Button>
-                </div>
-                <div className="flex flex-wrap justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2 xl:col-start-6">
                   {canManageChart ? (
                     <Button type="button" onClick={() => void openAccountDrawer("create")}>
                       <Plus className="mr-2 size-4" />
@@ -1114,10 +1094,9 @@ return (
                   <option value="cancelled">Cancelled</option>
                   <option value="reversed">Reversed</option>
                 </Select>
-                <div className="flex gap-2">
-                  <Input placeholder="Reference type" value={journalReferenceTypeFilter} onChange={(event) => { setJournalReferenceTypeFilter(event.target.value); setJournalsPage(1); }} />
+                <div className="flex">
                   {canCreateJournal ? (
-                    <Button type="button" onClick={() => void openJournalDrawer("create")}>
+                    <Button type="button" className="w-full" onClick={() => void openJournalDrawer("create")}>
                       <Plus className="mr-2 size-4" />
                       Add
                     </Button>
@@ -1246,44 +1225,6 @@ return (
                 )}
                 <Input type="date" value={ledgerDateFrom} onChange={(event) => { setLedgerDateFrom(event.target.value); setLedgerPage(1); }} />
                 <Input type="date" value={ledgerDateTo} onChange={(event) => { setLedgerDateTo(event.target.value); setLedgerPage(1); }} />
-                <div className="flex justify-end">
-                  {canExport ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={!ledgerTargetId}
-                      onClick={() =>
-                        void handleExport(
-                          () =>
-                            ledgerScope === "account"
-                              ? accountingApi.exportLedger(ledgerTargetId, {
-                                  page: ledgerPage,
-                                  limit: LEDGER_LIMIT,
-                                  dateFrom: ledgerDateFrom,
-                                  dateTo: ledgerDateTo,
-                                })
-                              : ledgerScope === "customer"
-                                ? accountingApi.exportCustomerLedger(ledgerTargetId, {
-                                    page: ledgerPage,
-                                    limit: LEDGER_LIMIT,
-                                    dateFrom: ledgerDateFrom,
-                                    dateTo: ledgerDateTo,
-                                  })
-                                : accountingApi.exportSupplierLedger(ledgerTargetId, {
-                                    page: ledgerPage,
-                                    limit: LEDGER_LIMIT,
-                                    dateFrom: ledgerDateFrom,
-                                    dateTo: ledgerDateTo,
-                                  }),
-                          "Ledger exported",
-                        )
-                      }
-                    >
-                      <Download className="mr-2 size-4" />
-                      Export
-                    </Button>
-                  ) : null}
-                </div>
               </CardContent>
             </Card>
             <LedgerTable data={ledgerData} loading={ledgerLoading} error={ledgerError} onPageChange={setLedgerPage} />
@@ -1309,6 +1250,7 @@ return (
                             accountingApi.exportCashBook({
                               page: cashBookPage,
                               limit: LEDGER_LIMIT,
+                              format: "pdf",
                               dateFrom: cashBookDateFrom,
                               dateTo: cashBookDateTo,
                             }),

@@ -462,23 +462,23 @@ export const createFinancialPeriodLockSchema = z
   });
 
 export const exportLedgerQuerySchema = ledgerQuerySchema.safeExtend({
-  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("pdf")
 });
 
 export const exportBookQuerySchema = bookQuerySchema.safeExtend({
-  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("pdf")
 });
 
 export const exportTrialBalanceQuerySchema = trialBalanceQuerySchema.safeExtend({
-  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("pdf")
 });
 
 export const exportProfitLossQuerySchema = profitLossQuerySchema.safeExtend({
-  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("pdf")
 });
 
 export const exportBalanceSheetQuerySchema = balanceSheetQuerySchema.safeExtend({
-  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(ACCOUNTING_EXPORT_FORMATS).optional().default("pdf")
 });
 
 export const emptyBodySchema = z.object({}).strict();

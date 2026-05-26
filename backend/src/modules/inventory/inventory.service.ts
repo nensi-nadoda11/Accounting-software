@@ -100,6 +100,18 @@ const ALL_ALERT_TYPES: InventoryAlertType[] = [
 const pickDefined = <T extends Record<string, unknown>>(value: T): Partial<T> =>
   Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Partial<T>;
 
+const formatReportDateLabel = (value: Date | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  return value.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+};
+
 class InventoryService {
   private mapWarehouse(warehouse: WarehouseRecord) {
     return {
@@ -1997,10 +2009,33 @@ class InventoryService {
       })
     });
 
+    let totalInQuantity = "0.000";
+    let totalOutQuantity = "0.000";
+    let totalValue = "0.00";
+
+    for (const row of rows) {
+      totalInQuantity = addDecimals(totalInQuantity, row.movement.inQuantity, 3);
+      totalOutQuantity = addDecimals(totalOutQuantity, row.movement.outQuantity, 3);
+      totalValue = addDecimals(totalValue, row.movement.value, 2);
+    }
+
     const dataset: ReportExportDataset = {
       title: "Inventory Movements",
+      subtitle: "Stock movement register",
+      metadata: [
+        { label: "Date From", value: formatReportDateLabel(query.dateFrom ?? null) },
+        { label: "Date To", value: formatReportDateLabel(query.dateTo ?? null) },
+        { label: "Reference", value: query.referenceType ?? "All" },
+        { label: "Movement Type", value: query.movementType ?? "All" }
+      ],
+      summary: [
+        { label: "Total Records", value: rows.length },
+        { label: "Total In Qty", value: normalizeQuantity(totalInQuantity) },
+        { label: "Total Out Qty", value: normalizeQuantity(totalOutQuantity) },
+        { label: "Total Value", value: normalizeMoney(totalValue) }
+      ],
       columns: [
-        { key: "movementDate", label: "Movement Date" },
+        { key: "movementDate", label: "Movement Date", type: "datetime" },
         { key: "movementType", label: "Movement Type" },
         { key: "productCode", label: "Product Code" },
         { key: "productName", label: "Product Name" },
@@ -2192,8 +2227,55 @@ class InventoryService {
       })
     });
 
+    let totalStockValue = "0.00";
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+    let expiredCount = 0;
+    let expiringSoonCount = 0;
+
+    for (const row of rows) {
+      totalStockValue = addDecimals(totalStockValue, row.balance.stockValue, 2);
+
+      if (compareDecimals(row.balance.availableQuantity, row.product.minimumStockLevel, 3) <= 0) {
+        lowStockCount += 1;
+      }
+
+      if (compareDecimals(row.balance.availableQuantity, "0", 3) <= 0) {
+        outOfStockCount += 1;
+      }
+
+      const expiryDateOnly = row.expiryDate ? toDateOnly(row.expiryDate) : null;
+      if (expiryDateOnly && expiryDateOnly < this.getTodayDateOnly() && compareDecimals(row.balance.availableQuantity, "0", 3) > 0) {
+        expiredCount += 1;
+      }
+
+      if (
+        expiryDateOnly &&
+        expiryDateOnly >= this.getTodayDateOnly() &&
+        expiryDateOnly <= this.getFutureDateOnly(env.INVENTORY_EXPIRY_ALERT_DAYS) &&
+        compareDecimals(row.balance.availableQuantity, "0", 3) > 0
+      ) {
+        expiringSoonCount += 1;
+      }
+    }
+
     const dataset: ReportExportDataset = {
       title: "Inventory Stock",
+      subtitle: "Current stock snapshot",
+      metadata: [
+        { label: "Search", value: query.search ?? "All" },
+        { label: "Status", value: query.status ?? "All" },
+        { label: "Low Stock", value: query.lowStock === undefined ? "All" : query.lowStock ? "Yes" : "No" },
+        { label: "Out Of Stock", value: query.outOfStock === undefined ? "All" : query.outOfStock ? "Yes" : "No" }
+      ],
+      summary: [
+        { label: "Total Records", value: rows.length },
+        { label: "Stock Value", value: normalizeMoney(totalStockValue) },
+        { label: "Low Stock", value: lowStockCount },
+        { label: "Out Of Stock", value: outOfStockCount },
+        { label: "Expired", value: expiredCount },
+        { label: "Expiring Soon", value: expiringSoonCount }
+      ],
       columns: [
         { key: "productCode", label: "Product Code" },
         { key: "productName", label: "Product Name" },
@@ -2202,7 +2284,7 @@ class InventoryService {
         { key: "warehouseCode", label: "Warehouse Code" },
         { key: "warehouseName", label: "Warehouse Name" },
         { key: "batchNumber", label: "Batch Number" },
-        { key: "expiryDate", label: "Expiry Date" },
+        { key: "expiryDate", label: "Expiry Date", type: "date" },
         { key: "availableQuantity", label: "Available Quantity", type: "number" },
         { key: "reservedQuantity", label: "Reserved Quantity", type: "number" },
         { key: "damagedQuantity", label: "Damaged Quantity", type: "number" },
@@ -2378,6 +2460,18 @@ class InventoryService {
 
     const dataset: ReportExportDataset = {
       title: "Inventory Valuation",
+      subtitle: "Inventory value summary",
+      metadata: [
+        { label: "Method", value: query.method },
+        { label: "Warehouse", value: query.warehouseId ? "Selected" : "All" },
+        { label: "Category", value: query.categoryId ? "Selected" : "All" },
+        { label: "Product", value: query.productId ? "Selected" : "All" }
+      ],
+      summary: [
+        { label: "Total Records", value: valuation.items.length },
+        { label: "Total Quantity", value: valuation.totals.totalQuantity },
+        { label: "Total Value", value: valuation.totals.totalValue }
+      ],
       columns: [
         { key: "productCode", label: "Product Code" },
         { key: "productName", label: "Product Name" },

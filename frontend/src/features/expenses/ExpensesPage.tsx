@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Download, Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
@@ -37,7 +37,6 @@ import type {
   RecurringExpense,
   RecurringExpenseListResponse,
 } from "../../types/expense";
-import { saveDownloadedFile } from "../customers/customerUtils";
 import { useDebouncedValue } from "../customers/useDebouncedValue";
 import {
   DEFAULT_EXPENSE_PAGE_SIZE,
@@ -92,7 +91,6 @@ export const ExpensesPage = () => {
   const canUpdate = auth.hasPermission("expense.update");
   const canDelete = auth.hasPermission("expense.delete");
   const canPost = auth.hasPermission("expense.post");
-  const canExport = auth.hasPermission("expense.export");
   const canManageCategories = auth.hasPermission("expense.category.manage");
   const canManageRecurring = auth.hasPermission("expense.recurring.manage");
 
@@ -130,33 +128,25 @@ export const ExpensesPage = () => {
   const [bankAccounts, setBankAccounts] = useState<CompanyBankAccount[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
   const [categoryLookup, setCategoryLookup] = useState<ExpenseCategory[]>([]);
-  const [recurringLookup, setRecurringLookup] = useState<RecurringExpense[]>([]);
   const [referencesLoading, setReferencesLoading] = useState(true);
 
   const [expensesSearch, setExpensesSearch] = useState("");
   const debouncedExpensesSearch = useDebouncedValue(expensesSearch, 350);
   const [expensesPage, setExpensesPage] = useState(1);
   const [expensesFilters, setExpensesFilters] = useState<{
-    categoryId: string;
     paymentMode: string;
     status: string;
-    gstApplicable: "" | "true" | "false";
     dateFrom: string;
     dateTo: string;
-    recurringExpenseId: string;
   }>({
-    categoryId: "",
     paymentMode: "",
     status: "",
-    gstApplicable: "",
     dateFrom: getMonthStartInput(),
     dateTo: getTodayInput(),
-    recurringExpenseId: "",
   });
   const [expensesData, setExpensesData] = useState<ExpenseListResponse | null>(null);
   const [expensesLoading, setExpensesLoading] = useState(false);
   const [expensesRefreshKey, setExpensesRefreshKey] = useState(0);
-  const [exportingList, setExportingList] = useState(false);
 
   const [expenseDrawerOpen, setExpenseDrawerOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -248,16 +238,10 @@ export const ExpensesPage = () => {
     page: expensesPage,
     limit: DEFAULT_EXPENSE_PAGE_SIZE,
     search: debouncedExpensesSearch || undefined,
-    categoryId: expensesFilters.categoryId || undefined,
     paymentMode: expensesFilters.paymentMode as ExpenseFiltersQuery["paymentMode"],
     status: expensesFilters.status as ExpenseFiltersQuery["status"],
-    gstApplicable:
-      expensesFilters.gstApplicable === ""
-        ? undefined
-        : expensesFilters.gstApplicable === "true",
     dateFrom: expensesFilters.dateFrom || undefined,
     dateTo: expensesFilters.dateTo || undefined,
-    recurringExpenseId: expensesFilters.recurringExpenseId || undefined,
   });
 
   const loadCategoryLookup = async () => {
@@ -267,18 +251,6 @@ export const ExpensesPage = () => {
 
     const response = await expensesApi.listCategories({});
     setCategoryLookup(response.data.items);
-  };
-
-  const loadRecurringLookup = async () => {
-    if (!canView && !canManageRecurring) {
-      return;
-    }
-
-    const response = await expensesApi.listRecurring({
-      page: 1,
-      limit: 100,
-    });
-    setRecurringLookup(response.data.items);
   };
 
   const loadReferences = async () => {
@@ -300,7 +272,7 @@ export const ExpensesPage = () => {
       setBankAccounts(banksResult.status === "fulfilled" ? banksResult.value.data.items.filter((item) => item.isActive) : []);
       setExpenseAccounts(accountsResult.status === "fulfilled" ? accountsResult.value.data.items : []);
 
-      await Promise.all([loadCategoryLookup(), loadRecurringLookup()]);
+      await loadCategoryLookup();
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to load expense references"));
     } finally {
@@ -644,7 +616,6 @@ export const ExpensesPage = () => {
 
       setRecurringDrawerOpen(false);
       setEditingRecurring(null);
-      await loadRecurringLookup();
       refreshRecurring();
     } finally {
       setRecurringSubmitting(false);
@@ -660,18 +631,14 @@ export const ExpensesPage = () => {
       const response = await expensesApi.runRecurring(item.id);
       const createdExpense = response.data.expense.expense;
 
-      setExpensesSearch("");
+      setExpensesSearch(createdExpense.expenseNumber);
       setExpensesPage(1);
-      setExpensesFilters((current) => ({
-        ...current,
-        categoryId: "",
+      setExpensesFilters({
         paymentMode: "",
         status: "",
-        gstApplicable: "",
-        dateFrom: "",
-        dateTo: "",
-        recurringExpenseId: item.id,
-      }));
+        dateFrom: getMonthStartInput(),
+        dateTo: getTodayInput(),
+      });
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.set("tab", "expenses");
@@ -693,7 +660,6 @@ export const ExpensesPage = () => {
       });
       toast.success(item.status === "paused" ? "Recurring expense activated" : "Recurring expense paused");
       refreshRecurring();
-      await loadRecurringLookup();
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to update recurring expense"));
     }
@@ -829,17 +795,24 @@ export const ExpensesPage = () => {
         {activeTab === "expenses" ? (
           <div className="space-y-4">
             <Card>
-              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <Input placeholder="Search expense no, payee, description, reference" value={expensesSearch} onChange={(event) => { setExpensesSearch(event.target.value); setExpensesPage(1); }} />
-                <Select value={expensesFilters.categoryId} onChange={(event) => { setExpensesFilters((current) => ({ ...current, categoryId: event.target.value })); setExpensesPage(1); }}>
-                  <option value="">All categories</option>
-                  {categoryLookup.filter((item) => item.status === "active").map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </Select>
-                <Select value={expensesFilters.paymentMode} onChange={(event) => { setExpensesFilters((current) => ({ ...current, paymentMode: event.target.value })); setExpensesPage(1); }}>
+              <CardContent className="flex flex-wrap gap-3 xl:flex-nowrap">
+                <Input
+                  placeholder="Search expense no, payee, description, reference"
+                  value={expensesSearch}
+                  className="h-[2.875rem] w-full px-4 text-base xl:min-w-[20rem] xl:flex-[1.7]"
+                  onChange={(event) => {
+                    setExpensesSearch(event.target.value);
+                    setExpensesPage(1);
+                  }}
+                />
+                <Select
+                  value={expensesFilters.paymentMode}
+                  className="h-[2.875rem] w-full px-4 text-base xl:min-w-[12rem] xl:flex-1"
+                  onChange={(event) => {
+                    setExpensesFilters((current) => ({ ...current, paymentMode: event.target.value }));
+                    setExpensesPage(1);
+                  }}
+                >
                   <option value="">All payment modes</option>
                   {EXPENSE_PAYMENT_MODE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -847,7 +820,14 @@ export const ExpensesPage = () => {
                     </option>
                   ))}
                 </Select>
-                <Select value={expensesFilters.status} onChange={(event) => { setExpensesFilters((current) => ({ ...current, status: event.target.value })); setExpensesPage(1); }}>
+                <Select
+                  value={expensesFilters.status}
+                  className="h-[2.875rem] w-full px-4 text-base xl:min-w-[11rem] xl:flex-1"
+                  onChange={(event) => {
+                    setExpensesFilters((current) => ({ ...current, status: event.target.value }));
+                    setExpensesPage(1);
+                  }}
+                >
                   <option value="">All status</option>
                   {EXPENSE_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -855,65 +835,24 @@ export const ExpensesPage = () => {
                     </option>
                   ))}
                 </Select>
-                <Select value={expensesFilters.gstApplicable} onChange={(event) => { setExpensesFilters((current) => ({ ...current, gstApplicable: event.target.value as "" | "true" | "false" })); setExpensesPage(1); }}>
-                  <option value="">GST all</option>
-                  <option value="true">GST only</option>
-                  <option value="false">Non-GST only</option>
-                </Select>
-                <Input type="date" value={expensesFilters.dateFrom} onChange={(event) => { setExpensesFilters((current) => ({ ...current, dateFrom: event.target.value })); setExpensesPage(1); }} />
-                <Input type="date" value={expensesFilters.dateTo} onChange={(event) => { setExpensesFilters((current) => ({ ...current, dateTo: event.target.value })); setExpensesPage(1); }} />
-                <Select value={expensesFilters.recurringExpenseId} onChange={(event) => { setExpensesFilters((current) => ({ ...current, recurringExpenseId: event.target.value })); setExpensesPage(1); }}>
-                  <option value="">All recurring templates</option>
-                  {recurringLookup.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.templateName}
-                    </option>
-                  ))}
-                </Select>
-                <div />
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setExpensesSearch("");
-                      setExpensesFilters({
-                        categoryId: "",
-                        paymentMode: "",
-                        status: "",
-                        gstApplicable: "",
-                        dateFrom: getMonthStartInput(),
-                        dateTo: getTodayInput(),
-                        recurringExpenseId: "",
-                      });
-                      setExpensesPage(1);
-                    }}
-                  >
-                    Reset
-                  </Button>
-                  {canExport ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      loading={exportingList}
-                      onClick={async () => {
-                        try {
-                          setExportingList(true);
-                          const file = await expensesApi.exportList(buildExpensesQuery());
-                          saveDownloadedFile(file.blob, file.fileName);
-                          toast.success("Expenses exported");
-                        } catch (error) {
-                          toast.error(getErrorMessage(error, "Failed to export expenses"));
-                        } finally {
-                          setExportingList(false);
-                        }
-                      }}
-                    >
-                      <Download className="mr-2 size-4" />
-                      Export
-                    </Button>
-                  ) : null}
-                </div>
+                <Input
+                  type="date"
+                  value={expensesFilters.dateFrom}
+                  className="h-[2.875rem] w-full px-4 text-base xl:min-w-[10.5rem] xl:flex-1"
+                  onChange={(event) => {
+                    setExpensesFilters((current) => ({ ...current, dateFrom: event.target.value }));
+                    setExpensesPage(1);
+                  }}
+                />
+                <Input
+                  type="date"
+                  value={expensesFilters.dateTo}
+                  className="h-[2.875rem] w-full px-4 text-base xl:min-w-[10.5rem] xl:flex-1"
+                  onChange={(event) => {
+                    setExpensesFilters((current) => ({ ...current, dateTo: event.target.value }));
+                    setExpensesPage(1);
+                  }}
+                />
               </CardContent>
             </Card>
 

@@ -87,6 +87,19 @@ const formatDateValue = (value: Date | string | null | undefined) => {
   return parsed.toISOString().slice(0, 10);
 };
 
+const formatReportDateLabel = (value: Date | string) => {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+};
+
 class GstService {
   private toDate(value: Date | string | null | undefined, fieldName: string): Date {
     if (value instanceof Date) {
@@ -1350,8 +1363,30 @@ class GstService {
 
   public async exportGstr1(actor: GstActor, query: GstGstr1ExportQuery, context: GstRequestContext): Promise<GstExportPayload> {
     const result = await this.listSales(actor, query, context);
+    const taxableAmountTotal = result.items.reduce((sum, row) => sum + Number(row.taxableAmount), 0);
+    const cgstAmountTotal = result.items.reduce((sum, row) => sum + Number(row.cgstAmount), 0);
+    const sgstAmountTotal = result.items.reduce((sum, row) => sum + Number(row.sgstAmount), 0);
+    const igstAmountTotal = result.items.reduce((sum, row) => sum + Number(row.igstAmount), 0);
+    const invoiceTotal = result.items.reduce((sum, row) => sum + Number(row.invoiceTotal), 0);
     const dataset: ReportExportDataset = {
       title: "GSTR-1",
+      subtitle: "GST outward supplies return",
+      metadata: [
+        {
+          label: "Period",
+          value: `${formatReportDateLabel(query.dateFrom)} to ${formatReportDateLabel(query.dateTo)}`
+        },
+        {
+          label: "Rows",
+          value: String(result.items.length)
+        }
+      ],
+      summary: [
+        { label: "Invoices", value: result.items.length },
+        { label: "Taxable Value", value: taxableAmountTotal.toFixed(2) },
+        { label: "Output GST", value: (cgstAmountTotal + sgstAmountTotal + igstAmountTotal).toFixed(2) },
+        { label: "Invoice Total", value: invoiceTotal.toFixed(2) }
+      ],
       columns: [
         { key: "invoiceDate", label: "Invoice Date" },
         { key: "invoiceNumber", label: "Invoice No" },
@@ -1409,6 +1444,23 @@ class GstService {
     );
     const dataset: ReportExportDataset = {
       title: "GSTR-3B",
+      subtitle: "GST summary return",
+      metadata: [
+        {
+          label: "Period",
+          value: `${formatReportDateLabel(query.dateFrom)} to ${formatReportDateLabel(query.dateTo)}`
+        },
+        {
+          label: "Sections",
+          value: "12"
+        }
+      ],
+      summary: [
+        { label: "Output GST", value: Number(summary.outputGst).toFixed(2) },
+        { label: "Input GST", value: Number(summary.inputGst).toFixed(2) },
+        { label: "Net Payable", value: Number(summary.netGstPayable).toFixed(2) },
+        { label: "Net Credit", value: Number(summary.netGstCredit).toFixed(2) }
+      ],
       columns: [
         { key: "section", label: "Section" },
         { key: "amount", label: "Amount", type: "number" }

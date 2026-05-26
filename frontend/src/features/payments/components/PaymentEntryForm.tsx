@@ -430,13 +430,25 @@ export const PaymentEntryForm = ({
           </div>
           <Input type="date" label="Payment Date" {...form.register("paymentDate")} error={form.formState.errors.paymentDate?.message} />
           <Input type="number" min="0" step="0.01" label="Amount" {...form.register("amount")} error={form.formState.errors.amount?.message} />
-          <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
-            {PAYMENT_MODE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
+          <div className="md:col-span-2 xl:col-span-4">
+            <div className="grid gap-4 xl:grid-cols-3">
+              <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
+                {PAYMENT_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+              <Input label="Reference Number" {...form.register("referenceNumber")} error={form.formState.errors.referenceNumber?.message} />
+              <Textarea
+                label="Notes"
+                rows={1}
+                className="app-control-height min-h-0 resize-none py-3"
+                {...form.register("notes")}
+                error={form.formState.errors.notes?.message}
+              />
+            </div>
+          </div>
           {requiresBankAccount(paymentMode) ? (
             <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
               <option value="">Select bank account</option>
@@ -449,7 +461,6 @@ export const PaymentEntryForm = ({
           ) : (
             <div />
           )}
-          <Input label="Reference Number" {...form.register("referenceNumber")} error={form.formState.errors.referenceNumber?.message} />
           {isChequeMode(paymentMode) ? (
             <>
               <Input label="Cheque Number" {...form.register("chequeNumber")} error={form.formState.errors.chequeNumber?.message} />
@@ -457,9 +468,6 @@ export const PaymentEntryForm = ({
               <Input label="Cheque Bank Name" {...form.register("chequeBankName")} error={form.formState.errors.chequeBankName?.message} />
             </>
           ) : null}
-          <div className="md:col-span-2 xl:col-span-4">
-            <Textarea label="Notes" rows={3} {...form.register("notes")} error={form.formState.errors.notes?.message} />
-          </div>
         </CardContent>
       </Card>
 

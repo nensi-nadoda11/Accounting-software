@@ -748,6 +748,7 @@ export const InventoryStockPage = () => {
                       outOfStock: stockOutOfStock === "" ? undefined : stockOutOfStock === "true",
                       expired: stockExpired === "" ? undefined : stockExpired === "true",
                       expiringSoon: stockExpiringSoon === "" ? undefined : stockExpiringSoon === "true",
+                      format: "pdf",
                     })
                   : activeTab === "movements"
                     ? await inventoryApi.exportMovements({
@@ -760,11 +761,13 @@ export const InventoryStockPage = () => {
                         referenceType: movementReferenceType || undefined,
                         dateFrom: movementDateFrom || undefined,
                         dateTo: movementDateTo || undefined,
+                        format: "pdf",
                       })
                     : await inventoryApi.exportValuation({
                         warehouseId: valuationWarehouseOption?.id,
                         categoryId: valuationCategoryId || undefined,
                         productId: valuationProductOption?.id,
+                        format: "pdf",
                       });
 
               saveDownloadedFile(download.blob, download.fileName);
@@ -798,23 +801,7 @@ export const InventoryStockPage = () => {
         {activeTab === "current-stock" ? (
           <div className="space-y-4">
             <StockSummaryCards summary={stockSummary} loading={stockSummaryLoading} />
-            <InventoryFilters
-              actions={
-                canManageInventory ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setOpeningStockSeed(null);
-                      setOpeningStockOpen(true);
-                    }}
-                  >
-                    <Plus className="mr-2 size-4" />
-                    Opening Stock
-                  </Button>
-                ) : undefined
-              }
-            >
+            <InventoryFilters className="md:grid-cols-2 xl:grid-cols-8">
               <Input
                 label="Search"
                 value={stockSearchInput}
@@ -1049,23 +1036,7 @@ export const InventoryStockPage = () => {
 
         {activeTab === "batches" ? (
           <div className="space-y-4">
-            <InventoryFilters
-              actions={
-                canManageInventory ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setOpeningStockSeed(null);
-                      setOpeningStockOpen(true);
-                    }}
-                  >
-                    <Plus className="mr-2 size-4" />
-                    Opening Stock
-                  </Button>
-                ) : undefined
-              }
-            >
+            <InventoryFilters className="md:grid-cols-2 xl:grid-cols-5">
               <InventoryLookupField
                 label="Product"
                 value={batchProductOption}
@@ -1210,7 +1181,7 @@ export const InventoryStockPage = () => {
 
         {activeTab === "adjustments" ? (
           <div className="space-y-4">
-            <InventoryFilters>
+            <InventoryFilters className="md:grid-cols-2 xl:grid-cols-5">
               <Input type="date" label="Date From" value={adjustmentDateFrom} onChange={(event) => setAdjustmentDateFrom(event.target.value)} />
               <Input type="date" label="Date To" value={adjustmentDateTo} onChange={(event) => setAdjustmentDateTo(event.target.value)} />
               <InventoryLookupField

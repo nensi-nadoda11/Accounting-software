@@ -238,7 +238,7 @@ export const updateGstItcStatusSchema = z
   });
 
 const exportFormatField = {
-  format: z.enum(GST_REPORT_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(GST_REPORT_EXPORT_FORMATS).optional().default("pdf")
 };
 
 export const gstSalesExportQuerySchema = gstSalesQuerySchema.extend(exportFormatField);

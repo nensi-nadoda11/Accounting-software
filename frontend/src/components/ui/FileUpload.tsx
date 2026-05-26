@@ -7,6 +7,7 @@ import { FormField } from "./FormField";
 
 export const FileUpload = ({
   label,
+  required,
   previewUrl,
   error,
   accept = "image/png,image/jpeg,image/webp",
@@ -18,6 +19,7 @@ export const FileUpload = ({
   previewClassName,
 }: {
   label: string;
+  required?: boolean;
   previewUrl?: string | null;
   error?: string;
   accept?: string;
@@ -32,7 +34,7 @@ export const FileUpload = ({
   const id = useId();
 
   return (
-    <FormField label={label} htmlFor={id} error={error}>
+    <FormField label={label} htmlFor={id} error={error} required={required}>
       <input
         ref={inputRef}
         id={id}

@@ -107,9 +107,10 @@ export const CustomerFormDrawer = ({
           <CardHeader title="Basic" />
           <CardContent className="space-y-4">
             <SectionGrid>
-              <Input label="Name" {...form.register("name")} error={form.formState.errors.name?.message} />
+              <Input label="Name" required {...form.register("name")} error={form.formState.errors.name?.message} />
               <Select
                 label="Customer Type"
+                required
                 {...form.register("customerType")}
                 error={form.formState.errors.customerType?.message}
               >
@@ -135,7 +136,7 @@ export const CustomerFormDrawer = ({
                   error={form.formState.errors.contactPerson?.message}
                 />
               ) : null}
-              <Input label="Mobile" inputMode="numeric" {...form.register("mobile")} error={form.formState.errors.mobile?.message} />
+              <Input label="Mobile" required inputMode="numeric" {...form.register("mobile")} error={form.formState.errors.mobile?.message} />
               <Input
                 label="Alternate Mobile"
                 inputMode="numeric"
@@ -162,7 +163,7 @@ export const CustomerFormDrawer = ({
                 value={watchInputValue("panNumber")}
                 error={form.formState.errors.panNumber?.message}
               />
-              <Select label="Tax Type" {...form.register("taxType")} error={form.formState.errors.taxType?.message}>
+              <Select label="Tax Type" required {...form.register("taxType")} error={form.formState.errors.taxType?.message}>
                 {FORM_TAX_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}

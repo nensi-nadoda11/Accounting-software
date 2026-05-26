@@ -125,8 +125,8 @@ export const ExpenseForm = ({
         <CardHeader title={editing ? "Edit Expense Draft" : "New Expense"} />
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Input type="date" label="Expense Date" {...form.register("expenseDate")} error={form.formState.errors.expenseDate?.message} />
-            <Select label="Category" {...form.register("categoryId")} error={form.formState.errors.categoryId?.message}>
+            <Input type="date" label="Expense Date" required {...form.register("expenseDate")} error={form.formState.errors.expenseDate?.message} />
+            <Select label="Category" required {...form.register("categoryId")} error={form.formState.errors.categoryId?.message}>
               <option value="">Select category</option>
               {categories.filter((item) => item.status === "active").map((category) => (
                 <option key={category.id} value={category.id}>
@@ -142,7 +142,7 @@ export const ExpenseForm = ({
                 </option>
               ))}
             </Select>
-            <Input label="Payee / Vendor" {...form.register("payeeName")} error={form.formState.errors.payeeName?.message} />
+            <Input label="Payee / Vendor" required {...form.register("payeeName")} error={form.formState.errors.payeeName?.message} />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -151,6 +151,7 @@ export const ExpenseForm = ({
             <Input label="HSN / SAC Code" {...form.register("hsnSacCode")} error={form.formState.errors.hsnSacCode?.message} />
             <Input
               label="Amount"
+              required
               type="number"
               min="0"
               step="0.01"
@@ -159,7 +160,7 @@ export const ExpenseForm = ({
             />
           </div>
 
-          <Textarea label="Description" rows={3} {...form.register("description")} error={form.formState.errors.description?.message} />
+          <Textarea label="Description" required rows={3} {...form.register("description")} error={form.formState.errors.description?.message} />
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <Controller
@@ -186,7 +187,7 @@ export const ExpenseForm = ({
                 </option>
               ))}
             </Select>
-            <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
+            <Select label="Payment Mode" required {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
               {EXPENSE_PAYMENT_MODE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -197,7 +198,7 @@ export const ExpenseForm = ({
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {requiresBankAccount ? (
-              <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
+              <Select label="Bank Account" required={requiresBankAccount} {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
                 <option value="">Select bank account</option>
                 {bankAccounts.map((account) => (
                   <option key={account.id} value={account.id}>
@@ -208,11 +209,11 @@ export const ExpenseForm = ({
             ) : (
               <div />
             )}
-            <Input label="Reference Number" {...form.register("referenceNumber")} error={form.formState.errors.referenceNumber?.message} />
+            <Input label="Reference Number" required={requiresBankAccount} {...form.register("referenceNumber")} error={form.formState.errors.referenceNumber?.message} />
             {paymentMode === "cheque" ? (
               <>
-                <Input label="Cheque Number" {...form.register("chequeNumber")} error={form.formState.errors.chequeNumber?.message} />
-                <Input type="date" label="Cheque Date" {...form.register("chequeDate")} error={form.formState.errors.chequeDate?.message} />
+                <Input label="Cheque Number" required {...form.register("chequeNumber")} error={form.formState.errors.chequeNumber?.message} />
+                <Input type="date" label="Cheque Date" required {...form.register("chequeDate")} error={form.formState.errors.chequeDate?.message} />
               </>
             ) : (
               <>

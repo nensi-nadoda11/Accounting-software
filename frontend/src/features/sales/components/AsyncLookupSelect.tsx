@@ -13,6 +13,7 @@ export type LookupOption = {
 
 export const AsyncLookupSelect = ({
   label,
+  required,
   placeholder,
   value,
   loading,
@@ -27,6 +28,7 @@ export const AsyncLookupSelect = ({
   onClear,
 }: {
   label?: string;
+  required?: boolean;
   placeholder?: string;
   value: LookupOption | null;
   loading?: boolean;
@@ -80,7 +82,12 @@ export const AsyncLookupSelect = ({
 
   return (
     <div ref={containerRef} className="relative flex w-full flex-col gap-2">
-      {label ? <span className="text-sm font-medium text-slate-700">{label}</span> : null}
+      {label ? (
+        <span className="text-sm font-medium text-slate-700">
+          {label}
+          {required ? <span className="ml-1 text-rose-500">*</span> : null}
+        </span>
+      ) : null}
       <div
         className={cn(
           "relative rounded-xl border border-slate-200 bg-white transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10",

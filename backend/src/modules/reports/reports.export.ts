@@ -14,7 +14,34 @@ const PDF_SUMMARY_FILL = { r: 0.96, g: 0.99, b: 0.98 };
 const isPhoneColumn = (key?: string) => Boolean(key && /(mobile|phone|contact)/i.test(key));
 const isAmountColumn = (key?: string) =>
   Boolean(key && /(amount|total|value|balance|paid|due|taxable|gst|sales|purchase|income|expense|debit|credit|net|gross|price)/i.test(key));
-const isCountColumn = (key?: string) => Boolean(key && /(count|qty|quantity|items?)/i.test(key));
+const isQuantityColumn = (key?: string) => Boolean(key && /(qty|quantity|stock|level)/i.test(key));
+const isCountColumn = (key?: string) => Boolean(key && /(count|items?)/i.test(key));
+
+const formatNumberValue = (value: number, columnKey?: string) => {
+  if (isAmountColumn(columnKey)) {
+    return value.toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  if (isQuantityColumn(columnKey)) {
+    return value.toLocaleString("en-IN", {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3
+    });
+  }
+
+  if (isCountColumn(columnKey)) {
+    return value.toLocaleString("en-IN", {
+      maximumFractionDigits: 0
+    });
+  }
+
+  return value.toLocaleString("en-IN", {
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 3
+  });
+};
 
 const toDisplayValue = (value: string | number | Date | null | undefined, column?: ReportColumn) => {
   if (value === null || value === undefined) {
@@ -36,11 +63,7 @@ const toDisplayValue = (value: string | number | Date | null | undefined, column
       return String(value);
     }
 
-    if (isAmountColumn(column.key) || isCountColumn(column.key)) {
-      return String(Math.round(parsed));
-    }
-
-    return Number.isInteger(parsed) ? String(parsed) : String(parsed);
+    return formatNumberValue(parsed, column.key);
   }
 
   if (column?.type === "date" || column?.type === "datetime") {

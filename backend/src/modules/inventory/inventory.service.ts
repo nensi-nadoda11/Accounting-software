@@ -2035,38 +2035,42 @@ class InventoryService {
         { label: "Total Value", value: normalizeMoney(totalValue) }
       ],
       columns: [
-        { key: "movementDate", label: "Movement Date", type: "datetime" },
-        { key: "movementType", label: "Movement Type" },
-        { key: "productCode", label: "Product Code" },
-        { key: "productName", label: "Product Name" },
-        { key: "warehouseCode", label: "Warehouse Code" },
-        { key: "warehouseName", label: "Warehouse Name" },
-        { key: "batchNumber", label: "Batch Number" },
-        { key: "referenceType", label: "Reference Type" },
-        { key: "referenceNumber", label: "Reference Number" },
-        { key: "inQuantity", label: "In Quantity", type: "number" },
-        { key: "outQuantity", label: "Out Quantity", type: "number" },
-        { key: "balanceAfter", label: "Balance After", type: "number" },
+        { key: "movementDate", label: "Date", type: "datetime" },
+        { key: "movementType", label: "Type" },
+        { key: "product", label: "Product" },
+        { key: "warehouse", label: "Warehouse" },
+        { key: "batchNumber", label: "Batch" },
+        { key: "reference", label: "Reference" },
+        { key: "inQuantity", label: "In", type: "number" },
+        { key: "outQuantity", label: "Out", type: "number" },
+        { key: "balanceAfter", label: "Balance", type: "number" },
         { key: "rate", label: "Rate", type: "number" },
-        { key: "value", label: "Value", type: "number" },
-        { key: "remarks", label: "Remarks" }
+        { key: "value", label: "Value", type: "number" }
       ],
       rows: rows.map((row) => ({
         movementDate: row.movement.movementDate.toISOString(),
         movementType: row.movement.movementType,
-        productCode: row.productCode ?? "",
-        productName: row.productName ?? "",
-        warehouseCode: row.warehouseCode ?? "",
-        warehouseName: row.warehouseName ?? "",
-        batchNumber: row.batchNumber ?? "",
-        referenceType: row.movement.referenceType ?? "",
-        referenceNumber: row.movement.referenceNumber ?? "",
+        product: row.productName
+          ? row.productCode
+            ? `${row.productName} (${row.productCode})`
+            : row.productName
+          : row.productCode ?? "",
+        warehouse: row.warehouseName
+          ? row.warehouseCode
+            ? `${row.warehouseName} (${row.warehouseCode})`
+            : row.warehouseName
+          : row.warehouseCode ?? "",
+        batchNumber: row.batchNumber ?? "-",
+        reference: row.movement.referenceType
+          ? row.movement.referenceNumber
+            ? `${row.movement.referenceType} (${row.movement.referenceNumber})`
+            : row.movement.referenceType
+          : row.movement.referenceNumber ?? "",
         inQuantity: normalizeQuantity(row.movement.inQuantity),
         outQuantity: normalizeQuantity(row.movement.outQuantity),
         balanceAfter: normalizeQuantity(row.movement.balanceAfter),
         rate: normalizeMoney(row.movement.rate),
-        value: normalizeMoney(row.movement.value),
-        remarks: row.movement.remarks ?? ""
+        value: normalizeMoney(row.movement.value)
       }))
     };
     const file = buildReportFile(dataset, query.format, `inventory-movements-${new Date().toISOString().slice(0, 10)}`);
@@ -2277,29 +2281,27 @@ class InventoryService {
         { label: "Expiring Soon", value: expiringSoonCount }
       ],
       columns: [
-        { key: "productCode", label: "Product Code" },
-        { key: "productName", label: "Product Name" },
-        { key: "sku", label: "SKU" },
+        { key: "product", label: "Product" },
         { key: "category", label: "Category" },
-        { key: "warehouseCode", label: "Warehouse Code" },
-        { key: "warehouseName", label: "Warehouse Name" },
-        { key: "batchNumber", label: "Batch Number" },
-        { key: "expiryDate", label: "Expiry Date", type: "date" },
-        { key: "availableQuantity", label: "Available Quantity", type: "number" },
-        { key: "reservedQuantity", label: "Reserved Quantity", type: "number" },
-        { key: "damagedQuantity", label: "Damaged Quantity", type: "number" },
-        { key: "expiredQuantity", label: "Expired Quantity", type: "number" },
-        { key: "averageCost", label: "Average Cost", type: "number" },
+        { key: "warehouse", label: "Warehouse" },
+        { key: "batchNumber", label: "Batch" },
+        { key: "expiryDate", label: "Expiry", type: "date" },
+        { key: "availableQuantity", label: "Available", type: "number" },
+        { key: "reservedQuantity", label: "Reserved", type: "number" },
+        { key: "damagedQuantity", label: "Damaged", type: "number" },
+        { key: "expiredQuantity", label: "Expired", type: "number" },
+        { key: "averageCost", label: "Avg Cost", type: "number" },
         { key: "stockValue", label: "Stock Value", type: "number" }
       ],
       rows: rows.map((row) => ({
-        productCode: row.product.productCode,
-        productName: row.product.name,
-        sku: row.product.sku,
+        product: `${row.product.name} (${row.product.productCode})`,
         category: row.categoryName ?? "",
-        warehouseCode: row.warehouseCode ?? "",
-        warehouseName: row.warehouseName ?? "",
-        batchNumber: row.batchNumber ?? "",
+        warehouse: row.warehouseName
+          ? row.warehouseCode
+            ? `${row.warehouseName} (${row.warehouseCode})`
+            : row.warehouseName
+          : row.warehouseCode ?? "",
+        batchNumber: row.batchNumber ?? "-",
         expiryDate: row.expiryDate ? toDateOnly(row.expiryDate) : "",
         availableQuantity: normalizeQuantity(row.balance.availableQuantity),
         reservedQuantity: normalizeQuantity(row.balance.reservedQuantity),

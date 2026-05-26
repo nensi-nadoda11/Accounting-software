@@ -8,10 +8,12 @@ import { suppliersRepository } from "../suppliers/suppliers.repository";
 import { auditLogService } from "../audit-logs/audit-log.service";
 import { AppError } from "../../utils/app-error";
 import { logger } from "../../config/logger";
+import { env } from "../../config/env";
 import { reportExports } from "../../db/schema";
 import { getPagination } from "../../utils/pagination";
 import { buildReportFile } from "./reports.export";
 import { reportsRepository } from "./reports.repository";
+import { addDecimals, compareDecimals, normalizeMoney, normalizeQuantity, toDateOnly as toInventoryDateOnly } from "../inventory/inventory.utils";
 import type {
   ReportColumn,
   ReportExportDataset,
@@ -697,6 +699,262 @@ export class ReportsService {
       }));
   }
 
+  private async buildInventoryCurrentStockDataset(
+    actor: ReportsActor,
+    query: ExportReportQuery
+  ): Promise<ReportExportDataset> {
+    const rows = await inventoryRepository.listStockForExport({
+      companyId: actor.companyId,
+      expiryAlertDays: env.INVENTORY_EXPIRY_ALERT_DAYS,
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.productId ? { productId: query.productId } : {}),
+      ...(query.status ? { status: query.status as "active" | "inactive" | "deleted" } : {})
+    });
+
+    const today = toInventoryDateOnly(new Date());
+    const futureDate = toInventoryDateOnly(new Date(Date.now() + env.INVENTORY_EXPIRY_ALERT_DAYS * 24 * 60 * 60 * 1000));
+
+    let totalStockValue = "0.00";
+    let totalAvailableQuantity = "0.000";
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+    let expiredCount = 0;
+    let expiringSoonCount = 0;
+
+    const exportRows = rows.map((row) => {
+      totalStockValue = addDecimals(totalStockValue, row.balance.stockValue, 2);
+      totalAvailableQuantity = addDecimals(totalAvailableQuantity, row.balance.availableQuantity, 3);
+
+      const isLowStock = compareDecimals(row.balance.availableQuantity, row.product.minimumStockLevel, 3) <= 0;
+      const isOutOfStock = compareDecimals(row.balance.availableQuantity, "0", 3) <= 0;
+      const expiryDateOnly = row.expiryDate ? toInventoryDateOnly(row.expiryDate) : null;
+      const isExpired = Boolean(expiryDateOnly && expiryDateOnly < today && compareDecimals(row.balance.availableQuantity, "0", 3) > 0);
+      const isExpiringSoon = Boolean(
+        expiryDateOnly &&
+          expiryDateOnly >= today &&
+          expiryDateOnly <= futureDate &&
+          compareDecimals(row.balance.availableQuantity, "0", 3) > 0
+      );
+
+      if (isLowStock) {
+        lowStockCount += 1;
+      }
+
+      if (isOutOfStock) {
+        outOfStockCount += 1;
+      }
+
+      if (isExpired) {
+        expiredCount += 1;
+      }
+
+      if (isExpiringSoon) {
+        expiringSoonCount += 1;
+      }
+
+      const stockStatus = isOutOfStock
+        ? "out_of_stock"
+        : isExpired
+          ? "expired"
+          : isExpiringSoon
+            ? "expiring_soon"
+            : isLowStock
+              ? "low_stock"
+              : "in_stock";
+
+      return {
+        productCode: row.product.productCode,
+        productName: row.product.name,
+        sku: row.product.sku ?? "",
+        category: row.categoryName ?? "",
+        unit: row.unitSymbol ?? row.unitName ?? "",
+        warehouseCode: row.warehouseCode ?? "",
+        warehouseName: row.warehouseName ?? "",
+        batchNumber: row.batchNumber ?? "",
+        expiryDate: row.expiryDate ?? null,
+        availableQuantity: normalizeQuantity(row.balance.availableQuantity),
+        reservedQuantity: normalizeQuantity(row.balance.reservedQuantity),
+        damagedQuantity: normalizeQuantity(row.balance.damagedQuantity),
+        expiredQuantity: normalizeQuantity(row.balance.expiredQuantity),
+        minimumStockLevel: normalizeQuantity(row.product.minimumStockLevel),
+        averageCost: normalizeMoney(row.balance.averageCost),
+        stockValue: normalizeMoney(row.balance.stockValue),
+        stockStatus
+      };
+    });
+
+    return {
+      title: "Inventory Current Stock",
+      subtitle: "Warehouse and batch-wise live stock snapshot",
+      metadata: [
+        { label: "Snapshot On", value: formatDateLabel(new Date()) },
+        { label: "Product Filter", value: query.productId ? "Selected product" : "All products" },
+        { label: "Category Filter", value: query.categoryId ? "Selected category" : "All categories" },
+        { label: "Status Filter", value: query.status ? humanizeWords(query.status) : "All" },
+        { label: "Exported On", value: new Date().toLocaleString("en-IN") }
+      ],
+      summary: [
+        { label: "Total Records", value: exportRows.length },
+        { label: "Available Qty", value: normalizeQuantity(totalAvailableQuantity) },
+        { label: "Stock Value", value: normalizeMoney(totalStockValue) },
+        { label: "Low Stock", value: lowStockCount },
+        { label: "Out Of Stock", value: outOfStockCount },
+        { label: "Expired", value: expiredCount },
+        { label: "Expiring Soon", value: expiringSoonCount }
+      ],
+      notes:
+        "Current stock is a live snapshot generated at export time. Date range filters do not change stock-on-hand values in this report.",
+      columns: [
+        { key: "productCode", label: "Product Code" },
+        { key: "productName", label: "Product Name" },
+        { key: "sku", label: "SKU" },
+        { key: "category", label: "Category" },
+        { key: "unit", label: "Unit" },
+        { key: "warehouseCode", label: "Warehouse Code" },
+        { key: "warehouseName", label: "Warehouse Name" },
+        { key: "batchNumber", label: "Batch Number" },
+        { key: "expiryDate", label: "Expiry Date", type: "date" },
+        { key: "availableQuantity", label: "Available Qty", type: "number" },
+        { key: "reservedQuantity", label: "Reserved Qty", type: "number" },
+        { key: "damagedQuantity", label: "Damaged Qty", type: "number" },
+        { key: "expiredQuantity", label: "Expired Qty", type: "number" },
+        { key: "minimumStockLevel", label: "Min Stock", type: "number" },
+        { key: "averageCost", label: "Average Cost", type: "number" },
+        { key: "stockValue", label: "Stock Value", type: "number" },
+        { key: "stockStatus", label: "Stock Status" }
+      ],
+      rows: exportRows
+    };
+  }
+
+  private async buildGstSummaryDataset(
+    actor: ReportsActor,
+    query: ExportReportQuery,
+    context: ReportsRequestContext
+  ): Promise<ReportExportDataset> {
+    const summary = await this.getGstSummary(actor, query, context) as {
+      dateFrom: Date | string;
+      dateTo: Date | string;
+      taxableSales: string;
+      salesGst: string;
+      netOutputGst: string;
+      outputGst: string;
+      taxablePurchases: string;
+      purchaseGst: string;
+      eligiblePurchaseGst: string;
+      claimedPurchaseGst: string;
+      inputGst: string;
+      eligibleItc: string;
+      claimedItc: string;
+      expenseInputGst: string;
+      claimedExpenseInputGst: string;
+      returns: {
+        salesReturnTaxable: string;
+        salesReturnGst: string;
+        purchaseReturnTaxable: string;
+        purchaseReturnGst: string;
+      };
+      adjustments: {
+        itcClaims: string;
+        itcReversals: string;
+        outputTaxAdjustments: string;
+        lateFee: string;
+        interest: string;
+        rounding: string;
+        other: string;
+      };
+      netGstPayable: string;
+      netGstCredit: string;
+      monthWiseTrend: Array<{
+        month: string;
+        taxableSales: string;
+        outputGst: string;
+        taxablePurchases: string;
+        inputGst: string;
+        expenseInputGst: string;
+        salesReturnGst: string;
+        purchaseReturnGst: string;
+        netGstPayable: string;
+        netGstCredit: string;
+      }>;
+    };
+
+    return {
+      title: "GST Summary",
+      subtitle: "Consolidated GST position for the selected period",
+      metadata: [
+        {
+          label: "Period",
+          value: `${formatDateLabel(summary.dateFrom)} to ${formatDateLabel(summary.dateTo)}`
+        },
+        {
+          label: "Financial Year",
+          value: query.financialYearId ? "Selected" : "Custom period"
+        },
+        {
+          label: "Exported On",
+          value: new Date().toLocaleString("en-IN")
+        }
+      ],
+      summary: [
+        { label: "Taxable Sales", value: summary.taxableSales },
+        { label: "Sales GST", value: summary.salesGst },
+        { label: "Taxable Purchases", value: summary.taxablePurchases },
+        { label: "Purchase GST", value: summary.purchaseGst },
+        { label: "Output GST", value: summary.outputGst },
+        { label: "Input GST", value: summary.inputGst },
+        { label: "Eligible ITC", value: summary.eligibleItc },
+        { label: "Claimed ITC", value: summary.claimedItc },
+        { label: "Sales Return GST", value: summary.returns.salesReturnGst },
+        { label: "Purchase Return GST", value: summary.returns.purchaseReturnGst },
+        { label: "Net GST Payable", value: summary.netGstPayable },
+        { label: "Net GST Credit", value: summary.netGstCredit }
+      ],
+      columns: [
+        { key: "month", label: "Month" },
+        { key: "taxableSales", label: "Taxable Sales", type: "number" },
+        { key: "outputGst", label: "Output GST", type: "number" },
+        { key: "taxablePurchases", label: "Taxable Purchases", type: "number" },
+        { key: "inputGst", label: "Input GST", type: "number" },
+        { key: "expenseInputGst", label: "Expense Input GST", type: "number" },
+        { key: "salesReturnGst", label: "Sales Return GST", type: "number" },
+        { key: "purchaseReturnGst", label: "Purchase Return GST", type: "number" },
+        { key: "netGstPayable", label: "Net GST Payable", type: "number" },
+        { key: "netGstCredit", label: "Net GST Credit", type: "number" }
+      ],
+      rows: summary.monthWiseTrend.map((row) => ({
+        month: formatDateLabel(row.month),
+        taxableSales: row.taxableSales,
+        outputGst: row.outputGst,
+        taxablePurchases: row.taxablePurchases,
+        inputGst: row.inputGst,
+        expenseInputGst: row.expenseInputGst,
+        salesReturnGst: row.salesReturnGst,
+        purchaseReturnGst: row.purchaseReturnGst,
+        netGstPayable: row.netGstPayable,
+        netGstCredit: row.netGstCredit
+      })),
+      secondaryTable: {
+        title: "Adjustments Breakdown",
+        columns: [
+          { key: "adjustmentType", label: "Adjustment Type" },
+          { key: "amount", label: "Amount", type: "number" }
+        ],
+        rows: [
+          { adjustmentType: "ITC Claims", amount: summary.adjustments.itcClaims },
+          { adjustmentType: "ITC Reversals", amount: summary.adjustments.itcReversals },
+          { adjustmentType: "Output Tax Adjustments", amount: summary.adjustments.outputTaxAdjustments },
+          { adjustmentType: "Late Fee", amount: summary.adjustments.lateFee },
+          { adjustmentType: "Interest", amount: summary.adjustments.interest },
+          { adjustmentType: "Rounding", amount: summary.adjustments.rounding },
+          { adjustmentType: "Other", amount: summary.adjustments.other }
+        ]
+      },
+      notes:
+        "All values are shown in INR. Monthly trend shows the GST movement month by month, while the adjustment breakdown captures ITC and statutory corrections applied in the period."
+    };
+  }
+
   private createDatasetFromRows(
     title: string,
     rows: Array<Record<string, unknown>>,
@@ -821,11 +1079,7 @@ export class ReportsService {
           query
         );
       case "inventory.current-stock":
-        return this.datasetFromDetailedResult(
-          "Current Stock",
-          await this.getInventoryCurrentStock(actor, { ...query, page: 1, limit: MAX_EXPORT_ROWS }, context),
-          query
-        );
+        return this.buildInventoryCurrentStockDataset(actor, query);
       case "inventory.valuation":
         return this.datasetFromRowsWithMetadata(
           "Inventory Valuation",
@@ -897,8 +1151,7 @@ export class ReportsService {
           query
         );
       case "gst.summary": {
-        const data = await this.getGstSummary(actor, query, context) as Record<string, unknown>;
-        return this.datasetFromRowsWithMetadata("GST Summary", [data], query, this.buildSummaryItems(data));
+        return this.buildGstSummaryDataset(actor, query, context);
       }
       case "gst.hsn":
         return this.datasetFromRowsWithMetadata(

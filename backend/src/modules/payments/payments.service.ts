@@ -936,7 +936,6 @@ class PaymentsService {
     }
 
     const party = await this.getPartyOrThrow(actor.companyId, existing.partyType, existing.partyId, executor);
-    const savedAllocations = await this.saveAllocations(actor, existing, input.allocations ?? [], executor);
     const completedChequeStatus =
       existing.paymentMode === "cheque" ? existing.chequeStatus ?? this.getDefaultChequeStatus(existing.paymentType, true) : null;
 
@@ -956,6 +955,8 @@ class PaymentsService {
     if (!updatedPayment) {
       throw new AppError("Failed to complete payment", 500);
     }
+
+    const savedAllocations = await this.saveAllocations(actor, updatedPayment, input.allocations ?? [], executor);
 
     if (updatedPayment.paymentMode === "cheque" && updatedPayment.chequeNumber && updatedPayment.chequeDate && updatedPayment.chequeBankName) {
       await paymentsRepository.createChequeTransaction(
@@ -1208,7 +1209,7 @@ class PaymentsService {
         throw new AppError("Failed to create payment", 500);
       }
 
-      if (input.allocations.length > 0) {
+      if (input.status !== "completed" && input.allocations.length > 0) {
         await this.saveAllocations(actor, createdPayment, input.allocations, transaction);
       }
 
@@ -1786,17 +1787,21 @@ class PaymentsService {
       throw new AppError("Invalid party type", 400);
     }
 
+    const normalizedPartyType = partyType as PaymentPartyType;
     const mapped = await this.mapDueItems(
       actor.companyId,
-      partyType,
-      partyType === "customer"
+      normalizedPartyType,
+      normalizedPartyType === "customer"
         ? await paymentsRepository.listCustomerDueItems({ companyId: actor.companyId, partyId })
         : await paymentsRepository.listSupplierDueItems({ companyId: actor.companyId, partyId })
     );
+    const advanceBalance =
+      mapped.advanceMap.get(partyId) ??
+      (await paymentsRepository.getAdvanceBalance(actor.companyId, normalizedPartyType, partyId));
 
     return {
       items: mapped.items,
-      advanceBalance: mapped.advanceMap.get(partyId) ?? "0.00",
+      advanceBalance,
       aging: mapped.agingSummary
     };
   }

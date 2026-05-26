@@ -324,6 +324,31 @@ class ExpensesService {
     return this.getExpenseAccountOrThrow(companyId, resolvedId, executor);
   }
 
+  private async resolveCategoryDefaultExpenseAccountId(
+    companyId: string,
+    category: Awaited<ReturnType<ExpensesService["getCategoryOrThrow"]>>,
+    executor?: TransactionClient
+  ) {
+    const visitedCategoryIds = new Set<string>();
+    let currentCategory: Awaited<ReturnType<ExpensesService["getCategoryOrThrow"]>> | null = category;
+
+    while (currentCategory && !visitedCategoryIds.has(currentCategory.id)) {
+      visitedCategoryIds.add(currentCategory.id);
+
+      if (currentCategory.defaultAccountId) {
+        return currentCategory.defaultAccountId;
+      }
+
+      if (!currentCategory.parentId) {
+        return null;
+      }
+
+      currentCategory = await expensesRepository.findCategoryById(companyId, currentCategory.parentId, executor);
+    }
+
+    return null;
+  }
+
   private async buildExpenseMutationData(
     companyId: string,
     input:
@@ -347,10 +372,11 @@ class ExpensesService {
       throw new AppError("Only active expense categories can be used", 400);
     }
 
+    const resolvedCategoryDefaultAccountId = await this.resolveCategoryDefaultExpenseAccountId(companyId, category, executor);
     const account = await this.resolveExpenseAccount(
       companyId,
       input.expenseAccountId ?? null,
-      category.defaultAccountId,
+      resolvedCategoryDefaultAccountId,
       false,
       executor
     );
@@ -375,6 +401,7 @@ class ExpensesService {
 
     return {
       category,
+      resolvedCategoryDefaultAccountId,
       account,
       totals
     };
@@ -518,7 +545,7 @@ class ExpensesService {
     const mutation = await this.buildExpenseMutationData(actor.companyId, input, undefined, undefined, executor);
     if (status === "posted") {
       await this.assertPeriodUnlocked(actor.companyId, input.expenseDate, executor);
-      await this.resolveExpenseAccount(actor.companyId, input.expenseAccountId, mutation.category.defaultAccountId, true, executor);
+      await this.resolveExpenseAccount(actor.companyId, input.expenseAccountId, mutation.resolvedCategoryDefaultAccountId, true, executor);
     }
 
     const expenseNumber = await this.getNextExpenseNumber(actor.companyId, executor);
@@ -528,7 +555,7 @@ class ExpensesService {
         expenseNumber,
         expenseDate: input.expenseDate,
         categoryId: mutation.category.id,
-        expenseAccountId: mutation.account?.id ?? input.expenseAccountId ?? mutation.category.defaultAccountId ?? null,
+        expenseAccountId: mutation.account?.id ?? mutation.resolvedCategoryDefaultAccountId ?? input.expenseAccountId ?? null,
         payeeName: input.payeeName ?? null,
         vendorGstNumber: input.vendorGstNumber ?? null,
         vendorPanNumber: input.vendorPanNumber ?? null,
@@ -750,7 +777,7 @@ class ExpensesService {
         {
           expenseDate,
           categoryId: mutation.category.id,
-          expenseAccountId: mutation.account?.id ?? input.expenseAccountId ?? mutation.category.defaultAccountId ?? null,
+          expenseAccountId: mutation.account?.id ?? mutation.resolvedCategoryDefaultAccountId ?? input.expenseAccountId ?? null,
           payeeName: input.payeeName ?? existing.payeeName,
           vendorGstNumber: input.vendorGstNumber ?? existing.vendorGstNumber,
           vendorPanNumber: input.vendorPanNumber ?? existing.vendorPanNumber,
@@ -810,12 +837,20 @@ class ExpensesService {
 
       await this.assertPeriodUnlocked(actor.companyId, existing.expenseDate, transaction);
       const category = await this.getCategoryOrThrow(actor.companyId, existing.categoryId, transaction);
-      await this.resolveExpenseAccount(actor.companyId, existing.expenseAccountId, category.defaultAccountId, true, transaction);
+      const resolvedCategoryDefaultAccountId = await this.resolveCategoryDefaultExpenseAccountId(actor.companyId, category, transaction);
+      const resolvedExpenseAccount = await this.resolveExpenseAccount(
+        actor.companyId,
+        existing.expenseAccountId,
+        resolvedCategoryDefaultAccountId,
+        true,
+        transaction
+      );
 
       const updated = await expensesRepository.updateExpense(
         actor.companyId,
         expenseId,
         {
+          expenseAccountId: resolvedExpenseAccount?.id ?? resolvedCategoryDefaultAccountId ?? existing.expenseAccountId,
           status: "posted",
           postedAt: new Date(),
           updatedBy: actor.id
@@ -1414,10 +1449,11 @@ class ExpensesService {
         bankAccountId: input.bankAccountId ?? null
       });
 
-      await this.resolveExpenseAccount(
+      const resolvedCategoryDefaultAccountId = await this.resolveCategoryDefaultExpenseAccountId(actor.companyId, category, transaction);
+      const resolvedExpenseAccount = await this.resolveExpenseAccount(
         actor.companyId,
         input.expenseAccountId ?? null,
-        category.defaultAccountId,
+        resolvedCategoryDefaultAccountId,
         true,
         transaction
       );
@@ -1430,7 +1466,7 @@ class ExpensesService {
           companyId: actor.companyId,
           templateName: input.templateName.trim(),
           categoryId: input.categoryId,
-          expenseAccountId: input.expenseAccountId ?? null,
+          expenseAccountId: resolvedExpenseAccount?.id ?? resolvedCategoryDefaultAccountId ?? input.expenseAccountId ?? null,
           payeeName: input.payeeName ?? null,
           description: input.description.trim(),
           amount: normalizeMoney(input.amount),
@@ -1517,10 +1553,11 @@ class ExpensesService {
         bankAccountId: nextBankAccountId
       });
 
-      await this.resolveExpenseAccount(
+      const resolvedCategoryDefaultAccountId = await this.resolveCategoryDefaultExpenseAccountId(actor.companyId, category, transaction);
+      const resolvedExpenseAccount = await this.resolveExpenseAccount(
         actor.companyId,
         input.expenseAccountId ?? existing.expenseAccountId,
-        category.defaultAccountId,
+        resolvedCategoryDefaultAccountId,
         true,
         transaction
       );
@@ -1534,7 +1571,11 @@ class ExpensesService {
         {
           templateName: input.templateName?.trim() ?? existing.templateName,
           categoryId,
-          expenseAccountId: input.expenseAccountId ?? existing.expenseAccountId,
+          expenseAccountId:
+            resolvedExpenseAccount?.id ??
+            resolvedCategoryDefaultAccountId ??
+            input.expenseAccountId ??
+            existing.expenseAccountId,
           payeeName: input.payeeName ?? existing.payeeName,
           description: input.description?.trim() ?? existing.description,
           amount: input.amount !== undefined ? normalizeMoney(input.amount) : existing.amount,

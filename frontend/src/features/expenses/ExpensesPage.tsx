@@ -151,6 +151,7 @@ export const ExpensesPage = () => {
   const [expenseDrawerOpen, setExpenseDrawerOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseSubmitState, setExpenseSubmitState] = useState<"draft" | "posted" | null>(null);
+  const [expenseFormSessionKey, setExpenseFormSessionKey] = useState(0);
   const [formUploadingFiles, setFormUploadingFiles] = useState<UploadingFile[]>([]);
   const [newExpenseAttachmentFiles, setNewExpenseAttachmentFiles] = useState<UploadingFile[]>([]);
 
@@ -420,6 +421,8 @@ export const ExpensesPage = () => {
       const response = await expensesApi.get(expenseId);
       setEditingExpense(response.data.expense);
       setFormUploadingFiles([]);
+      setNewExpenseAttachmentFiles([]);
+      setExpenseFormSessionKey((current) => current + 1);
       setExpenseDrawerOpen(true);
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to load expense draft"));
@@ -754,6 +757,7 @@ export const ExpensesPage = () => {
                   setEditingExpense(null);
                   setFormUploadingFiles([]);
                   setNewExpenseAttachmentFiles([]);
+                  setExpenseFormSessionKey((current) => current + 1);
                   setExpenseDrawerOpen(true);
                 }}
               >
@@ -995,6 +999,8 @@ export const ExpensesPage = () => {
           setDetailExpense(null);
           setEditingExpense(expense);
           setFormUploadingFiles([]);
+          setNewExpenseAttachmentFiles([]);
+          setExpenseFormSessionKey((current) => current + 1);
           setExpenseDrawerOpen(true);
         }}
         onPost={(expense) => setPostExpenseId(expense.id)}
@@ -1020,6 +1026,7 @@ export const ExpensesPage = () => {
             companyGstNumber={auth.company?.gstNumber}
             companyState={auth.company?.state}
             editing={Boolean(editingExpense)}
+            resetKey={`${editingExpense?.id ?? "new"}:${expenseFormSessionKey}`}
             loadingState={expenseSubmitState}
             attachmentsContent={
               !editingExpense ? (

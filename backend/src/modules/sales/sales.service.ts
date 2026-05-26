@@ -2429,55 +2429,58 @@ class SalesService {
       cessAmount: string;
       lineTotal: string;
     }>;
-    const itemLines = items.map((item) => {
-      const gstAmount = (
-        Number(item.cgstAmount) +
-        Number(item.sgstAmount) +
-        Number(item.igstAmount) +
-        Number(item.cessAmount)
-      ).toFixed(2);
 
-      return [
-        padCell(item.productNameSnapshot, 28),
-        padCell(item.quantity, 8, "right"),
-        padCell(item.saleRate, 10, "right"),
-        padCell(item.taxableAmount, 12, "right"),
-        padCell(gstAmount, 10, "right"),
-        padCell(item.lineTotal, 12, "right")
-      ].join(" ");
-    });
-    const lines = [
-      company.legalName || company.name,
-      [company.addressLine1, company.addressLine2, company.city, company.state, company.pincode].filter(Boolean).join(", ") || "Address not available",
-      `GSTIN: ${company.gstNumber || "-"}`,
-      "",
-      `SALES INVOICE ${invoice.invoiceNumber}`,
-      `Invoice Date : ${formatDateValue(invoice.invoiceDate)}`,
-      `Due Date     : ${formatDateValue(invoice.dueDate)}`,
-      `Type         : ${invoice.invoiceType}`,
-      `Status       : ${invoice.invoiceStatus}`,
-      `Payment      : ${invoice.paymentStatus}`,
-      `Customer     : ${invoice.customer?.name ?? invoice.walkInName ?? invoice.customerNameSnapshot}`,
-      `Mobile       : ${invoice.customer?.mobile ?? invoice.walkInMobile ?? "-"}`,
-      `Place Supply : ${invoice.placeOfSupply}`,
-      `Warehouse    : ${invoice.warehouse.name ?? "-"}`,
-      "",
-      [padCell("Product", 28), padCell("Qty", 8, "right"), padCell("Rate", 10, "right"), padCell("Taxable", 12, "right"), padCell("GST", 10, "right"), padCell("Total", 12, "right")].join(" "),
-      "-".repeat(86),
-      ...(itemLines.length ? itemLines : ["No line items available"]),
-      "",
-      `Subtotal     : ${invoice.subtotal}`,
-      `GST Total    : ${invoice.gstTotal}`,
-      `Round Off    : ${invoice.roundOffAmount}`,
-      `Grand Total  : ${invoice.grandTotal}`,
-      `Paid Amount  : ${invoice.paidAmount}`,
-      `Due Amount   : ${invoice.dueAmount}`,
-      `Notes        : ${invoice.notes || "-"}`,
-      `Terms        : ${invoice.termsConditions || "-"}`,
-      "",
-      `Generated At : ${formatDateTimeValue(new Date())}`
-    ];
-    const file = buildTextPdfFile(invoice.invoiceNumber, lines);
+    const dataset: ReportExportDataset = {
+      title: `Sales Invoice ${invoice.invoiceNumber}`,
+      subtitle: company.legalName || company.name || "Company",
+      metadata: [
+        { label: "Invoice Date", value: formatDateValue(invoice.invoiceDate) },
+        { label: "Due Date", value: formatDateValue(invoice.dueDate) },
+        { label: "Type", value: invoice.invoiceType },
+        { label: "Status", value: invoice.invoiceStatus },
+        { label: "Payment Status", value: invoice.paymentStatus },
+        { label: "Customer", value: invoice.customer?.name ?? invoice.walkInName ?? invoice.customerNameSnapshot },
+        { label: "Mobile", value: invoice.customer?.mobile ?? invoice.walkInMobile ?? "-" },
+        { label: "Place of Supply", value: invoice.placeOfSupply },
+        { label: "Warehouse", value: invoice.warehouse.name ?? "-" }
+      ],
+      summary: [
+        { label: "Subtotal", value: invoice.subtotal },
+        { label: "GST Total", value: invoice.gstTotal },
+        { label: "Round Off", value: invoice.roundOffAmount },
+        { label: "Grand Total", value: invoice.grandTotal },
+        { label: "Paid Amount", value: invoice.paidAmount },
+        { label: "Due Amount", value: invoice.dueAmount }
+      ],
+      columns: [
+        { key: "productName", label: "Product" },
+        { key: "quantity", label: "Qty", type: "number" },
+        { key: "saleRate", label: "Rate", type: "number" },
+        { key: "taxableAmount", label: "Taxable", type: "number" },
+        { key: "gstAmount", label: "GST", type: "number" },
+        { key: "lineTotal", label: "Total", type: "number" }
+      ],
+      rows: items.map((item) => {
+        const gstAmount = (
+          Number(item.cgstAmount) +
+          Number(item.sgstAmount) +
+          Number(item.igstAmount) +
+          Number(item.cessAmount)
+        ).toFixed(2);
+        return {
+          productName: item.productNameSnapshot,
+          quantity: Number(item.quantity),
+          saleRate: Number(item.saleRate),
+          taxableAmount: Number(item.taxableAmount),
+          gstAmount: Number(gstAmount),
+          lineTotal: Number(item.lineTotal)
+        };
+      }),
+      notes: invoice.notes || undefined,
+      terms: invoice.termsConditions || undefined
+    };
+
+    const file = buildReportFile(dataset, "pdf", invoice.invoiceNumber);
 
     await auditLogService.log({
       companyId: actor.companyId,

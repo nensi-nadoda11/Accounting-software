@@ -2174,7 +2174,6 @@ class PurchasesService {
 
     return file;
   }
-
   public async generatePurchasePdf(
     actor: PurchaseActor,
     purchaseId: string,
@@ -2184,50 +2183,51 @@ class PurchasesService {
     const invoice = detail.invoice;
     const items = (invoice.items ?? []) as Array<ReturnType<PurchasesService["mapInvoiceItemRow"]>>;
     const company = await companyRepository.findCompanyById(actor.companyId);
-    const lines = [
-      company?.legalName || company?.name || "Company",
-      [company?.addressLine1, company?.addressLine2, company?.city, company?.state, company?.pincode].filter(Boolean).join(", ") || "Address not available",
-      `GSTIN: ${company?.gstNumber || "-"}`,
-      "",
-      `PURCHASE INVOICE ${invoice.purchaseNumber}`,
-      `Invoice Date   : ${formatDateValue(invoice.invoiceDate)}`,
-      `Due Date       : ${formatDateValue(invoice.dueDate)}`,
-      `Supplier       : ${invoice.supplier.name}`,
-      `Supplier Code  : ${invoice.supplier.supplierCode ?? "-"}`,
-      `Supplier GSTIN : ${invoice.supplier.gstNumber ?? "-"}`,
-      `Warehouse      : ${invoice.warehouse?.name ?? "-"}`,
-      `Status         : ${invoice.purchaseStatus}`,
-      `Payment        : ${invoice.paymentStatus}`,
-      "",
-      [padCell("Product", 26), padCell("Qty", 8, "right"), padCell("Free", 8, "right"), padCell("Rate", 10, "right"), padCell("Taxable", 12, "right"), padCell("Total", 12, "right")].join(" "),
-      "-".repeat(82),
-      ...(items.length
-        ? items.map((item) =>
-            [
-              padCell(item.productNameSnapshot, 26),
-              padCell(item.quantity, 8, "right"),
-              padCell(item.freeQuantity, 8, "right"),
-              padCell(item.purchaseRate, 10, "right"),
-              padCell(item.taxableAmount, 12, "right"),
-              padCell(item.lineTotal, 12, "right")
-            ].join(" ")
-          )
-        : ["No line items available"]),
-      "",
-      `Subtotal       : ${invoice.subtotal}`,
-      `GST Total      : ${invoice.gstTotal}`,
-      `Freight        : ${invoice.freightCharges}`,
-      `Other Charges  : ${invoice.additionalCharges}`,
-      `Round Off      : ${invoice.roundOffAmount}`,
-      `Grand Total    : ${invoice.grandTotal}`,
-      `Paid Amount    : ${invoice.paidAmount}`,
-      `Due Amount     : ${invoice.dueAmount}`,
-      `Notes          : ${invoice.notes || "-"}`,
-      `Terms          : ${invoice.termsConditions || "-"}`,
-      "",
-      `Generated At   : ${formatDateTimeValue(new Date())}`
-    ];
-    const file = buildTextPdfFile(invoice.purchaseNumber, lines);
+
+    const dataset: ReportExportDataset = {
+      title: `Purchase Invoice ${invoice.purchaseNumber}`,
+      subtitle: company?.legalName || company?.name || "Company",
+      metadata: [
+        { label: "Invoice Date", value: formatDateValue(invoice.invoiceDate) },
+        { label: "Due Date", value: formatDateValue(invoice.dueDate) },
+        { label: "Supplier", value: invoice.supplier.name },
+        { label: "Supplier Code", value: invoice.supplier.supplierCode ?? "-" },
+        { label: "Supplier GSTIN", value: invoice.supplier.gstNumber ?? "-" },
+        { label: "Warehouse", value: invoice.warehouse?.name ?? "-" },
+        { label: "Status", value: invoice.purchaseStatus },
+        { label: "Payment Status", value: invoice.paymentStatus }
+      ],
+      summary: [
+        { label: "Subtotal", value: invoice.subtotal },
+        { label: "GST Total", value: invoice.gstTotal },
+        { label: "Freight", value: invoice.freightCharges },
+        { label: "Other Charges", value: invoice.additionalCharges },
+        { label: "Round Off", value: invoice.roundOffAmount },
+        { label: "Grand Total", value: invoice.grandTotal },
+        { label: "Paid Amount", value: invoice.paidAmount },
+        { label: "Due Amount", value: invoice.dueAmount }
+      ],
+      columns: [
+        { key: "productName", label: "Product" },
+        { key: "quantity", label: "Qty", type: "number" },
+        { key: "freeQuantity", label: "Free", type: "number" },
+        { key: "purchaseRate", label: "Rate", type: "number" },
+        { key: "taxableAmount", label: "Taxable", type: "number" },
+        { key: "lineTotal", label: "Total", type: "number" }
+      ],
+      rows: items.map((item) => ({
+        productName: item.productNameSnapshot,
+        quantity: Number(item.quantity),
+        freeQuantity: Number(item.freeQuantity),
+        purchaseRate: Number(item.purchaseRate),
+        taxableAmount: Number(item.taxableAmount),
+        lineTotal: Number(item.lineTotal)
+      })),
+      notes: invoice.notes || undefined,
+      terms: invoice.termsConditions || undefined
+    };
+
+    const file = buildReportFile(dataset, "pdf", invoice.purchaseNumber);
 
     await auditLogService.log({
       companyId: actor.companyId,
@@ -2340,51 +2340,60 @@ class PurchasesService {
     }>;
 
     const company = await companyRepository.findCompanyById(actor.companyId);
-    const lines = [
-      company?.legalName || company?.name || "Company",
-      [company?.addressLine1, company?.addressLine2, company?.city, company?.state, company?.pincode].filter(Boolean).join(", ") || "Address not available",
-      "",
-      `PURCHASE RETURN ${purchaseReturn.returnNumber}`,
-      `Return Date    : ${formatDateValue(purchaseReturn.returnDate)}`,
-      `Purchase No    : ${purchaseReturn.purchaseNumber ?? "-"}`,
-      `Supplier       : ${purchaseReturn.supplierName}`,
-      `Supplier Code  : ${purchaseReturn.supplierCode ?? "-"}`,
-      `Warehouse      : ${purchaseReturn.warehouse?.name ?? "-"}`,
-      "",
-      [padCell("Product", 30), padCell("Qty", 8, "right"), padCell("Rate", 10, "right"), padCell("Taxable", 12, "right"), padCell("GST", 10, "right"), padCell("Total", 12, "right")].join(" "),
-      "-".repeat(88),
-      ...(items.length
-        ? items.map((item) =>
-            [
-              padCell(item.productName, 30),
-              padCell(item.quantity, 8, "right"),
-              padCell(item.returnRate, 10, "right"),
-              padCell(item.taxableAmount, 12, "right"),
-              padCell(item.gstAmount, 10, "right"),
-              padCell(item.lineTotal, 12, "right")
-            ].join(" ")
-          )
-        : ["No return items available"]),
-      "",
-      `Subtotal       : ${purchaseReturn.subtotal}`,
-      `GST Total      : ${purchaseReturn.gstTotal}`,
-      `Round Off      : ${purchaseReturn.roundOffAmount}`,
-      `Grand Total    : ${purchaseReturn.grandTotal}`,
-      `Refund Got     : ${purchaseReturn.refundedAmount}`,
-      `Refund Pending : ${purchaseReturn.remainingRefundAmount}`,
-      `Notes          : ${purchaseReturn.notes || "-"}`,
-      "",
-      "Refund Entries",
-      ...(refunds.length
-        ? refunds.map(
-            (refund) =>
-              `${formatDateValue(refund.refundDate)} | ${refund.paymentMode} | ${refund.amount} | Ref ${refund.referenceNumber ?? "-"}`
-          )
-        : ["No refund entries available"]),
-      "",
-      `Generated At   : ${formatDateTimeValue(new Date())}`
-    ];
-    const file = buildTextPdfFile(purchaseReturn.returnNumber, lines);
+
+    const dataset: ReportExportDataset = {
+      title: `Purchase Return ${purchaseReturn.returnNumber}`,
+      subtitle: company?.legalName || company?.name || "Company",
+      metadata: [
+        { label: "Return Date", value: formatDateValue(purchaseReturn.returnDate) },
+        { label: "Purchase No", value: purchaseReturn.purchaseNumber ?? "-" },
+        { label: "Supplier", value: purchaseReturn.supplierName },
+        { label: "Supplier Code", value: purchaseReturn.supplierCode ?? "-" },
+        { label: "Warehouse", value: purchaseReturn.warehouse?.name ?? "-" }
+      ],
+      summary: [
+        { label: "Subtotal", value: purchaseReturn.subtotal },
+        { label: "GST Total", value: purchaseReturn.gstTotal },
+        { label: "Round Off", value: purchaseReturn.roundOffAmount },
+        { label: "Grand Total", value: purchaseReturn.grandTotal },
+        { label: "Refund Received", value: purchaseReturn.refundedAmount },
+        { label: "Refund Pending", value: purchaseReturn.remainingRefundAmount }
+      ],
+      columns: [
+        { key: "productName", label: "Product" },
+        { key: "quantity", label: "Qty", type: "number" },
+        { key: "returnRate", label: "Rate", type: "number" },
+        { key: "taxableAmount", label: "Taxable", type: "number" },
+        { key: "gstAmount", label: "GST", type: "number" },
+        { key: "lineTotal", label: "Total", type: "number" }
+      ],
+      rows: items.map((item) => ({
+        productName: item.productName,
+        quantity: Number(item.quantity),
+        returnRate: Number(item.returnRate),
+        taxableAmount: Number(item.taxableAmount),
+        gstAmount: Number(item.gstAmount),
+        lineTotal: Number(item.lineTotal)
+      })),
+      notes: purchaseReturn.notes || undefined,
+      secondaryTable: refunds.length ? {
+        title: "Refund Entries",
+        columns: [
+          { key: "refundDate", label: "Date", type: "date" },
+          { key: "paymentMode", label: "Payment Mode" },
+          { key: "referenceNumber", label: "Reference" },
+          { key: "amount", label: "Amount", type: "number" }
+        ],
+        rows: refunds.map((refund) => ({
+          refundDate: refund.refundDate instanceof Date ? refund.refundDate : new Date(refund.refundDate),
+          paymentMode: refund.paymentMode,
+          referenceNumber: refund.referenceNumber ?? "-",
+          amount: Number(refund.amount)
+        }))
+      } : undefined
+    };
+
+    const file = buildReportFile(dataset, "pdf", purchaseReturn.returnNumber);
 
     await auditLogService.log({
       companyId: actor.companyId,

@@ -1911,68 +1911,65 @@ class PayrollService {
       generatedBy: actor.id,
       fileUrl: null
     });
-    const lines = [
-      slip.company?.legalName || slip.company?.name || "Company",
-      [slip.company?.addressLine1, slip.company?.addressLine2, slip.company?.city, slip.company?.state, slip.company?.pincode].filter(Boolean).join(", ") || "Address not available",
-      "",
-      `SALARY SLIP ${slip.runNumber}`,
-      `Payroll Month : ${slip.payrollMonth}`,
-      `Period        : ${formatDateValue(slip.periodStart)} to ${formatDateValue(slip.periodEnd)}`,
-      `Employee      : ${slip.employee.fullName}`,
-      `Employee Code : ${slip.employee.employeeCode}`,
-      `Department    : ${slip.employee.department ?? "-"}`,
-      `Designation   : ${slip.employee.designation ?? "-"}`,
-      `Joining Date  : ${formatDateValue(slip.employee.joiningDate)}`,
-      "",
-      `Working Days  : ${slip.attendance.workingDays}`,
-      `Present Days  : ${slip.attendance.presentDays}`,
-      `Paid Leaves   : ${slip.attendance.paidLeaveDays}`,
-      `Unpaid Leaves : ${slip.attendance.unpaidLeaveDays}`,
-      `Payable Days  : ${slip.attendance.payableDays}`,
-      `Overtime Hrs  : ${slip.attendance.overtimeHours}`,
-      "",
-      `Basic Salary  : ${slip.salary.basicSalary}`,
-      `HRA           : ${slip.salary.hra}`,
-      `Allowances    : ${slip.salary.allowancesTotal}`,
-      `Bonus         : ${slip.salary.bonusTotal}`,
-      `Gross Salary  : ${slip.salary.grossSalary}`,
-      `Deductions    : ${slip.salary.deductionsTotal}`,
-      `Net Salary    : ${slip.salary.netSalary}`,
-      `Paid Amount   : ${slip.salary.paidAmount}`,
-      `Unpaid Amount : ${slip.salary.unpaidAmount}`,
-      `Pay Status    : ${slip.salary.paymentStatus}`,
-      "",
-      "BONUS / DEDUCTIONS",
-      [padCell("Type", 12), padCell("Name", 28), padCell("Amount", 12, "right"), padCell("Taxable", 10)].join(" "),
-      "-".repeat(66),
-      ...(slip.bonusDeductions.length
-        ? slip.bonusDeductions.map((entry) =>
-            [
-              padCell(entry.type, 12),
-              padCell(entry.name, 28),
-              padCell(entry.amount, 12, "right"),
-              padCell(entry.taxable ? "Yes" : "No", 10)
-            ].join(" ")
-          )
-        : ["No bonus or deduction entries"]),
-      "",
-      "PAYMENTS",
-      [padCell("Date", 12), padCell("Mode", 12), padCell("Reference", 20), padCell("Amount", 12, "right")].join(" "),
-      "-".repeat(60),
-      ...(slip.payments.length
-        ? slip.payments.map((payment) =>
-            [
-              padCell(formatDateValue(payment.paymentDate), 12),
-              padCell(payment.paymentMode, 12),
-              padCell(payment.referenceNumber ?? "-", 20),
-              padCell(payment.amount, 12, "right")
-            ].join(" ")
-          )
-        : ["No salary payments recorded"]),
-      "",
-      `Generated At  : ${formatDateTimeValue(new Date())}`
-    ];
-    const file = buildTextPdfFile(`${slip.employee.employeeCode}-${slip.payrollMonth}-salary-slip`, lines);
+
+    const dataset: ReportExportDataset = {
+      title: "Salary Slip",
+      subtitle: `${slip.employee.fullName} (${slip.employee.employeeCode})`,
+      metadata: [
+        { label: "Payroll Month", value: slip.payrollMonth },
+        { label: "Period", value: `${formatDateValue(slip.periodStart)} to ${formatDateValue(slip.periodEnd)}` },
+        { label: "Department", value: slip.employee.department ?? "-" },
+        { label: "Designation", value: slip.employee.designation ?? "-" },
+        { label: "Joining Date", value: formatDateValue(slip.employee.joiningDate) },
+        { label: "Working Days", value: String(slip.attendance.workingDays) },
+        { label: "Present Days", value: String(slip.attendance.presentDays) },
+        { label: "Paid Leaves", value: String(slip.attendance.paidLeaveDays) },
+        { label: "Unpaid Leaves", value: String(slip.attendance.unpaidLeaveDays) },
+        { label: "Payable Days", value: String(slip.attendance.payableDays) },
+        { label: "Overtime Hours", value: String(slip.attendance.overtimeHours) }
+      ],
+      summary: [
+        { label: "Basic Salary", value: slip.salary.basicSalary },
+        { label: "HRA", value: slip.salary.hra },
+        { label: "Allowances", value: slip.salary.allowancesTotal },
+        { label: "Bonus", value: slip.salary.bonusTotal },
+        { label: "Gross Salary", value: slip.salary.grossSalary },
+        { label: "Deductions", value: slip.salary.deductionsTotal },
+        { label: "Net Salary", value: slip.salary.netSalary },
+        { label: "Paid Amount", value: slip.salary.paidAmount },
+        { label: "Unpaid Amount", value: slip.salary.unpaidAmount },
+        { label: "Pay Status", value: slip.salary.paymentStatus }
+      ],
+      columns: [
+        { key: "type", label: "Type" },
+        { key: "name", label: "Name" },
+        { key: "amount", label: "Amount", type: "number" },
+        { key: "taxable", label: "Taxable" }
+      ],
+      rows: slip.bonusDeductions.map((entry) => ({
+        type: entry.type,
+        name: entry.name,
+        amount: Number(entry.amount),
+        taxable: entry.taxable ? "Yes" : "No"
+      })),
+      secondaryTable: slip.payments.length ? {
+        title: "Payments",
+        columns: [
+          { key: "paymentDate", label: "Date", type: "date" },
+          { key: "paymentMode", label: "Mode" },
+          { key: "referenceNumber", label: "Reference" },
+          { key: "amount", label: "Amount", type: "number" }
+        ],
+        rows: slip.payments.map((payment) => ({
+          paymentDate: payment.paymentDate instanceof Date ? payment.paymentDate : new Date(payment.paymentDate),
+          paymentMode: payment.paymentMode,
+          referenceNumber: payment.referenceNumber ?? "-",
+          amount: Number(payment.amount)
+        }))
+      } : undefined
+    };
+
+    const file = buildReportFile(dataset, "pdf", `${slip.employee.employeeCode}-${slip.payrollMonth}-salary-slip`);
 
     await auditLogService.log({
       companyId: actor.companyId,

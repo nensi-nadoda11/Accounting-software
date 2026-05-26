@@ -78,7 +78,15 @@ export type ReportExportDataset = {
   rows: Array<Record<string, string | number | Date | null | undefined>>;
   metadata?: ReportMetaItem[] | undefined;
   summary?: ReportSummaryItem[] | undefined;
+  notes?: string | undefined;
+  terms?: string | undefined;
+  secondaryTable?: {
+    title: string;
+    columns: ReportColumn[];
+    rows: Array<Record<string, string | number | Date | null | undefined>>;
+  } | undefined;
 };
+
 
 export type ReportPagination = {
   page: number;

@@ -1818,39 +1818,41 @@ class PaymentsService {
   public async getReceiptPdf(actor: PaymentActor, paymentId: string, context: PaymentRequestContext): Promise<PaymentExportPayload> {
     const receipt = await this.loadPaymentReceipt(actor, paymentId);
     const data = receipt.receiptData as ReceiptPdfData;
-    const lines = [
-      `PAYMENT ${data.receiptType === "customer_receipt" ? "RECEIPT" : "VOUCHER"} ${receipt.receiptNumber}`,
-      `Generated At : ${formatDateTimeValue(receipt.generatedAt)}`,
-      `Payment No   : ${data.payment.paymentNumber}`,
-      `Payment Date : ${formatDateValue(data.payment.paymentDate)}`,
-      `Party        : ${data.party.name}`,
-      `Party Code   : ${data.party.code}`,
-      `Mode         : ${data.payment.paymentMode}`,
-      `Reference    : ${data.payment.referenceNumber ?? "-"}`,
-      `Status       : ${data.receiptType === "customer_receipt" ? "Received" : "Paid"}`,
-      "",
-      [padCell("Allocation", 26), padCell("Reference", 20), padCell("Date", 12), padCell("Amount", 12, "right")].join(" "),
-      "-".repeat(76),
-      ...(data.allocations.length
-        ? data.allocations.map((allocation) =>
-            [
-              padCell(allocation.allocationType, 26),
-              padCell(allocation.referenceNumber ?? "-", 20),
-              padCell(formatDateValue(allocation.allocationDate), 12),
-              padCell(allocation.allocatedAmount, 12, "right")
-            ].join(" ")
-          )
-        : ["No allocations available"]),
-      "",
-      `Total Amount : ${data.payment.amount}`,
-      `Allocated    : ${data.payment.allocatedAmount}`,
-      `Unallocated  : ${data.payment.unallocatedAmount}`,
-      `Bank Account : ${data.bankAccount ? `${data.bankAccount.bankName} ${data.bankAccount.accountNumber}` : "-"}`,
-      `Notes        : ${data.payment.notes ?? "-"}`,
-      "",
-      `Generated At : ${formatDateTimeValue(new Date())}`
-    ];
-    const file = buildTextPdfFile(receipt.receiptNumber, lines);
+
+    const dataset: ReportExportDataset = {
+      title: data.receiptType === "customer_receipt" ? "Payment Receipt" : "Payment Voucher",
+      subtitle: receipt.receiptNumber,
+      metadata: [
+        { label: "Payment No", value: data.payment.paymentNumber },
+        { label: "Payment Date", value: formatDateValue(data.payment.paymentDate) },
+        { label: "Party", value: data.party.name },
+        { label: "Party Code", value: data.party.code },
+        { label: "Mode", value: data.payment.paymentMode },
+        { label: "Reference", value: data.payment.referenceNumber ?? "-" },
+        { label: "Status", value: data.receiptType === "customer_receipt" ? "Received" : "Paid" },
+        { label: "Bank Account", value: data.bankAccount ? `${data.bankAccount.bankName} ${data.bankAccount.accountNumber}` : "-" }
+      ],
+      summary: [
+        { label: "Total Amount", value: data.payment.amount },
+        { label: "Allocated", value: data.payment.allocatedAmount },
+        { label: "Unallocated", value: data.payment.unallocatedAmount }
+      ],
+      columns: [
+        { key: "allocationType", label: "Allocation" },
+        { key: "referenceNumber", label: "Reference" },
+        { key: "allocationDate", label: "Date", type: "date" },
+        { key: "allocatedAmount", label: "Amount", type: "number" }
+      ],
+      rows: data.allocations.map((alloc) => ({
+        allocationType: alloc.allocationType,
+        referenceNumber: alloc.referenceNumber ?? "-",
+        allocationDate: new Date(alloc.allocationDate ?? data.payment.paymentDate),
+        allocatedAmount: Number(alloc.allocatedAmount)
+      })),
+      notes: data.payment.notes || undefined
+    };
+
+    const file = buildReportFile(dataset, "pdf", receipt.receiptNumber);
 
     await auditLogService.log({
       companyId: actor.companyId,

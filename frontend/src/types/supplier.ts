@@ -2,7 +2,6 @@ export type SupplierStatus = "active" | "inactive" | "blocked" | "deleted";
 export type SupplierMutableStatus = Exclude<SupplierStatus, "deleted">;
 export type SupplierType = "individual" | "business" | "manufacturer" | "distributor" | "wholesaler";
 export type TaxType = "registered" | "unregistered" | "composition";
-export type SupplierOpeningBalanceType = "debit" | "credit" | "none";
 export type SupplierSortBy = "name" | "createdAt" | "outstandingPayable" | "supplierCode";
 export type SortOrder = "asc" | "desc";
 export type SupplierExportFormat = "csv" | "xlsx" | "pdf";
@@ -47,8 +46,6 @@ export interface Supplier {
   shippingPincode: string | null;
   shippingCountry: string;
   sameAsBilling: boolean;
-  openingBalanceAmount: string;
-  openingBalanceType: SupplierOpeningBalanceType;
   creditLimit: string;
   creditDays: number;
   paymentTerms: string | null;
@@ -100,8 +97,6 @@ export interface SupplierFormInput {
   shippingPincode: string | null;
   shippingCountry: string;
   sameAsBilling: boolean;
-  openingBalanceAmount: number;
-  openingBalanceType: SupplierOpeningBalanceType;
   creditLimit: number;
   creditDays: number;
   paymentTerms: string | null;
@@ -229,6 +224,7 @@ export interface SupplierPurchaseRow {
   id: string;
   date: string;
   purchaseInvoiceNo?: string | null;
+  supplierInvoiceNo?: string | null;
   referenceNo?: string | null;
   itemsCount?: number | null;
   gst?: string | null;

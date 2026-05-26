@@ -13,7 +13,7 @@ import { SideSheet } from "../../../components/ui/SideSheet";
 import { Table, TableWrapper } from "../../../components/ui/Table";
 import { getErrorMessage } from "../../../lib/errors";
 import { suppliersApi } from "../../../services/suppliersApi";
-import { formatDate, formatInr, getGenericStatusTone, getPurchaseGstAmount, getPurchaseInvoiceLabel, getPurchasePaidAmount, getPurchaseTotalAmount } from "../supplierUtils";
+import { formatDate, formatInr, getGenericStatusTone, getPurchaseInvoiceLabel, getPurchasePaidAmount, getPurchaseTotalAmount } from "../supplierUtils";
 
 export const SupplierPurchasesDrawer = ({
   open,
@@ -171,7 +171,7 @@ export const SupplierPurchasesDrawer = ({
                 <Table>
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      {["Purchase Invoice No", "Date", "Items Count", "GST", "Total Amount", "Paid Amount", "Due Amount", "Status"].map((head) => (
+                      {["Purchase Invoice No", "Supplier Invoice No", "Date", "Total Amount", "Paid Amount", "Due Amount", "Status", "Notes"].map((head) => (
                         <th key={head} className="px-5 py-3 font-semibold">
                           {head}
                         </th>
@@ -182,11 +182,8 @@ export const SupplierPurchasesDrawer = ({
                     {data.items.map((item) => (
                       <tr key={item.id}>
                         <td className="px-5 py-4 whitespace-nowrap">{getPurchaseInvoiceLabel(item)}</td>
+                        <td className="px-5 py-4 whitespace-nowrap">{item.supplierInvoiceNo || "-"}</td>
                         <td className="px-5 py-4 whitespace-nowrap">{formatDate(item.date)}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">{item.itemsCount ?? "-"}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          {getPurchaseGstAmount(item) ? formatInr(getPurchaseGstAmount(item)) : "-"}
-                        </td>
                         <td className="px-5 py-4 whitespace-nowrap">
                           {getPurchaseTotalAmount(item) ? <AmountText value={getPurchaseTotalAmount(item)} /> : "-"}
                         </td>
@@ -199,6 +196,7 @@ export const SupplierPurchasesDrawer = ({
                         <td className="px-5 py-4 whitespace-nowrap">
                           <Badge tone={getGenericStatusTone(item.status)}>{item.status || "-"}</Badge>
                         </td>
+                        <td className="min-w-56 px-5 py-4">{item.remarks || "-"}</td>
                       </tr>
                     ))}
                   </tbody>

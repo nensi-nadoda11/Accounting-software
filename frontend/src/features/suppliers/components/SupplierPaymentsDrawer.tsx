@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { RotateCcw, Wallet } from "lucide-react";
 
 import { AmountText } from "../../../components/ui/AmountText";
-import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
@@ -12,7 +11,7 @@ import { SideSheet } from "../../../components/ui/SideSheet";
 import { Table, TableWrapper } from "../../../components/ui/Table";
 import { getErrorMessage } from "../../../lib/errors";
 import { suppliersApi } from "../../../services/suppliersApi";
-import { formatDate, getGenericStatusTone, getLinkedPurchaseLabel } from "../supplierUtils";
+import { formatDate, getLinkedPurchaseLabel } from "../supplierUtils";
 
 export const SupplierPaymentsDrawer = ({
   open,
@@ -145,7 +144,7 @@ export const SupplierPaymentsDrawer = ({
                 <Table>
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      {["Date", "Amount", "Payment Mode", "Reference No", "Linked Purchase", "Receipt No", "Status", "Notes"].map((head) => (
+                      {["Date", "Amount", "Payment Mode", "Reference No", "Linked Purchase", "Notes"].map((head) => (
                         <th key={head} className="px-5 py-3 font-semibold">
                           {head}
                         </th>
@@ -162,10 +161,6 @@ export const SupplierPaymentsDrawer = ({
                         <td className="px-5 py-4 whitespace-nowrap">{item.paymentMode || "-"}</td>
                         <td className="px-5 py-4 whitespace-nowrap">{item.referenceNo || "-"}</td>
                         <td className="px-5 py-4 whitespace-nowrap">{getLinkedPurchaseLabel(item)}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">{item.receiptNo || "-"}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <Badge tone={getGenericStatusTone(item.status)}>{item.status || "-"}</Badge>
-                        </td>
                         <td className="min-w-56 px-5 py-4">{item.notes || item.remarks || "-"}</td>
                       </tr>
                     ))}

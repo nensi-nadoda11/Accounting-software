@@ -47,7 +47,6 @@ export const SupplierFormDrawer = ({
   const billingState = form.watch("billingState");
   const billingPincode = form.watch("billingPincode");
   const billingCountry = form.watch("billingCountry");
-  const openingBalanceAmount = Number(form.watch("openingBalanceAmount") ?? 0);
   const watchInputValue = (name: keyof SupplierFormValues) =>
     toInputString(form.watch(name) as string | number | null | undefined);
 
@@ -333,26 +332,9 @@ export const SupplierFormDrawer = ({
         </div>
 
         <Card>
-          <CardHeader title="Financial" />
-          <CardContent className="space-y-4">
+          <CardHeader title="Credit & Bank" />
+          <CardContent>
             <SectionGrid>
-              <Input
-                label="Opening Balance"
-                type="number"
-                min="0"
-                step="0.01"
-                {...form.register("openingBalanceAmount")}
-                error={form.formState.errors.openingBalanceAmount?.message}
-              />
-              <Select
-                label="Opening Balance Type"
-                {...form.register("openingBalanceType")}
-                error={form.formState.errors.openingBalanceType?.message}
-              >
-                <option value="none">None</option>
-                <option value="debit">Debit</option>
-                <option value="credit">Credit</option>
-              </Select>
               <Input
                 label="Credit Limit"
                 type="number"
@@ -393,17 +375,6 @@ export const SupplierFormDrawer = ({
                 {...form.register("defaultDiscount")}
                 error={form.formState.errors.defaultDiscount?.message}
               />
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                Opening type: <span className="font-medium text-slate-900">{openingBalanceAmount > 0 ? "Required" : "None"}</span>
-              </div>
-            </SectionGrid>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader title="Bank" />
-          <CardContent>
-            <SectionGrid>
               <Input
                 label="Bank Name"
                 {...form.register("bankName")}

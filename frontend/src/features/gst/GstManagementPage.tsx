@@ -262,7 +262,7 @@ export const GstManagementPage = () => {
       const [yearsResult, customersResult, suppliersResult] = await Promise.allSettled([
         financialYearApi.list(),
         customersApi.list({ page: 1, limit: 100, status: "active" }),
-        suppliersApi.list({ page: 1, limit: 100, status: "active" }),
+        suppliersApi.list({ page: 1, limit: 100, status: "active", isBlacklisted: false }),
       ]);
 
       if (yearsResult.status === "fulfilled") {

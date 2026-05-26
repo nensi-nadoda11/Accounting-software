@@ -42,6 +42,7 @@ import { SalesReturnDrawer } from "./components/SalesReturnDrawer";
 import { SalesReturnList } from "./components/SalesReturnList";
 import { SalesReturnRefundDrawer } from "./components/SalesReturnRefundDrawer";
 import { SendInvoiceModal } from "./components/SendInvoiceModal";
+import { allocateAdvancePayments } from "../payments/advanceAllocation";
 import { createPaymentPayload, createReturnPayload, createReturnRefundPayload, createSalesUpdatePayload } from "./salesUtils";
 import type { LookupOption } from "./components/AsyncLookupSelect";
 
@@ -733,18 +734,37 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
               setEditInvoice(null);
             }}
             onPrint={(invoice) => void printInvoice(invoice.id)}
-            onSubmit={async (values, setError, mode) => {
+            onSubmit={async (values, setError, mode, advanceAdjustmentAmount) => {
               try {
                 setSubmittingForm(true);
+                let invoiceId = "";
+                let invoiceNumber = "";
                 if (editInvoice) {
                   await salesApi.update(editInvoice.id, createSalesUpdatePayload(values));
                   if (mode === "posted") {
-                    await salesApi.post(editInvoice.id);
+                    const posted = await salesApi.post(editInvoice.id);
+                    invoiceId = posted.data.invoice.id;
+                    invoiceNumber = posted.data.invoice.invoiceNumber;
                   }
                   toast.success(mode === "posted" ? "Sales draft posted" : "Sales draft updated");
                 } else {
-                  await salesApi.create(values);
+                  const created = await salesApi.create(values);
+                  invoiceId = created.data.invoice.id;
+                  invoiceNumber = created.data.invoice.invoiceNumber;
                   toast.success(mode === "posted" ? "Sales invoice saved and posted" : "Sales draft saved");
+                }
+
+                if (mode === "posted" && advanceAdjustmentAmount > 0 && values.customerId && invoiceId) {
+                  await allocateAdvancePayments({
+                    partyType: "customer",
+                    paymentType: "customer_receive",
+                    partyId: values.customerId,
+                    referenceType: "sales_invoice",
+                    referenceId: invoiceId,
+                    referenceNumber: invoiceNumber,
+                    allocationDate: values.invoiceDate,
+                    amount: advanceAdjustmentAmount,
+                  });
                 }
 
                 setFormOpen(false);

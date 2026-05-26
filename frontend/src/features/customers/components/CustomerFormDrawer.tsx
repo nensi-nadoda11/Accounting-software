@@ -44,7 +44,6 @@ export const CustomerFormDrawer = ({
   const billingState = form.watch("billingState");
   const billingPincode = form.watch("billingPincode");
   const billingCountry = form.watch("billingCountry");
-  const openingBalanceAmount = Number(form.watch("openingBalanceAmount") ?? 0);
   const watchInputValue = (name: keyof CustomerFormValues) =>
     toInputString(form.watch(name) as string | number | null | undefined);
 
@@ -276,26 +275,9 @@ export const CustomerFormDrawer = ({
         </Card>
 
         <Card>
-          <CardHeader title="Financial" />
-          <CardContent>
-            <SectionGrid>
-              <Input
-                label="Opening Balance"
-                type="number"
-                min="0"
-                step="0.01"
-                {...form.register("openingBalanceAmount")}
-                error={form.formState.errors.openingBalanceAmount?.message}
-              />
-              <Select
-                label="Opening Balance Type"
-                {...form.register("openingBalanceType")}
-                error={form.formState.errors.openingBalanceType?.message}
-              >
-                <option value="none">None</option>
-                <option value="debit">Debit</option>
-                <option value="credit">Credit</option>
-              </Select>
+          <CardHeader title="Other" />
+          <CardContent className="space-y-4">
+            <SectionGrid className="xl:grid-cols-2">
               <Input
                 label="Credit Limit"
                 type="number"
@@ -321,17 +303,6 @@ export const CustomerFormDrawer = ({
                 {...form.register("defaultDiscount")}
                 error={form.formState.errors.defaultDiscount?.message}
               />
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                Opening type: <span className="font-medium text-slate-900">{openingBalanceAmount > 0 ? "Required" : "None"}</span>
-              </div>
-            </SectionGrid>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader title="Other" />
-          <CardContent className="space-y-4">
-            <SectionGrid className="xl:grid-cols-2">
               <Select label="Status" {...form.register("status")} error={form.formState.errors.status?.message}>
                 {CUSTOMER_MUTABLE_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>

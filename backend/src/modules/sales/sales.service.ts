@@ -393,7 +393,17 @@ class SalesService {
     };
   }
 
-  private mapPaymentRow(row: typeof import("../../db/schema").salesPayments.$inferSelect) {
+  private mapPaymentRow(row: {
+    id: string;
+    paymentDate: Date;
+    amount: string;
+    paymentMode: string;
+    bankAccountId: string | null;
+    referenceNumber: string | null;
+    notes: string | null;
+    createdBy: string | null;
+    createdAt: Date;
+  }) {
     return {
       id: row.id,
       paymentDate: row.paymentDate,

@@ -270,7 +270,6 @@ export const SupplierDetailDrawer = ({
                   { label: "PAN Number", value: supplier.panNumber || "-" },
                   { label: "TAN Number", value: supplier.tanNumber || "-" },
                   { label: "GST State", value: supplier.gstState || "-" },
-                  { label: "Opening Balance", value: formatInr(supplier.openingBalanceAmount) },
                   { label: "Created", value: formatDateTime(supplier.createdAt) },
                 ].map((item) => (
                   <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">

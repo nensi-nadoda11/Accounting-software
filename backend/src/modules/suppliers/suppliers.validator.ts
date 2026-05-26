@@ -5,7 +5,6 @@ import {
   SUPPLIER_EXPORT_FORMATS,
   SUPPLIER_LEDGER_TRANSACTION_TYPES,
   SUPPLIER_MUTABLE_STATUSES,
-  SUPPLIER_OPENING_BALANCE_TYPES,
   SUPPLIER_STATUSES,
   SUPPLIER_TAX_TYPES,
   SUPPLIER_TYPES
@@ -205,8 +204,6 @@ const supplierBodyFields = {
   shippingPincode: optionalNullablePincode,
   shippingCountry: optionalNullableString(120),
   sameAsBilling: z.boolean().optional().default(true),
-  openingBalanceAmount: z.coerce.number().min(0).optional().default(0),
-  openingBalanceType: z.enum(SUPPLIER_OPENING_BALANCE_TYPES).optional().default("none"),
   creditLimit: z.coerce.number().min(0).optional().default(0),
   creditDays: z.coerce.number().int().min(0).max(365).optional().default(0),
   paymentTerms: optionalNullableString(500),
@@ -253,10 +250,6 @@ const validateSupplierBody = (value: Record<string, unknown>, ctx: z.RefinementC
   const alternateMobile = value.alternateMobile as string | null | undefined;
   const gstNumber = value.gstNumber as string | null | undefined;
   const panNumber = value.panNumber as string | null | undefined;
-  const openingBalanceAmount = value.openingBalanceAmount as number | undefined;
-  const openingBalanceType = value.openingBalanceType as
-    | (typeof SUPPLIER_OPENING_BALANCE_TYPES)[number]
-    | undefined;
 
   if (mobile && alternateMobile && mobile === alternateMobile) {
     ctx.addIssue({
@@ -271,22 +264,6 @@ const validateSupplierBody = (value: Record<string, unknown>, ctx: z.RefinementC
       code: "custom",
       path: ["panNumber"],
       message: "PAN must match the PAN section of GST number"
-    });
-  }
-
-  if (openingBalanceAmount !== undefined && openingBalanceAmount > 0 && openingBalanceType === "none") {
-    ctx.addIssue({
-      code: "custom",
-      path: ["openingBalanceType"],
-      message: "Opening balance type must be debit or credit when amount is greater than 0"
-    });
-  }
-
-  if (openingBalanceAmount !== undefined && openingBalanceAmount === 0 && openingBalanceType && openingBalanceType !== "none") {
-    ctx.addIssue({
-      code: "custom",
-      path: ["openingBalanceType"],
-      message: "Opening balance type must be none when amount is 0"
     });
   }
 
@@ -332,8 +309,6 @@ export const updateSupplierSchema = z
     shippingPincode: supplierBodyFields.shippingPincode,
     shippingCountry: supplierBodyFields.shippingCountry,
     sameAsBilling: z.boolean().optional(),
-    openingBalanceAmount: z.coerce.number().min(0).optional(),
-    openingBalanceType: z.enum(SUPPLIER_OPENING_BALANCE_TYPES).optional(),
     creditLimit: z.coerce.number().min(0).optional(),
     creditDays: z.coerce.number().int().min(0).max(365).optional(),
     paymentTerms: supplierBodyFields.paymentTerms,

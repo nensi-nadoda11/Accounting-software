@@ -330,11 +330,6 @@ class SuppliersService {
         shippingPincode: input.shippingPincode,
         shippingCountry: input.shippingCountry ?? undefined,
         sameAsBilling: input.sameAsBilling,
-        openingBalanceAmount:
-          input.openingBalanceAmount !== undefined
-            ? normalizeDecimalString(input.openingBalanceAmount)
-            : undefined,
-        openingBalanceType: input.openingBalanceType,
         creditLimit: input.creditLimit !== undefined ? normalizeDecimalString(input.creditLimit) : undefined,
         creditDays: input.creditDays,
         paymentTerms: input.paymentTerms,
@@ -1195,8 +1190,11 @@ class SuppliersService {
       userAgent: context.userAgent
     });
 
+    const start = (pagination.page - 1) * pagination.limit;
+    const items = purchaseHistory.rows.slice(start, start + pagination.limit);
+
     return {
-      items: purchaseHistory.rows,
+      items,
       totals: {
         totalPurchases: purchaseHistory.totalPurchases,
         totalPurchaseReturns: purchaseHistory.totalPurchaseReturns
@@ -1218,8 +1216,11 @@ class SuppliersService {
       dateTo: query.dateTo
     });
 
+    const start = (pagination.page - 1) * pagination.limit;
+    const items = paymentHistory.rows.slice(start, start + pagination.limit);
+
     return {
-      items: paymentHistory.rows,
+      items,
       totals: {
         totalPaymentsMade: paymentHistory.totalAmount
       },

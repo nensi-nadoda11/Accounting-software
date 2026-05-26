@@ -5,6 +5,7 @@ import { ArrowLeft, Plus, Save } from "lucide-react";
 
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
+import { Checkbox } from "../../../components/ui/Checkbox";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
@@ -12,6 +13,7 @@ import { applyFriendlyFieldErrors } from "../../customers/customerUtils";
 import { getErrorMessage } from "../../../lib/errors";
 import { useAuth } from "../../../providers/useAuth";
 import { useToast } from "../../../providers/useToast";
+import { paymentsApi } from "../../../services/paymentsApi";
 import { productsApi } from "../../../services/productsApi";
 import { suppliersApi } from "../../../services/suppliersApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../../types/company";
@@ -112,6 +114,7 @@ export const PurchaseForm = ({
     values: PurchaseFormInput,
     setError: UseFormSetError<PurchaseFormValues>,
     mode: "draft" | "posted",
+    advanceAdjustmentAmount: number,
   ) => Promise<void>;
 }) => {
   const auth = useAuth();
@@ -132,6 +135,10 @@ export const PurchaseForm = ({
   const [productLookupLoading, setProductLookupLoading] = useState(false);
   const [supplierDetail, setSupplierDetail] = useState<Supplier | null>(null);
   const [productDetails, setProductDetails] = useState<Record<string, Product>>({});
+  const [availableAdvanceAmount, setAvailableAdvanceAmount] = useState(0);
+  const [useAdvanceAmount, setUseAdvanceAmount] = useState(false);
+  const [advanceAdjustmentAmount, setAdvanceAdjustmentAmount] = useState(0);
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
   const supplierLookupRequestRef = useRef(0);
   const productLookupRequestRef = useRef(0);
   const canCreateSupplier = auth.hasPermission("supplier.create");
@@ -160,7 +167,7 @@ export const PurchaseForm = ({
     invoiceDiscountTotal: Number(values.invoiceDiscountTotal ?? 0),
     additionalCharges: Number(values.additionalCharges ?? 0),
     freightCharges: Number(values.freightCharges ?? 0),
-    paidAmount: Number(values.paidAmount ?? 0),
+    paidAmount: Number(values.paidAmount ?? 0) + (useAdvanceAmount ? advanceAdjustmentAmount : 0),
     dueDate: (values.dueDate as string | null | undefined) ?? null,
     roundOffEnabled: invoiceSettings?.roundOffEnabled ?? true,
   });
@@ -178,6 +185,7 @@ export const PurchaseForm = ({
           page: 1,
           limit: SUPPLIER_DIRECTORY_LIMIT,
           status: "active",
+          isBlacklisted: false,
           sortBy: "name",
           sortOrder: "asc",
         });
@@ -245,6 +253,10 @@ export const PurchaseForm = ({
     if (!initialInvoice) {
       setSupplierLookupValue(null);
       setSupplierDetail(null);
+      setAvailableAdvanceAmount(0);
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
+      setAdvanceError(null);
       form.reset({
         ...buildPurchaseFormDefaults(null, invoiceSettings),
         grandTotalPreview: 0,
@@ -256,6 +268,10 @@ export const PurchaseForm = ({
       ...buildPurchaseFormDefaults(initialInvoice, invoiceSettings),
       grandTotalPreview: Number(initialInvoice.grandTotal),
     });
+    setAvailableAdvanceAmount(0);
+    setUseAdvanceAmount(false);
+    setAdvanceAdjustmentAmount(0);
+    setAdvanceError(null);
     setSupplierLookupValue({
       id: initialInvoice.supplier.id,
       label: initialInvoice.supplier.name,
@@ -316,6 +332,7 @@ export const PurchaseForm = ({
         limit: 20,
         search: normalizedSearch,
         status: "active",
+        isBlacklisted: false,
       });
       if (supplierLookupRequestRef.current !== requestId) {
         return;
@@ -461,10 +478,17 @@ export const PurchaseForm = ({
     stopSupplierLookup();
     setSupplierLookupValue(option);
     form.setValue("supplierId", option.id, { shouldDirty: true, shouldValidate: true });
+    setAdvanceError(null);
 
     try {
-      const response = await suppliersApi.get(option.id);
+      const [response, dueItemsResponse] = await Promise.all([
+        suppliersApi.get(option.id),
+        paymentsApi.getPartyDueItems("supplier", option.id),
+      ]);
       setSupplierDetail(response.data.supplier);
+      setAvailableAdvanceAmount(Number(dueItemsResponse.data.advanceBalance ?? 0));
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
       if (!form.getValues("termsConditions")) {
         form.setValue("termsConditions", response.data.supplier.paymentTerms ?? invoiceSettings?.termsAndConditions ?? null, {
           shouldDirty: true,
@@ -472,6 +496,9 @@ export const PurchaseForm = ({
       }
     } catch {
       setSupplierDetail(null);
+      setAvailableAdvanceAmount(0);
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
     }
   };
 
@@ -557,6 +584,9 @@ export const PurchaseForm = ({
       setSupplierLookup((current) => [lookupOption, ...current.filter((option) => option.id !== supplier.id)]);
       setSupplierLookupValue(lookupOption);
       setSupplierDetail(supplier);
+      setAvailableAdvanceAmount(0);
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
       form.setValue("supplierId", supplier.id, { shouldDirty: true, shouldValidate: true });
 
       if (!form.getValues("termsConditions")) {
@@ -580,10 +610,29 @@ export const PurchaseForm = ({
       className="space-y-5"
       onSubmit={form.handleSubmit(async (output) => {
         try {
+          const directPaidAmount = Number(output.paidAmount ?? 0);
+          const requestedAdvanceAmount = useAdvanceAmount ? Number(advanceAdjustmentAmount ?? 0) : 0;
+
+          setAdvanceError(null);
+          if (submitMode === "draft" && requestedAdvanceAmount > 0) {
+            setAdvanceError("Advance adjustment sirf Save & Post par apply hoga.");
+            return;
+          }
+
+          if (requestedAdvanceAmount > availableAdvanceAmount) {
+            setAdvanceError("Advance amount available balance se zyada nahi ho sakta.");
+            return;
+          }
+
+          if (directPaidAmount + requestedAdvanceAmount > Number(preview.grandTotal)) {
+            setAdvanceError("Cash payment aur advance milakar grand total se zyada nahi ho sakte.");
+            return;
+          }
+
           const payload = submitMode === "draft"
             ? createPurchasePayload({ ...output, purchaseStatus: "draft" })
             : createPurchasePayload({ ...output, purchaseStatus: "posted" });
-          await onSubmit(payload, form.setError, submitMode);
+          await onSubmit(payload, form.setError, submitMode, requestedAdvanceAmount);
         } catch (error) {
           applyFriendlyFieldErrors(error, form.setError);
         }
@@ -598,10 +647,19 @@ export const PurchaseForm = ({
           <h1 className="text-xl font-semibold text-slate-900">{initialInvoice ? "Edit Purchase Draft" : "New Purchase"}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" onClick={() => form.reset({
-            ...buildPurchaseFormDefaults(initialInvoice, invoiceSettings),
-            grandTotalPreview: Number(initialInvoice?.grandTotal ?? 0),
-          })}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setUseAdvanceAmount(false);
+              setAdvanceAdjustmentAmount(0);
+              setAdvanceError(null);
+              form.reset({
+                ...buildPurchaseFormDefaults(initialInvoice, invoiceSettings),
+                grandTotalPreview: Number(initialInvoice?.grandTotal ?? 0),
+              });
+            }}
+          >
             Reset
           </Button>
           <Button type="submit" variant="secondary" loading={submitting} onClick={() => setSubmitMode("draft")}>
@@ -637,6 +695,10 @@ export const PurchaseForm = ({
                       stopSupplierLookup();
                       setSupplierLookupValue(null);
                       setSupplierDetail(null);
+                      setAvailableAdvanceAmount(0);
+                      setUseAdvanceAmount(false);
+                      setAdvanceAdjustmentAmount(0);
+                      setAdvanceError(null);
                       form.setValue("supplierId", "", { shouldDirty: true, shouldValidate: true });
                     }}
                   />
@@ -767,6 +829,48 @@ export const PurchaseForm = ({
                   ))}
                 </Select>
               ) : null}
+              <div className="md:col-span-2 xl:col-span-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Advance Adjustment</p>
+                    <p className="text-xs text-slate-600">Available advance: {availableAdvanceAmount.toFixed(2)}</p>
+                  </div>
+                  <Checkbox
+                    label="Use available advance"
+                    checked={useAdvanceAmount}
+                    disabled={availableAdvanceAmount <= 0}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setUseAdvanceAmount(checked);
+                      setAdvanceError(null);
+                      if (!checked) {
+                        setAdvanceAdjustmentAmount(0);
+                        return;
+                      }
+
+                      if (advanceAdjustmentAmount === 0) {
+                        setAdvanceAdjustmentAmount(Number(Math.min(availableAdvanceAmount, Number(preview.grandTotal)).toFixed(2)));
+                      }
+                    }}
+                  />
+                </div>
+                {useAdvanceAmount ? (
+                  <div className="mt-3">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      label="Adjust Advance Amount"
+                      value={advanceAdjustmentAmount}
+                      onChange={(event) => {
+                        setAdvanceAdjustmentAmount(Number(event.target.value || 0));
+                        setAdvanceError(null);
+                      }}
+                      error={advanceError ?? undefined}
+                    />
+                  </div>
+                ) : advanceError ? <p className="mt-3 text-sm text-rose-600">{advanceError}</p> : null}
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -39,6 +39,7 @@ import { PurchasePaymentDrawer } from "./components/PurchasePaymentDrawer";
 import { PurchaseReturnDrawer } from "./components/PurchaseReturnDrawer";
 import { PurchaseReturnList } from "./components/PurchaseReturnList";
 import { PurchaseReturnRefundDrawer } from "./components/PurchaseReturnRefundDrawer";
+import { allocateAdvancePayments } from "../payments/advanceAllocation";
 import { createPaymentPayload, createPurchaseUpdatePayload, createReturnPayload, createReturnRefundPayload } from "./purchaseUtils";
 import type { LookupOption } from "./components/AsyncLookupSelect";
 
@@ -521,18 +522,37 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
         invoiceSettings={invoiceSettings}
         submitting={submittingForm}
         onBack={() => navigate("/app/purchases/invoices")}
-        onSubmit={async (values, setError, mode) => {
+        onSubmit={async (values, setError, mode, advanceAdjustmentAmount) => {
           try {
             setSubmittingForm(true);
+            let invoiceId = "";
+            let invoiceNumber = "";
             if (purchaseId) {
               await purchasesApi.update(purchaseId, createPurchaseUpdatePayload({ ...values, purchaseStatus: mode }));
               if (mode === "posted") {
-                await purchasesApi.post(purchaseId);
+                const posted = await purchasesApi.post(purchaseId);
+                invoiceId = posted.data.invoice.id;
+                invoiceNumber = posted.data.invoice.purchaseNumber;
               }
               toast.success("Purchase draft updated");
             } else {
-              await purchasesApi.create({ ...values, purchaseStatus: mode });
+              const created = await purchasesApi.create({ ...values, purchaseStatus: mode });
+              invoiceId = created.data.invoice.id;
+              invoiceNumber = created.data.invoice.purchaseNumber;
               toast.success(mode === "posted" ? "Purchase saved and posted" : "Purchase draft saved");
+            }
+
+            if (mode === "posted" && advanceAdjustmentAmount > 0 && values.supplierId && invoiceId) {
+              await allocateAdvancePayments({
+                partyType: "supplier",
+                paymentType: "supplier_pay",
+                partyId: values.supplierId,
+                referenceType: "purchase_invoice",
+                referenceId: invoiceId,
+                referenceNumber: invoiceNumber,
+                allocationDate: values.invoiceDate,
+                amount: advanceAdjustmentAmount,
+              });
             }
 
             navigate("/app/purchases/invoices");

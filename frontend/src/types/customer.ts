@@ -2,7 +2,6 @@ export type CustomerStatus = "active" | "inactive" | "deleted";
 export type CustomerMutableStatus = Exclude<CustomerStatus, "deleted">;
 export type CustomerType = "individual" | "business";
 export type TaxType = "registered" | "unregistered" | "composition";
-export type CustomerOpeningBalanceType = "debit" | "credit" | "none";
 export type CustomerSortBy = "name" | "createdAt" | "outstandingAmount" | "customerCode";
 export type SortOrder = "asc" | "desc";
 export type CustomerExportFormat = "csv" | "xlsx" | "pdf";
@@ -41,8 +40,6 @@ export interface Customer {
   shippingPincode: string | null;
   shippingCountry: string;
   sameAsBilling: boolean;
-  openingBalanceAmount: string;
-  openingBalanceType: CustomerOpeningBalanceType;
   creditLimit: string;
   creditDays: number;
   defaultDiscount: string;
@@ -80,8 +77,6 @@ export interface CustomerFormInput {
   shippingPincode: string | null;
   shippingCountry: string;
   sameAsBilling: boolean;
-  openingBalanceAmount: number;
-  openingBalanceType: CustomerOpeningBalanceType;
   creditLimit: number;
   creditDays: number;
   defaultDiscount: number;
@@ -119,8 +114,6 @@ export interface CustomerListItem {
   taxType: TaxType;
   status: CustomerStatus;
   isBlacklisted: boolean;
-  openingBalanceAmount: string;
-  openingBalanceType: CustomerOpeningBalanceType;
   creditLimit: string;
   createdAt: string;
   updatedAt: string;

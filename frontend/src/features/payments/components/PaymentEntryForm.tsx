@@ -165,7 +165,14 @@ export const PaymentEntryForm = ({
         const response =
           partyType === "customer"
             ? await customersApi.list({ page: 1, limit: DIRECTORY_LIMIT, status: "active", sortBy: "name", sortOrder: "asc" })
-            : await suppliersApi.list({ page: 1, limit: DIRECTORY_LIMIT, status: "active", sortBy: "name", sortOrder: "asc" });
+            : await suppliersApi.list({
+                page: 1,
+                limit: DIRECTORY_LIMIT,
+                status: "active",
+                isBlacklisted: false,
+                sortBy: "name",
+                sortOrder: "asc",
+              });
 
         if (cancelled) {
           return;
@@ -227,7 +234,13 @@ export const PaymentEntryForm = ({
 
         remoteOptions = response.data.items.map(buildCustomerLookupOption);
       } else {
-        const response = await suppliersApi.list({ page: 1, limit: 20, search: normalizedSearch, status: "active" });
+        const response = await suppliersApi.list({
+          page: 1,
+          limit: 20,
+          search: normalizedSearch,
+          status: "active",
+          isBlacklisted: false,
+        });
         if (lookupRequestRef.current !== requestId) {
           return;
         }

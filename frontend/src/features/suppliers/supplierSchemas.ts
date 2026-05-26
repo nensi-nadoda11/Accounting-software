@@ -99,8 +99,6 @@ export const supplierFormSchema = z
     ),
     shippingCountry: z.preprocess(trim, z.string().max(120).optional().catch("India")),
     sameAsBilling: z.boolean(),
-    openingBalanceAmount: decimalField(0),
-    openingBalanceType: z.enum(["debit", "credit", "none"]),
     creditLimit: decimalField(0),
     creditDays: z.coerce.number({ message: "Enter valid credit days" }).int().min(0, "Must be at least 0").max(365, "Must be 365 or less"),
     paymentTerms: textField(500),
@@ -142,22 +140,6 @@ export const supplierFormSchema = z
         code: "custom",
         path: ["panNumber"],
         message: "PAN must match the PAN section of GST number",
-      });
-    }
-
-    if (value.openingBalanceAmount > 0 && value.openingBalanceType === "none") {
-      ctx.addIssue({
-        code: "custom",
-        path: ["openingBalanceType"],
-        message: "Select debit or credit when opening balance is greater than 0",
-      });
-    }
-
-    if (value.openingBalanceAmount === 0 && value.openingBalanceType !== "none") {
-      ctx.addIssue({
-        code: "custom",
-        path: ["openingBalanceType"],
-        message: "Opening balance type must be none when amount is 0",
       });
     }
 

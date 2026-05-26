@@ -5,6 +5,7 @@ import { ArrowLeft, FileText, Plus, Save } from "lucide-react";
 
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
+import { Checkbox } from "../../../components/ui/Checkbox";
 import { Input } from "../../../components/ui/Input";
 import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { Select } from "../../../components/ui/Select";
@@ -15,6 +16,7 @@ import { useAuth } from "../../../providers/useAuth";
 import { useToast } from "../../../providers/useToast";
 import { customersApi } from "../../../services/customersApi";
 import { inventoryApi } from "../../../services/inventoryApi";
+import { paymentsApi } from "../../../services/paymentsApi";
 import { productsApi } from "../../../services/productsApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../../types/company";
 import type { Customer, CustomerFormInput, CustomerListItem } from "../../../types/customer";
@@ -126,6 +128,7 @@ export const SalesInvoiceForm = ({
     values: SalesFormInput,
     setError: UseFormSetError<SalesFormValues>,
     mode: "draft" | "posted",
+    advanceAdjustmentAmount: number,
   ) => Promise<void>;
   onPrint?: (invoice: SalesInvoice) => void;
 }) => {
@@ -146,6 +149,10 @@ export const SalesInvoiceForm = ({
   const [productLookupLoading, setProductLookupLoading] = useState(false);
   const [customerDetail, setCustomerDetail] = useState<Customer | null>(null);
   const [productDetails, setProductDetails] = useState<Record<string, Product>>({});
+  const [availableAdvanceAmount, setAvailableAdvanceAmount] = useState(0);
+  const [useAdvanceAmount, setUseAdvanceAmount] = useState(false);
+  const [advanceAdjustmentAmount, setAdvanceAdjustmentAmount] = useState(0);
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
   const [batchOptions, setBatchOptions] = useState<Record<number, BatchOption[]>>({});
   const [loadingBatchIndex, setLoadingBatchIndex] = useState<number | null>(null);
   const customerLookupRequestRef = useRef(0);
@@ -179,7 +186,7 @@ export const SalesInvoiceForm = ({
     deliveryCharges: Number(values.deliveryCharges ?? 0),
     packingCharges: Number(values.packingCharges ?? 0),
     otherCharges: Number(values.otherCharges ?? 0),
-    paidAmount: Number(values.paidAmount ?? 0),
+    paidAmount: Number(values.paidAmount ?? 0) + (useAdvanceAmount ? advanceAdjustmentAmount : 0),
     dueDate: (values.dueDate as string | null | undefined) ?? null,
     roundOffEnabled: invoiceSettings?.roundOffEnabled ?? true,
   });
@@ -264,6 +271,10 @@ export const SalesInvoiceForm = ({
     if (!initialInvoice) {
       setCustomerLookupValue(null);
       setCustomerDetail(null);
+      setAvailableAdvanceAmount(0);
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
+      setAdvanceError(null);
       form.reset({
         ...buildSalesFormDefaults(null, invoiceSettings, mode === "pos" ? "pos" : "gst_invoice"),
         grandTotalPreview: 0,
@@ -275,6 +286,10 @@ export const SalesInvoiceForm = ({
       ...buildSalesFormDefaults(initialInvoice, invoiceSettings, mode === "pos" ? "pos" : "gst_invoice"),
       grandTotalPreview: Number(initialInvoice.grandTotal),
     });
+    setAvailableAdvanceAmount(0);
+    setUseAdvanceAmount(false);
+    setAdvanceAdjustmentAmount(0);
+    setAdvanceError(null);
     setCustomerLookupValue(
       initialInvoice.customer
         ? {
@@ -462,10 +477,17 @@ export const SalesInvoiceForm = ({
     setCustomerLookupValue(option);
     form.setValue("customerId", option.id, { shouldDirty: true, shouldValidate: true });
     form.setValue("isWalkIn", false, { shouldDirty: true, shouldValidate: true });
+    setAdvanceError(null);
 
     try {
-      const response = await customersApi.get(option.id);
+      const [response, dueItemsResponse] = await Promise.all([
+        customersApi.get(option.id),
+        paymentsApi.getPartyDueItems("customer", option.id),
+      ]);
       setCustomerDetail(response.data.customer);
+      setAvailableAdvanceAmount(Number(dueItemsResponse.data.advanceBalance ?? 0));
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
       if (!form.getValues("placeOfSupply")) {
         form.setValue(
           "placeOfSupply",
@@ -477,6 +499,9 @@ export const SalesInvoiceForm = ({
       }
     } catch {
       setCustomerDetail(null);
+      setAvailableAdvanceAmount(0);
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
     }
   };
 
@@ -544,6 +569,9 @@ export const SalesInvoiceForm = ({
       setCustomerLookup((current) => [lookupOption, ...current.filter((option) => option.id !== customer.id)]);
       setCustomerLookupValue(lookupOption);
       setCustomerDetail(customer);
+      setAvailableAdvanceAmount(0);
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
       form.setValue("customerId", customer.id, { shouldDirty: true, shouldValidate: true });
       form.setValue("isWalkIn", false, { shouldDirty: true, shouldValidate: true });
 
@@ -585,15 +613,26 @@ export const SalesInvoiceForm = ({
   };
 
   const resetForm = () =>
-    form.reset({
-      ...buildSalesFormDefaults(initialInvoice, invoiceSettings, mode === "pos" ? "pos" : "gst_invoice"),
-      grandTotalPreview: Number(initialInvoice?.grandTotal ?? 0),
-    });
+    {
+      setUseAdvanceAmount(false);
+      setAdvanceAdjustmentAmount(0);
+      setAdvanceError(null);
+      form.reset({
+        ...buildSalesFormDefaults(initialInvoice, invoiceSettings, mode === "pos" ? "pos" : "gst_invoice"),
+        grandTotalPreview: Number(initialInvoice?.grandTotal ?? 0),
+      });
+    };
 
   const submitDraft = form.handleSubmit(async (output) => {
     setSubmitMode("draft");
     try {
-      await onSubmit(createSalesPayload({ ...output, invoiceStatus: "draft" }), form.setError, "draft");
+      setAdvanceError(null);
+      if (useAdvanceAmount && advanceAdjustmentAmount > 0) {
+        setAdvanceError("Advance adjustment sirf Save & Post par apply hoga.");
+        return;
+      }
+
+      await onSubmit(createSalesPayload({ ...output, invoiceStatus: "draft" }), form.setError, "draft", 0);
     } catch (error) {
       applyFriendlyFieldErrors(error, form.setError);
     }
@@ -602,7 +641,20 @@ export const SalesInvoiceForm = ({
   const submitPosted = form.handleSubmit(async (output) => {
     setSubmitMode("posted");
     try {
-      await onSubmit(createSalesPayload({ ...output, invoiceStatus: "posted" }), form.setError, "posted");
+      const requestedAdvanceAmount = useAdvanceAmount ? Number(advanceAdjustmentAmount ?? 0) : 0;
+      setAdvanceError(null);
+
+      if (requestedAdvanceAmount > availableAdvanceAmount) {
+        setAdvanceError("Advance amount available balance se zyada nahi ho sakta.");
+        return;
+      }
+
+      if (Number(output.paidAmount ?? 0) + requestedAdvanceAmount > Number(preview.grandTotal)) {
+        setAdvanceError("Cash payment aur advance milakar grand total se zyada nahi ho sakte.");
+        return;
+      }
+
+      await onSubmit(createSalesPayload({ ...output, invoiceStatus: "posted" }), form.setError, "posted", requestedAdvanceAmount);
     } catch (error) {
       applyFriendlyFieldErrors(error, form.setError);
     }
@@ -660,6 +712,10 @@ export const SalesInvoiceForm = ({
                           onClear={() => {
                             setCustomerLookupValue(null);
                             setCustomerDetail(null);
+                            setAvailableAdvanceAmount(0);
+                            setUseAdvanceAmount(false);
+                            setAdvanceAdjustmentAmount(0);
+                            setAdvanceError(null);
                             form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
                           }}
                         />
@@ -779,6 +835,48 @@ export const SalesInvoiceForm = ({
                     </Select>
                   ) : null}
                   <Input label="Reference (optional)" placeholder="Enter reference" {...form.register("paymentReference")} error={form.formState.errors.paymentReference?.message} />
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Advance Adjustment</p>
+                        <p className="text-xs text-slate-600">Available advance: {availableAdvanceAmount.toFixed(2)}</p>
+                      </div>
+                      <Checkbox
+                        label="Use available advance"
+                        checked={useAdvanceAmount}
+                        disabled={availableAdvanceAmount <= 0 || Boolean(isWalkIn)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setUseAdvanceAmount(checked);
+                          setAdvanceError(null);
+                          if (!checked) {
+                            setAdvanceAdjustmentAmount(0);
+                            return;
+                          }
+
+                          if (advanceAdjustmentAmount === 0) {
+                            setAdvanceAdjustmentAmount(Number(Math.min(availableAdvanceAmount, Number(preview.grandTotal)).toFixed(2)));
+                          }
+                        }}
+                      />
+                    </div>
+                    {useAdvanceAmount ? (
+                      <div className="mt-3">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          label="Adjust Advance Amount"
+                          value={advanceAdjustmentAmount}
+                          onChange={(event) => {
+                            setAdvanceAdjustmentAmount(Number(event.target.value || 0));
+                            setAdvanceError(null);
+                          }}
+                          error={advanceError ?? undefined}
+                        />
+                      </div>
+                    ) : advanceError ? <p className="mt-3 text-sm text-rose-600">{advanceError}</p> : null}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -870,6 +968,10 @@ export const SalesInvoiceForm = ({
                   if (checked) {
                     form.setValue("customerId", null, { shouldDirty: true, shouldValidate: true });
                     setCustomerLookupValue(null);
+                    setAvailableAdvanceAmount(0);
+                    setUseAdvanceAmount(false);
+                    setAdvanceAdjustmentAmount(0);
+                    setAdvanceError(null);
                   }
                 }}
               />
@@ -950,6 +1052,48 @@ export const SalesInvoiceForm = ({
                     <div />
                   )}
                   <Input label="Payment Reference" {...form.register("paymentReference")} error={form.formState.errors.paymentReference?.message} />
+                  <div className="md:col-span-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Advance Adjustment</p>
+                        <p className="text-xs text-slate-600">Available advance: {availableAdvanceAmount.toFixed(2)}</p>
+                      </div>
+                      <Checkbox
+                        label="Use available advance"
+                        checked={useAdvanceAmount}
+                        disabled={availableAdvanceAmount <= 0 || Boolean(isWalkIn)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setUseAdvanceAmount(checked);
+                          setAdvanceError(null);
+                          if (!checked) {
+                            setAdvanceAdjustmentAmount(0);
+                            return;
+                          }
+
+                          if (advanceAdjustmentAmount === 0) {
+                            setAdvanceAdjustmentAmount(Number(Math.min(availableAdvanceAmount, Number(preview.grandTotal)).toFixed(2)));
+                          }
+                        }}
+                      />
+                    </div>
+                    {useAdvanceAmount ? (
+                      <div className="mt-3">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          label="Adjust Advance Amount"
+                          value={advanceAdjustmentAmount}
+                          onChange={(event) => {
+                            setAdvanceAdjustmentAmount(Number(event.target.value || 0));
+                            setAdvanceError(null);
+                          }}
+                          error={advanceError ?? undefined}
+                        />
+                      </div>
+                    ) : advanceError ? <p className="mt-3 text-sm text-rose-600">{advanceError}</p> : null}
+                  </div>
                 </CardContent>
               </Card>
             </div>

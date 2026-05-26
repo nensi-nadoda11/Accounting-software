@@ -283,11 +283,6 @@ class CustomersService {
         shippingPincode: input.shippingPincode,
         shippingCountry: input.shippingCountry ?? undefined,
         sameAsBilling: input.sameAsBilling,
-        openingBalanceAmount:
-          input.openingBalanceAmount !== undefined
-            ? normalizeDecimalString(input.openingBalanceAmount)
-            : undefined,
-        openingBalanceType: input.openingBalanceType,
         creditLimit: input.creditLimit !== undefined ? normalizeDecimalString(input.creditLimit) : undefined,
         creditDays: input.creditDays,
         defaultDiscount:

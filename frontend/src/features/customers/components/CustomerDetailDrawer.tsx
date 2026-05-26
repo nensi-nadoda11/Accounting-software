@@ -236,10 +236,6 @@ export const CustomerDetailDrawer = ({
                   <p className="mt-1 text-sm font-medium text-slate-900">{formatInr(outstanding.creditLimit)}</p>
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Opening Balance</p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">{formatInr(outstanding.openingBalance)}</p>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Credit Days</p>
                   <p className="mt-1 text-sm font-medium text-slate-900">{customer.creditDays}</p>
                 </div>

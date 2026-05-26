@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../db";
-import { customers, salesInvoices, salesPayments, salesReturns } from "../../db/schema";
+import { customers, payments, salesInvoices, salesPayments, salesReturns } from "../../db/schema";
 
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbExecutor = typeof db | TransactionClient;
@@ -340,7 +340,7 @@ class CustomersRepository {
     const paymentConditions: SQL[] = [eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId)];
     const returnConditions: SQL[] = [eq(salesReturns.companyId, companyId), eq(salesReturns.customerId, customerId)];
 
-    const [salesRows, returnRows, paymentRows, overdueRows] = await Promise.all([
+    const [salesRows, returnRows, paymentRows, genericPaymentRows, overdueRows] = await Promise.all([
       db
         .select({
           totalSales: sql<string>`coalesce(sum(${salesInvoices.grandTotal}), 0)`
@@ -361,6 +361,20 @@ class CustomersRepository {
         .where(and(...paymentConditions)),
       db
         .select({
+          totalPayments: sql<string>`coalesce(sum(${payments.amount}), 0)`
+        })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.companyId, companyId),
+            eq(payments.partyType, "customer"),
+            eq(payments.partyId, customerId),
+            eq(payments.status, "completed"),
+            isNull(payments.deletedAt)
+          )
+        ),
+      db
+        .select({
           overdueAmount: sql<string>`coalesce(sum(${salesInvoices.dueAmount}), 0)`
         })
         .from(salesInvoices)
@@ -375,12 +389,13 @@ class CustomersRepository {
     const salesRow = salesRows[0];
     const returnRow = returnRows[0];
     const paymentRow = paymentRows[0];
+    const genericPaymentRow = genericPaymentRows[0];
     const overdueRow = overdueRows[0];
 
     return {
       totalSales: salesRow?.totalSales ?? "0.00",
       totalReturns: returnRow?.totalReturns ?? "0.00",
-      totalPayments: paymentRow?.totalPayments ?? "0.00",
+      totalPayments: (Number(paymentRow?.totalPayments ?? 0) + Number(genericPaymentRow?.totalPayments ?? 0)).toFixed(2),
       debitAdjustments: "0.00",
       creditAdjustments: "0.00",
       overdueAmount: overdueRow?.overdueAmount ?? "0.00"
@@ -388,7 +403,7 @@ class CustomersRepository {
   }
 
   public async hasLinkedTransactions(companyId: string, customerId: string): Promise<boolean> {
-    const [invoiceRows, paymentRows, returnRows] = await Promise.all([
+    const [invoiceRows, paymentRows, genericPaymentRows, returnRows] = await Promise.all([
       db
         .select({ value: count() })
         .from(salesInvoices)
@@ -399,6 +414,17 @@ class CustomersRepository {
         .where(and(eq(salesPayments.companyId, companyId), eq(salesPayments.customerId, customerId))),
       db
         .select({ value: count() })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.companyId, companyId),
+            eq(payments.partyType, "customer"),
+            eq(payments.partyId, customerId),
+            isNull(payments.deletedAt)
+          )
+        ),
+      db
+        .select({ value: count() })
         .from(salesReturns)
         .where(and(eq(salesReturns.companyId, companyId), eq(salesReturns.customerId, customerId)))
     ]);
@@ -407,7 +433,12 @@ class CustomersRepository {
     const paymentRow = paymentRows[0];
     const returnRow = returnRows[0];
 
-    return (invoiceRow?.value ?? 0) > 0 || (paymentRow?.value ?? 0) > 0 || (returnRow?.value ?? 0) > 0;
+    return (
+      (invoiceRow?.value ?? 0) > 0 ||
+      (paymentRow?.value ?? 0) > 0 ||
+      (genericPaymentRows[0]?.value ?? 0) > 0 ||
+      (returnRow?.value ?? 0) > 0
+    );
   }
 
   public async listLedgerTransactions(
@@ -441,7 +472,7 @@ class CustomersRepository {
       paymentConditions.push(sql`${salesPayments.paymentDate} <= ${filters.dateTo}`);
     }
 
-    const [invoiceRows, returnRows, paymentRows] = await Promise.all([
+    const [invoiceRows, returnRows, paymentRows, genericPaymentRows] = await Promise.all([
       filters?.transactionType && filters.transactionType !== "sale"
         ? Promise.resolve([])
         : db
@@ -489,10 +520,36 @@ class CustomersRepository {
               remarks: salesPayments.notes
             })
             .from(salesPayments)
-            .where(and(...paymentConditions))
+            .where(and(...paymentConditions)),
+      filters?.transactionType && filters.transactionType !== "payment"
+        ? Promise.resolve([])
+        : db
+            .select({
+              date: payments.paymentDate,
+              createdAt: payments.createdAt,
+              transactionType: sql<string>`'payment'`,
+              referenceNo: sql<string | null>`coalesce(${payments.referenceNumber}, ${payments.paymentNumber})`,
+              description: sql<string>`'Payment received'`,
+              debit: sql<string>`'0.00'`,
+              credit: payments.amount,
+              paymentMode: sql<string | null>`${payments.paymentMode}`,
+              remarks: payments.notes
+            })
+            .from(payments)
+            .where(
+              and(
+                eq(payments.companyId, companyId),
+                eq(payments.partyType, "customer"),
+                eq(payments.partyId, customerId),
+                eq(payments.status, "completed"),
+                isNull(payments.deletedAt),
+                ...(filters?.dateFrom ? [sql`${payments.paymentDate} >= ${filters.dateFrom}`] : []),
+                ...(filters?.dateTo ? [sql`${payments.paymentDate} <= ${filters.dateTo}`] : [])
+              )
+            )
     ]);
 
-    const rows = [...invoiceRows, ...returnRows, ...paymentRows].sort((left, right) => {
+    const rows = [...invoiceRows, ...returnRows, ...paymentRows, ...genericPaymentRows].sort((left, right) => {
       const dateDiff = left.date.getTime() - right.date.getTime();
       if (dateDiff !== 0) {
         return dateDiff;
@@ -527,31 +584,57 @@ class CustomersRepository {
       conditions.push(sql`${salesPayments.paymentDate} <= ${filters.dateTo}`);
     }
 
-    const rows = await db
-      .select({
-        id: salesPayments.id,
-        date: salesPayments.paymentDate,
-        referenceNo: salesPayments.referenceNumber,
-        amount: salesPayments.amount,
-        paymentMode: salesPayments.paymentMode,
-        remarks: salesPayments.notes
-      })
-      .from(salesPayments)
-      .where(and(...conditions))
-      .orderBy(desc(salesPayments.paymentDate), desc(salesPayments.createdAt));
+    const [rows, genericRows] = await Promise.all([
+      db
+        .select({
+          id: salesPayments.id,
+          date: salesPayments.paymentDate,
+          referenceNo: salesPayments.referenceNumber,
+          amount: salesPayments.amount,
+          paymentMode: salesPayments.paymentMode,
+          remarks: salesPayments.notes
+        })
+        .from(salesPayments)
+        .where(and(...conditions))
+        .orderBy(desc(salesPayments.paymentDate), desc(salesPayments.createdAt)),
+      db
+        .select({
+          id: payments.id,
+          date: payments.paymentDate,
+          referenceNo: sql<string | null>`coalesce(${payments.referenceNumber}, ${payments.paymentNumber})`,
+          amount: payments.amount,
+          paymentMode: sql<string | null>`${payments.paymentMode}`,
+          remarks: payments.notes
+        })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.companyId, companyId),
+            eq(payments.partyType, "customer"),
+            eq(payments.partyId, customerId),
+            eq(payments.status, "completed"),
+            isNull(payments.deletedAt),
+            ...(filters?.dateFrom ? [sql`${payments.paymentDate} >= ${filters.dateFrom}`] : []),
+            ...(filters?.dateTo ? [sql`${payments.paymentDate} <= ${filters.dateTo}`] : [])
+          )
+        )
+        .orderBy(desc(payments.paymentDate), desc(payments.createdAt))
+    ]);
 
-    const [summaryRow] = await db
-      .select({
-        totalAmount: sql<string>`coalesce(sum(${salesPayments.amount}), 0)`,
-        total: count()
-      })
-      .from(salesPayments)
-      .where(and(...conditions));
+    const combinedRows = [...rows, ...genericRows].sort((left, right) => {
+      const dateDiff = right.date.getTime() - left.date.getTime();
+      if (dateDiff !== 0) {
+        return dateDiff;
+      }
+
+      return (right.referenceNo ?? "").localeCompare(left.referenceNo ?? "");
+    });
+    const totalAmount = combinedRows.reduce((sum, row) => sum + Number(row.amount), 0);
 
     return {
-      rows,
-      total: summaryRow?.total ?? 0,
-      totalAmount: summaryRow?.totalAmount ?? "0.00"
+      rows: combinedRows,
+      total: combinedRows.length,
+      totalAmount: totalAmount.toFixed(2)
     };
   }
 }

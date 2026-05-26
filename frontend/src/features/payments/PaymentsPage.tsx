@@ -275,7 +275,7 @@ export const PaymentsPage = () => {
       const [bankResult, customerResult, supplierResult] = await Promise.allSettled([
         bankApi.list({ page: 1, limit: ALL_FETCH_LIMIT, isActive: true }),
         customersApi.list({ page: 1, limit: ALL_FETCH_LIMIT, status: "active" }),
-        suppliersApi.list({ page: 1, limit: ALL_FETCH_LIMIT, status: "active" }),
+        suppliersApi.list({ page: 1, limit: ALL_FETCH_LIMIT, status: "active", isBlacklisted: false }),
       ]);
 
       setBankAccounts(bankResult.status === "fulfilled" ? bankResult.value.data.items.filter((item) => item.isActive) : []);

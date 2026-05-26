@@ -256,7 +256,7 @@ export const ReportsPage = () => {
         ] = await Promise.allSettled([
           financialYearApi.list(),
           customersApi.list({ page: 1, limit: 100, status: "active" }),
-          suppliersApi.list({ page: 1, limit: 100, status: "active" }),
+          suppliersApi.list({ page: 1, limit: 100, status: "active", isBlacklisted: false }),
           productsApi.list({ page: 1, limit: 100, status: "active" }),
           categoriesApi.list({ page: 1, limit: 100, status: "active" }),
           expensesApi.listCategories({ status: "active" }),

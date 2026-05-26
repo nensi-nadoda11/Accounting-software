@@ -17,6 +17,8 @@ import { db } from "../../db";
 import {
   accountingEvents,
   customers,
+  paymentAllocations,
+  payments,
   productBatches,
   products,
   salesInvoiceItems,
@@ -32,6 +34,17 @@ import {
 
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbExecutor = typeof db | TransactionClient;
+type PaymentListRow = {
+  id: string;
+  paymentDate: Date;
+  amount: string;
+  paymentMode: string;
+  bankAccountId: string | null;
+  referenceNumber: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: Date;
+};
 
 type SalesListFilters = {
   companyId: string;
@@ -387,43 +400,67 @@ class SalesRepository {
   }
 
   public async listPayments(companyId: string, invoiceId: string, page?: number, limit?: number, executor?: DbExecutor) {
-    const query = this
+    const localPayments = await this
       .getExecutor(executor)
       .select()
       .from(salesPayments)
       .where(and(eq(salesPayments.companyId, companyId), eq(salesPayments.salesInvoiceId, invoiceId)))
       .orderBy(desc(salesPayments.paymentDate), desc(salesPayments.createdAt));
 
+    const allocatedPayments = await this
+      .getExecutor(executor)
+      .select({
+        id: payments.id,
+        paymentDate: payments.paymentDate,
+        amount: paymentAllocations.allocatedAmount,
+        paymentMode: sql<string>`${payments.paymentMode}`,
+        bankAccountId: payments.bankAccountId,
+        referenceNumber: payments.referenceNumber,
+        notes: payments.notes,
+        createdBy: payments.createdBy,
+        createdAt: payments.createdAt
+      })
+      .from(paymentAllocations)
+      .innerJoin(payments, eq(paymentAllocations.paymentId, payments.id))
+      .where(
+        and(
+          eq(paymentAllocations.companyId, companyId),
+          eq(paymentAllocations.referenceId, invoiceId),
+          eq(paymentAllocations.allocationType, "sales_invoice"),
+          eq(payments.status, "completed"),
+          isNull(payments.deletedAt)
+        )
+      )
+      .orderBy(desc(paymentAllocations.allocationDate), desc(payments.createdAt));
+
+    const rows = [...localPayments, ...allocatedPayments].sort((left, right) => {
+      const dateDiff = right.paymentDate.getTime() - left.paymentDate.getTime();
+      if (dateDiff !== 0) {
+        return dateDiff;
+      }
+
+      return right.createdAt.getTime() - left.createdAt.getTime();
+    });
+
     if (page && limit) {
-      return query.limit(limit).offset((page - 1) * limit);
+      return rows.slice((page - 1) * limit, (page - 1) * limit + limit);
     }
 
-    return query;
+    return rows;
   }
 
   public async countPayments(companyId: string, invoiceId: string, executor?: DbExecutor) {
-    const [row] = await this
-      .getExecutor(executor)
-      .select({ value: count() })
-      .from(salesPayments)
-      .where(and(eq(salesPayments.companyId, companyId), eq(salesPayments.salesInvoiceId, invoiceId)));
-
-    return row?.value ?? 0;
+    const rows = await this.listPayments(companyId, invoiceId, undefined, undefined, executor);
+    return rows.length;
   }
 
   public async getPaymentTotals(companyId: string, invoiceId: string, executor?: DbExecutor) {
-    const [row] = await this
-      .getExecutor(executor)
-      .select({
-        totalAmount: sql<string>`coalesce(sum(${salesPayments.amount}), 0)`,
-        paymentCount: count()
-      })
-      .from(salesPayments)
-      .where(and(eq(salesPayments.companyId, companyId), eq(salesPayments.salesInvoiceId, invoiceId)));
+    const rows = (await this.listPayments(companyId, invoiceId, undefined, undefined, executor)) as PaymentListRow[];
+    const totalAmount = rows.reduce((sum, row) => Number(sum) + Number(row.amount), 0);
 
     return {
-      totalAmount: row?.totalAmount ?? "0.00",
-      paymentCount: row?.paymentCount ?? 0
+      totalAmount: totalAmount.toFixed(2),
+      paymentCount: rows.length
     };
   }
 

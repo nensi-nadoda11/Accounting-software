@@ -290,7 +290,7 @@ export const AccountingCorePage = () => {
           financialYearApi.list(),
           bankApi.list({ page: 1, limit: 100, isActive: true }),
           customersApi.list({ page: 1, limit: 100, status: "active" }),
-          suppliersApi.list({ page: 1, limit: 100, status: "active" }),
+          suppliersApi.list({ page: 1, limit: 100, status: "active", isBlacklisted: false }),
         ]);
 
         setFinancialYears(yearsResult.status === "fulfilled" ? yearsResult.value.data.items : []);

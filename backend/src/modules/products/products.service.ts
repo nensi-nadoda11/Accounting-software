@@ -212,6 +212,18 @@ class ProductsService {
     });
   }
 
+  private toReportLabel(value: string | null | undefined) {
+    if (!value) {
+      return "";
+    }
+
+    return value
+      .replaceAll(/[_-]+/g, " ")
+      .replaceAll(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+  }
+
   private mapProduct(
     row: {
       product: ProductRecord;
@@ -1216,62 +1228,70 @@ class ProductsService {
 
     const rows = await productsRepository.listProductsForExport(params);
 
+    const goodsCount = rows.filter((row) => row.product.productType === "goods").length;
+    const serviceCount = rows.length - goodsCount;
+    const activeCount = rows.filter((row) => row.product.status === "active").length;
+
     const dataset: ReportExportDataset = {
       title: "Products",
+      subtitle: "Readable catalog export with core details and pricing summary.",
+      summary: [
+        { label: "Total Products", value: rows.length },
+        { label: "Goods", value: goodsCount },
+        { label: "Services", value: serviceCount },
+        { label: "Active", value: activeCount }
+      ],
       columns: [
         { key: "productCode", label: "Product Code" },
+        { key: "name", label: "Product / Service" },
         { key: "productType", label: "Type" },
-        { key: "name", label: "Name" },
-        { key: "sku", label: "SKU" },
-        { key: "barcode", label: "Barcode" },
         { key: "category", label: "Category" },
         { key: "unit", label: "Unit" },
         { key: "brand", label: "Brand" },
         { key: "hsnSacCode", label: "HSN/SAC" },
-        { key: "taxType", label: "Tax Type" },
-        { key: "gstRate", label: "GST Rate", type: "number" },
-        { key: "cessRate", label: "Cess Rate", type: "number" },
-        { key: "priceTaxType", label: "Price Tax Type" },
-        { key: "purchasePrice", label: "Purchase Price", type: "number" },
-        { key: "salePrice", label: "Sale Price", type: "number" },
-        { key: "finalSalePrice", label: "Final Sale Price", type: "number" },
-        { key: "mrp", label: "MRP", type: "number" },
-        { key: "wholesalePrice", label: "Wholesale Price", type: "number" },
-        { key: "minimumSalePrice", label: "Minimum Sale Price", type: "number" },
-        { key: "defaultDiscount", label: "Default Discount", type: "number" },
-        { key: "openingStockQuantity", label: "Opening Stock Qty", type: "number" },
-        { key: "openingStockValue", label: "Opening Stock Value", type: "number" },
         { key: "status", label: "Status" }
       ],
-      rows: rows.map((row) => {
-        const preview = this.buildProductPreview(row.product);
+      rows: rows.map((row) => ({
+        productCode: row.product.productCode,
+        name: row.product.name,
+        productType: this.toReportLabel(row.product.productType),
+        category: row.categoryName ?? "",
+        unit: row.unitSymbol ?? row.unitName ?? "",
+        brand: row.product.brand ?? "",
+        hsnSacCode: row.product.hsnSacCode ?? "",
+        status: this.toReportLabel(row.product.status)
+      })),
+      secondaryTable: {
+        title: "Pricing, Tax & Opening Stock",
+        columns: [
+          { key: "productCode", label: "Code" },
+          { key: "taxType", label: "Tax Type" },
+          { key: "gstRate", label: "GST %", type: "number" },
+          { key: "purchasePrice", label: "Purchase", type: "number" },
+          { key: "salePrice", label: "Sale", type: "number" },
+          { key: "finalSalePrice", label: "Final Sale", type: "number" },
+          { key: "mrp", label: "MRP", type: "number" },
+          { key: "openingStockQuantity", label: "Opening Qty", type: "number" },
+          { key: "openingStockValue", label: "Opening Value", type: "number" }
+        ],
+        rows: rows.map((row) => {
+          const preview = this.buildProductPreview(row.product);
 
-        return {
-          productCode: row.product.productCode,
-          productType: row.product.productType,
-          name: row.product.name,
-          sku: row.product.sku,
-          barcode: row.product.barcode ?? "",
-          category: row.categoryName ?? "",
-          unit: row.unitSymbol ?? row.unitName ?? "",
-          brand: row.product.brand ?? "",
-          hsnSacCode: row.product.hsnSacCode ?? "",
-          taxType: row.product.taxType,
-          gstRate: normalizeRate(row.product.gstRate),
-          cessRate: normalizeRate(row.product.cessRate),
-          priceTaxType: row.product.priceTaxType,
-          purchasePrice: normalizeMoney(row.product.purchasePrice),
-          salePrice: normalizeMoney(row.product.salePrice),
-          finalSalePrice: preview.finalSalePrice,
-          mrp: normalizeMoney(row.product.mrp),
-          wholesalePrice: normalizeMoney(row.product.wholesalePrice),
-          minimumSalePrice: normalizeMoney(row.product.minimumSalePrice),
-          defaultDiscount: normalizeRate(row.product.defaultDiscount),
-          openingStockQuantity: normalizeQuantity(row.product.openingStockQuantity),
-          openingStockValue: normalizeMoney(row.product.openingStockValue),
-          status: row.product.status
-        };
-      })
+          return {
+            productCode: row.product.productCode,
+            taxType: this.toReportLabel(row.product.taxType),
+            gstRate: normalizeRate(row.product.gstRate),
+            purchasePrice: normalizeMoney(row.product.purchasePrice),
+            salePrice: normalizeMoney(row.product.salePrice),
+            finalSalePrice: preview.finalSalePrice,
+            mrp: normalizeMoney(row.product.mrp),
+            openingStockQuantity: normalizeQuantity(row.product.openingStockQuantity),
+            openingStockValue: normalizeMoney(row.product.openingStockValue)
+          };
+        })
+      },
+      notes:
+        "This PDF is optimized for readability. Use CSV or XLSX export when you need every detailed field such as SKU, barcode, cess rate, wholesale price, minimum sale price, or default discount."
     };
     const file = buildReportFile(dataset, query.format, `products-${new Date().toISOString().slice(0, 10)}`);
 

@@ -508,6 +508,22 @@ export const errorHandler = (
     return;
   }
 
+  const normalizedMessage = rawMessage.toLowerCase();
+  if (
+    normalizedMessage.includes("timeout exceeded when trying to connect") ||
+    normalizedMessage.includes("connection terminated due to connection timeout") ||
+    normalizedMessage.includes("connection terminated unexpectedly")
+  ) {
+    response
+      .status(503)
+      .json(
+        errorResponse(
+          "Database is temporarily busy. Please try again in a moment.",
+        ),
+      );
+    return;
+  }
+
   const systemError = error as NodeJS.ErrnoException & {
     name?: string;
     message?: string;

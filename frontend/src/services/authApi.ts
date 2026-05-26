@@ -1,6 +1,6 @@
 import type { ApiResponse, LoginResponse } from "../types/api";
 import type { SessionData } from "../types/auth";
-import { client } from "../lib/api/client";
+import { client, refreshSessionData } from "../lib/api/client";
 
 export interface RegisterPayload {
   fullName: string;
@@ -25,7 +25,11 @@ export const authApi = {
   login: async (payload: { identifier: string; password: string; rememberMe?: boolean }) =>
     (await client.post<ApiResponse<LoginResponse>>("/auth/login", payload)).data,
   session: async () => (await client.get<ApiResponse<SessionData>>("/auth/session")).data,
-  refresh: async () => (await client.post<ApiResponse<LoginResponse>>("/auth/refresh")).data,
+  refresh: async () => ({
+    success: true,
+    message: "Token refreshed successfully",
+    data: await refreshSessionData(),
+  }),
   forgotPassword: async (payload: { identifier: string }) =>
     (await client.post<ApiResponse<Record<string, never>>>("/auth/forgot-password", payload)).data,
   resetPassword: async (payload: { email: string; otp: string; newPassword: string; confirmPassword: string }) =>

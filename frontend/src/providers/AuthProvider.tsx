@@ -8,6 +8,7 @@ import {
 import { AxiosError } from "axios";
 
 import { authBootstrap } from "../lib/auth-bootstrap";
+import { refreshSessionData } from "../lib/api/client";
 import { SESSION_EXPIRED_EVENT, SESSION_UPDATED_EVENT, type SessionUpdatedDetail } from "../lib/auth-events";
 import { authApi } from "../services/authApi";
 import { tokenStore } from "../lib/token-store";
@@ -44,12 +45,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   const refreshSession = useCallback(async () => {
     try {
-      const response = await authApi.refresh();
+      const session = await refreshSessionData();
       setSession({
-        accessToken: response.data.accessToken,
-        user: response.data.user,
-        company: response.data.company,
-        permissions: response.data.permissions,
+        accessToken: session.accessToken,
+        user: session.user,
+        company: session.company,
+        permissions: session.permissions,
       });
     } catch (error) {
       if (error instanceof AxiosError) {
@@ -65,6 +66,14 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   }, [clearSession, setSession]);
 
   useEffect(() => {
+    const existingBootstrap = authBootstrap.get();
+    if (existingBootstrap) {
+      void existingBootstrap.finally(() => {
+        setIsInitializing(false);
+      });
+      return;
+    }
+
     const bootstrapPromise = (async () => {
       try {
         await refreshSession();

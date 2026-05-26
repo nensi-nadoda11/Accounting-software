@@ -11,6 +11,8 @@ const API_BASE_URL = getApiBaseUrl({
   isDev: import.meta.env.DEV
 });
 const REQUEST_TIMEOUT_MS = 15000;
+const TRANSIENT_RETRY_DELAY_MS = 500;
+const MAX_REFRESH_ATTEMPTS = 2;
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -27,12 +29,19 @@ const refreshClient = axios.create({
   withCredentials: true,
 });
 
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<LoginResponse> | null = null;
 
 const shouldInvalidateSession = (error: AxiosError) => {
   const status = error.response?.status;
   return status === 401 || status === 403;
 };
+
+const isTransientStatus = (status: number | undefined) => status === 502 || status === 503 || status === 504;
+
+const isTransientAxiosError = (error: AxiosError) =>
+  isTransientStatus(error.response?.status) ||
+  error.code === "ECONNABORTED" ||
+  error.code === "ERR_NETWORK";
 
 const isAuthRefreshRequest = (url: string) => url.includes("/auth/refresh");
 
@@ -46,37 +55,67 @@ const isAuthBootstrapSafeRequest = (url: string) =>
   url.includes("/users/accept-invite") ||
   isAuthRefreshRequest(url);
 
-const refreshAccessToken = async () => {
-  try {
-    const response = await refreshClient.post("/auth/refresh");
-    const session = response.data.data as LoginResponse | undefined;
-    const token = session?.accessToken;
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 
-    if (!token) {
-      throw new Error("Missing access token");
+const applySessionUpdate = (session: LoginResponse) => {
+  tokenStore.set(session.accessToken);
+  dispatchSessionUpdated({
+    accessToken: session.accessToken,
+    user: session.user,
+    company: session.company ?? null,
+    permissions: session.permissions,
+  });
+};
+
+const requestRefreshedSession = async (): Promise<LoginResponse> => {
+  for (let attempt = 1; attempt <= MAX_REFRESH_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await refreshClient.post("/auth/refresh");
+      const session = response.data.data as LoginResponse | undefined;
+
+      if (!session?.accessToken) {
+        throw new Error("Missing access token");
+      }
+
+      applySessionUpdate(session);
+      return session;
+    } catch (refreshError) {
+      if (refreshError instanceof AxiosError && shouldInvalidateSession(refreshError)) {
+        tokenStore.clear();
+        dispatchSessionExpired();
+      }
+
+      if (
+        !(refreshError instanceof AxiosError) ||
+        !isTransientAxiosError(refreshError) ||
+        attempt === MAX_REFRESH_ATTEMPTS
+      ) {
+        throw refreshError;
+      }
+
+      await sleep(TRANSIENT_RETRY_DELAY_MS);
     }
-
-    tokenStore.set(token);
-    if (session?.user) {
-      dispatchSessionUpdated({
-        accessToken: token,
-        user: session.user,
-        company: session.company ?? null,
-        permissions: session.permissions,
-      });
-    }
-
-    return token;
-  } catch (refreshError) {
-    if (refreshError instanceof AxiosError && shouldInvalidateSession(refreshError)) {
-      tokenStore.clear();
-      dispatchSessionExpired();
-    }
-
-    throw refreshError;
-  } finally {
-    refreshPromise = null;
   }
+
+  throw new Error("Refresh failed");
+};
+
+export const refreshSessionData = async () => {
+  if (!refreshPromise) {
+    refreshPromise = requestRefreshedSession().finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+};
+
+export const refreshAccessToken = async () => {
+  const session = await refreshSessionData();
+  return session.accessToken;
 };
 
 client.interceptors.request.use(async (config) => {
@@ -101,26 +140,38 @@ client.interceptors.request.use(async (config) => {
 client.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const originalRequest = error.config as (InternalAxiosRequestConfig & {
+      _retry?: boolean;
+      _transientRetry?: boolean;
+    }) | undefined;
     const status = error.response?.status;
     const requestUrl = originalRequest?.url ?? "";
+    const method = originalRequest?.method?.toLowerCase();
 
     if (status !== 401 || !originalRequest || originalRequest._retry || requestUrl.includes("/auth/login") || isAuthRefreshRequest(requestUrl)) {
+      if (
+        originalRequest &&
+        !originalRequest._transientRetry &&
+        (method === "get" || method === "head") &&
+        isTransientAxiosError(error)
+      ) {
+        originalRequest._transientRetry = true;
+        await sleep(TRANSIENT_RETRY_DELAY_MS);
+        return client(originalRequest);
+      }
+
       return Promise.reject(error);
     }
 
     originalRequest._retry = true;
 
     try {
-      if (!refreshPromise) {
-        refreshPromise = refreshAccessToken();
-      }
-
-      const newToken = await refreshPromise;
+      const newToken = await refreshAccessToken();
       if (!newToken) {
         return Promise.reject(error);
       }
 
+      originalRequest.headers = originalRequest.headers ?? {};
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       return client(originalRequest);
     } catch {

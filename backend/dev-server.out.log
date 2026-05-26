@@ -2,7 +2,4 @@
 > backend@1.0.0 dev
 > tsx watch src/server.ts
 
-◇ injected env (33) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
-Running database migrations 
-Database migrations completed 
-Backend server running on port 4000 
+◇ injected env (33) from .env // tip: ⌘ override existing { override: true }

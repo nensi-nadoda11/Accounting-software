@@ -21,7 +21,7 @@ export const JOURNAL_STATUSES = ["draft", "posted", "cancelled", "reversed"] as 
 export const JOURNAL_PARTY_TYPES = ["customer", "supplier"] as const;
 export const ACCOUNTING_EVENT_STATUSES = ["pending", "posted", "failed", "ignored"] as const;
 export const FINANCIAL_LOCK_TYPES = ["month", "quarter", "year"] as const;
-export const ACCOUNTING_EXPORT_FORMATS = ["csv"] as const;
+export const ACCOUNTING_EXPORT_FORMATS = ["csv", "xlsx", "pdf"] as const;
 
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 export type AccountNormalBalance = (typeof ACCOUNT_NORMAL_BALANCES)[number];

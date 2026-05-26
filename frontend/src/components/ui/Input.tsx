@@ -8,7 +8,7 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, id, required, onWheel, type, ...props }, ref) => (
+  ({ className, label, error, id, required, onKeyDown, onWheel, type, ...props }, ref) => (
     <label className="flex w-full flex-col gap-2">
       {label ? (
         <span className="text-sm font-medium text-slate-700">
@@ -28,9 +28,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         required={required}
         onWheel={(event) => {
           if (type === "number") {
-            event.currentTarget.blur();
+            event.preventDefault();
           }
           onWheel?.(event);
+        }}
+        onKeyDown={(event) => {
+          if (type === "number" && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+            event.preventDefault();
+          }
+          onKeyDown?.(event);
         }}
         {...props}
       />

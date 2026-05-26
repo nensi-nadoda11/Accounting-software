@@ -913,6 +913,14 @@ class AccountingService {
       const serviceExpense = context.items
         .filter((item) => item.productType === "service")
         .reduce((sum, item) => addMoney(sum, normalizeMoney(item.taxableAmount)), "0.00");
+      const chargeExpense = addMoney(
+        normalizeMoney(context.invoice.additionalCharges),
+        normalizeMoney(context.invoice.freightCharges)
+      );
+      const inputTaxTotal = addMoney(
+        normalizeMoney(context.invoice.gstTotal),
+        normalizeMoney(context.invoice.cessTotal)
+      );
       const payableAccount = await this.getSystemAccount(actor.companyId, "accounts_payable", executor);
       const inventoryAccount = await this.getSystemAccount(actor.companyId, "inventory", executor);
       const purchaseExpenseAccount = await this.getSystemAccount(actor.companyId, "purchases", executor);
@@ -942,21 +950,32 @@ class AccountingService {
         });
       }
 
-      if (compareDecimals(context.invoice.gstTotal, "0.00", 2) > 0) {
+      if (compareDecimals(chargeExpense, "0.00", 2) > 0) {
+        lines.push({
+          accountId: purchaseExpenseAccount.id,
+          debit: chargeExpense,
+          credit: "0.00",
+          description: `Purchase charges for ${context.invoice.purchaseNumber}`
+        });
+      }
+
+      if (compareDecimals(inputTaxTotal, "0.00", 2) > 0) {
         lines.push({
           accountId: inputGstAccount.id,
-          debit: normalizeMoney(context.invoice.gstTotal),
+          debit: inputTaxTotal,
           credit: "0.00",
-          description: `Input GST for ${context.invoice.purchaseNumber}`
+          description: `Input tax for ${context.invoice.purchaseNumber}`
         });
       }
 
       if (compareDecimals(context.invoice.roundOffAmount, "0.00", 2) !== 0) {
         const amount = normalizeMoney(context.invoice.roundOffAmount);
+        const absoluteAmount =
+          compareDecimals(amount, "0.00", 2) < 0 ? normalizeMoney(amount.slice(1)) : amount;
         lines.push({
           accountId: roundOffAccount.id,
-          debit: compareDecimals(amount, "0.00", 2) > 0 ? amount : "0.00",
-          credit: compareDecimals(amount, "0.00", 2) < 0 ? amount : "0.00",
+          debit: compareDecimals(amount, "0.00", 2) > 0 ? absoluteAmount : "0.00",
+          credit: compareDecimals(amount, "0.00", 2) < 0 ? absoluteAmount : "0.00",
           description: `Round off for ${context.invoice.purchaseNumber}`
         });
       }

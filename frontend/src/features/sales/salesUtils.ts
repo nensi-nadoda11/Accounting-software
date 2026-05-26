@@ -580,6 +580,10 @@ export const createSalesUpdatePayload = (values: SalesFormInput) => ({
   deliveryCharges: values.deliveryCharges,
   packingCharges: values.packingCharges,
   otherCharges: values.otherCharges,
+  paidAmount: values.paidAmount,
+  paymentMode: values.paymentMode ?? null,
+  paymentReference: trimToNull(values.paymentReference),
+  bankAccountId: values.bankAccountId ?? null,
   notes: trimToNull(values.notes),
   termsConditions: trimToNull(values.termsConditions),
 });

@@ -181,7 +181,7 @@ export const purchaseFormSchema = z
       });
     }
 
-    if (value.paymentMode && ["bank", "upi", "card", "cheque"].includes(value.paymentMode) && !value.bankAccountId) {
+    if (value.paidAmount > 0 && value.paymentMode && ["bank", "upi", "card", "cheque"].includes(value.paymentMode) && !value.bankAccountId) {
       ctx.addIssue({
         code: "custom",
         path: ["bankAccountId"],

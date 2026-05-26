@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, RotateCcw, Save } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import { Button } from "../../../components/ui/Button";
@@ -20,6 +20,7 @@ import {
   EXPENSE_PAYMENT_MODE_OPTIONS,
   EXPENSE_PRICE_TAX_TYPE_OPTIONS,
   BANK_LINKED_PAYMENT_MODES,
+  REFERENCE_REQUIRED_PAYMENT_MODES,
 } from "../expenseOptions";
 import { expenseFormSchema, type ExpenseFormInputValues, type ExpenseFormValues } from "../expenseSchemas";
 import { applyExpenseFieldErrors, calculateExpensePreview, resolveIntraState } from "../expenseUtils";
@@ -33,6 +34,7 @@ export const ExpenseForm = ({
   companyGstNumber,
   companyState,
   attachmentsContent,
+  resetKey,
   editing,
   loadingState,
   onSubmit,
@@ -46,6 +48,7 @@ export const ExpenseForm = ({
   companyGstNumber: string | null | undefined;
   companyState: string | null | undefined;
   attachmentsContent?: ReactNode;
+  resetKey: string;
   editing: boolean;
   loadingState: "draft" | "posted" | null;
   onSubmit: (values: ExpenseFormInput, status: "draft" | "posted") => Promise<void>;
@@ -57,10 +60,16 @@ export const ExpenseForm = ({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: initialValues,
   });
+  const lastResetKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (lastResetKeyRef.current === resetKey) {
+      return;
+    }
+
     form.reset(initialValues);
-  }, [form, initialValues]);
+    lastResetKeyRef.current = resetKey;
+  }, [form, initialValues, resetKey]);
 
   const paymentMode = form.watch("paymentMode");
   const gstApplicable = form.watch("gstApplicable");
@@ -69,6 +78,7 @@ export const ExpenseForm = ({
   const priceTaxType = form.watch("priceTaxType");
   const vendorGstNumber = form.watch("vendorGstNumber");
   const requiresBankAccount = BANK_LINKED_PAYMENT_MODES.has(paymentMode ?? "cash");
+  const requiresReferenceNumber = REFERENCE_REQUIRED_PAYMENT_MODES.has(paymentMode ?? "cash");
 
   useEffect(() => {
     if (!gstApplicable) {
@@ -142,7 +152,7 @@ export const ExpenseForm = ({
                 </option>
               ))}
             </Select>
-            <Input label="Payee / Vendor" required {...form.register("payeeName")} error={form.formState.errors.payeeName?.message} />
+            <Input label="Payee / Vendor" {...form.register("payeeName")} error={form.formState.errors.payeeName?.message} />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -209,7 +219,12 @@ export const ExpenseForm = ({
             ) : (
               <div />
             )}
-            <Input label="Reference Number" required={requiresBankAccount} {...form.register("referenceNumber")} error={form.formState.errors.referenceNumber?.message} />
+            <Input
+              label="Reference Number"
+              required={requiresReferenceNumber}
+              {...form.register("referenceNumber")}
+              error={form.formState.errors.referenceNumber?.message}
+            />
             {paymentMode === "cheque" ? (
               <>
                 <Input label="Cheque Number" required {...form.register("chequeNumber")} error={form.formState.errors.chequeNumber?.message} />

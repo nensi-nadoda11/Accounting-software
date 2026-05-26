@@ -59,108 +59,132 @@ export const ReportFiltersPanel = ({
   statuses: Option[];
 }) => (
   <Card>
-    <CardContent className="space-y-3 p-4">
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Input type="date" value={filters.dateFrom} onChange={(event) => onChange("dateFrom", event.target.value)} />
-        <Input type="date" value={filters.dateTo} onChange={(event) => onChange("dateTo", event.target.value)} />
-        <Select value={filters.financialYearId} onChange={(event) => onChange("financialYearId", event.target.value)}>
-          <option value="">Financial Year</option>
-          {financialYears.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </Select>
-        {visibility.customer ? (
-          <Select value={filters.customerId} onChange={(event) => onChange("customerId", event.target.value)}>
-            <option value="">Customer</option>
-            {customers.map((item) => (
+    <CardContent className="p-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-full sm:w-[230px] xl:w-[230px]">
+          <Input type="date" value={filters.dateFrom} onChange={(event) => onChange("dateFrom", event.target.value)} />
+        </div>
+        <div className="w-full sm:w-[230px] xl:w-[230px]">
+          <Input type="date" value={filters.dateTo} onChange={(event) => onChange("dateTo", event.target.value)} />
+        </div>
+        <div className="w-full sm:w-[180px] xl:w-[180px]">
+          <Select value={filters.financialYearId} onChange={(event) => onChange("financialYearId", event.target.value)}>
+            <option value="">Financial Year</option>
+            {financialYears.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
             ))}
           </Select>
+        </div>
+        {visibility.customer ? (
+          <div className="w-full sm:w-[190px] xl:w-[190px]">
+            <Select value={filters.customerId} onChange={(event) => onChange("customerId", event.target.value)}>
+              <option value="">Customer</option>
+              {customers.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         ) : null}
         {visibility.supplier ? (
-          <Select value={filters.supplierId} onChange={(event) => onChange("supplierId", event.target.value)}>
-            <option value="">Supplier</option>
-            {suppliers.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
+          <div className="w-full sm:w-[190px] xl:w-[190px]">
+            <Select value={filters.supplierId} onChange={(event) => onChange("supplierId", event.target.value)}>
+              <option value="">Supplier</option>
+              {suppliers.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         ) : null}
         {visibility.product ? (
-          <Select value={filters.productId} onChange={(event) => onChange("productId", event.target.value)}>
-            <option value="">Product</option>
-            {products.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
+          <div className="w-full sm:w-[190px] xl:w-[190px]">
+            <Select value={filters.productId} onChange={(event) => onChange("productId", event.target.value)}>
+              <option value="">Product</option>
+              {products.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         ) : null}
         {visibility.category ? (
-          <Select value={filters.categoryId} onChange={(event) => onChange("categoryId", event.target.value)}>
-            <option value="">Category</option>
-            {categories.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
+          <div className="w-full sm:w-[170px] xl:w-[170px]">
+            <Select value={filters.categoryId} onChange={(event) => onChange("categoryId", event.target.value)}>
+              <option value="">Category</option>
+              {categories.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         ) : null}
         {visibility.employee ? (
-          <Select value={filters.employeeId} onChange={(event) => onChange("employeeId", event.target.value)}>
-            <option value="">Employee</option>
-            {employees.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
+          <div className="w-full sm:w-[190px] xl:w-[190px]">
+            <Select value={filters.employeeId} onChange={(event) => onChange("employeeId", event.target.value)}>
+              <option value="">Employee</option>
+              {employees.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         ) : null}
         {visibility.department ? (
-          <Select value={filters.department} onChange={(event) => onChange("department", event.target.value)}>
-            <option value="">Department</option>
-            {departments.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
+          <div className="w-full sm:w-[190px] xl:w-[190px]">
+            <Select value={filters.department} onChange={(event) => onChange("department", event.target.value)}>
+              <option value="">Department</option>
+              {departments.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         ) : null}
         {visibility.paymentMode ? (
-          <Select value={filters.paymentMode} onChange={(event) => onChange("paymentMode", event.target.value)}>
-            <option value="">Payment Mode</option>
-            {paymentModes.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
+          <div className="w-full sm:w-[180px] xl:w-[180px]">
+            <Select value={filters.paymentMode} onChange={(event) => onChange("paymentMode", event.target.value)}>
+              <option value="">Payment Mode</option>
+              {paymentModes.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         ) : null}
         {visibility.gstRate ? (
-          <Input placeholder="GST Rate" value={filters.gstRate} onChange={(event) => onChange("gstRate", event.target.value)} />
+          <div className="w-full sm:w-[150px] xl:w-[150px]">
+            <Input placeholder="GST Rate" value={filters.gstRate} onChange={(event) => onChange("gstRate", event.target.value)} />
+          </div>
         ) : null}
         {visibility.status ? (
-          <Select value={filters.status} onChange={(event) => onChange("status", event.target.value)}>
-            <option value="">Status</option>
-            {statuses.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
+          <div className="w-full sm:w-[150px] xl:w-[150px]">
+            <Select value={filters.status} onChange={(event) => onChange("status", event.target.value)}>
+              <option value="">Status</option>
+              {statuses.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         ) : null}
-      </div>
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onReset}>
-          <FilterX className="mr-2 size-4" />
-          Reset
-        </Button>
-        {visibility.export && onExport ? <ReportExportButton onClick={onExport} loading={exportLoading} /> : null}
+        <div className="flex min-w-fit items-end justify-end gap-2 xl:ml-auto">
+          <Button type="button" variant="secondary" onClick={onReset}>
+            <FilterX className="mr-2 size-4" />
+            Reset
+          </Button>
+          {visibility.export && onExport ? <ReportExportButton onClick={onExport} loading={exportLoading} /> : null}
+        </div>
       </div>
     </CardContent>
   </Card>

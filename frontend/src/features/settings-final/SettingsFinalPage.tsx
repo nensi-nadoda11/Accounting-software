@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import type { z } from "zod";
 
@@ -235,32 +234,6 @@ export const SettingsFinalPage = () => {
     }
   }, [activeTab, invoiceLoading, invoiceTemplates, paymentLoading, paymentModes, permissionLoading, permissionMatrix, profileLoading, profileSettings, taxLoading, taxSettings, themeLoading, uiPreferences]);
 
-  const refreshActiveTab = async () => {
-    if (activeTab === "permissions") {
-      await loadPermissions();
-      return;
-    }
-    if (activeTab === "invoice-templates") {
-      await loadInvoiceTemplates();
-      return;
-    }
-    if (activeTab === "tax-settings") {
-      await loadTaxSettings();
-      return;
-    }
-    if (activeTab === "payment-modes") {
-      await loadPaymentModes();
-      return;
-    }
-    if (activeTab === "theme") {
-      await loadTheme();
-      return;
-    }
-    if (activeTab === "profile") {
-      await loadProfile();
-    }
-  };
-
   const handleInvoiceSubmit = async (value: InvoiceTemplateValues) => {
     try {
       setInvoiceSaving(true);
@@ -316,16 +289,6 @@ export const SettingsFinalPage = () => {
     }
     return (
       <div className="space-y-4">
-        <div className="flex justify-end">
-          <Button
-            onClick={() => {
-              setSelectedInvoiceTemplate(null);
-              setInvoiceEditorOpen(true);
-            }}
-          >
-            Add Template
-          </Button>
-        </div>
         <div className="grid gap-4 xl:grid-cols-2">
           {invoiceTemplates.map((template) => (
             <InvoiceTemplatePreview
@@ -381,17 +344,30 @@ export const SettingsFinalPage = () => {
     return <PermissionDeniedState title="You do not have access to final settings." />;
   }
 
+  const headerActions =
+    activeTab === "invoice-templates" ? (
+      <Button
+        onClick={() => {
+          setSelectedInvoiceTemplate(null);
+          setInvoiceEditorOpen(true);
+        }}
+      >
+        Add Template
+      </Button>
+    ) : activeTab === "payment-modes" ? (
+      <Button
+        onClick={() => {
+          setSelectedPaymentMode(null);
+          setPaymentModalOpen(true);
+        }}
+      >
+        Add Payment Mode
+      </Button>
+    ) : null;
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Settings & Final Polishing"
-        actions={
-          <Button variant="secondary" onClick={() => void refreshActiveTab()}>
-            <RefreshCw className="mr-2 size-4" />
-            Refresh
-          </Button>
-        }
-      />
+      <PageHeader title="Settings & Final Polishing" actions={headerActions} />
 
       <SettingsFinalTabs tabs={availableTabs.map((tab) => ({ key: tab.key, label: tab.label }))} activeTab={activeTab} onChange={(tab) => setSearchParams({ tab })} />
 
@@ -483,16 +459,6 @@ export const SettingsFinalPage = () => {
             <ErrorState title={paymentError} action={<Button variant="secondary" onClick={() => void loadPaymentModes()}>Retry</Button>} />
           ) : (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button
-                  onClick={() => {
-                    setSelectedPaymentMode(null);
-                    setPaymentModalOpen(true);
-                  }}
-                >
-                  Add Payment Mode
-                </Button>
-              </div>
               <PaymentModesTable
                 items={paymentModes || []}
                 onEdit={(item) => {

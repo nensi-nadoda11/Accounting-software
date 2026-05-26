@@ -32,13 +32,10 @@ import type {
   ProductCategory,
   ProductCategoryStatus,
   ProductPriceHistoryResponse,
-  ProductSortBy,
   ProductStatus,
   ProductType,
   ProductUnit,
   ProductUnitStatus,
-  SortOrder,
-  TaxType,
 } from "../../types/product";
 import { useDebouncedValue } from "../customers/useDebouncedValue";
 import {
@@ -47,7 +44,6 @@ import {
   PRODUCT_PRICE_HISTORY_CHANGE_TYPE_LABELS,
   PRODUCT_STATUS_LABELS,
   PRODUCT_TYPE_LABELS,
-  TAX_TYPE_LABELS,
   UNIT_STATUS_OPTIONS,
 } from "./productOptions";
 import { CategoryFormModal } from "./components/CategoryFormModal";
@@ -66,7 +62,6 @@ import {
   formatInr,
   formatPercent,
   getProductStatusTone,
-  getTaxTypeTone,
   saveDownloadedFile,
 } from "./productUtils";
 
@@ -82,18 +77,6 @@ const isProductStatus = (value: string | null): value is ProductStatus =>
 
 const isProductType = (value: string | null): value is ProductType =>
   value === "goods" || value === "service";
-
-const isTaxType = (value: string | null): value is TaxType =>
-  value === "taxable" || value === "exempt" || value === "nil_rated" || value === "non_gst";
-
-const isSortBy = (value: string | null): value is ProductSortBy =>
-  value === "name" ||
-  value === "salePrice" ||
-  value === "purchasePrice" ||
-  value === "createdAt" ||
-  value === "productCode";
-
-const isSortOrder = (value: string | null): value is SortOrder => value === "asc" || value === "desc";
 
 const isInternalTab = (value: string | null): value is InternalTab =>
   value === "products" || value === "categories" || value === "units" || value === "price-history";
@@ -117,7 +100,6 @@ const ProductTableSkeleton = () => (
               "Product Code",
               "Product Name",
               "Type",
-              "SKU / Barcode",
               "Category",
               "Unit",
               "GST %",
@@ -135,7 +117,7 @@ const ProductTableSkeleton = () => (
         <tbody className="divide-y divide-slate-100 bg-white">
           {Array.from({ length: 8 }).map((_, rowIndex) => (
             <tr key={rowIndex} className="animate-pulse">
-              {Array.from({ length: 11 }).map((__, cellIndex) => (
+              {Array.from({ length: 10 }).map((__, cellIndex) => (
                 <td key={cellIndex} className="px-4 py-4">
                   <div className="h-4 rounded bg-slate-100" />
                 </td>
@@ -216,23 +198,14 @@ export const ProductsPage = () => {
   const tabParam = searchParams.get("tab");
   const productTypeParam = searchParams.get("productType");
   const statusParam = searchParams.get("status");
-  const taxTypeParam = searchParams.get("taxType");
-  const sortByParam = searchParams.get("sortBy");
-  const sortOrderParam = searchParams.get("sortOrder");
 
   const activeTab: InternalTab = isInternalTab(tabParam) ? tabParam : "products";
   const pageValue = Number(searchParams.get("page") ?? "1");
   const page = Number.isFinite(pageValue) && pageValue > 0 ? pageValue : 1;
   const productType: ProductType | "" = isProductType(productTypeParam) ? productTypeParam : "";
   const status: ProductStatus | "" = isProductStatus(statusParam) ? statusParam : "";
-  const taxType: TaxType | "" = isTaxType(taxTypeParam) ? taxTypeParam : "";
-  const sortBy: ProductSortBy = isSortBy(sortByParam) ? sortByParam : "createdAt";
-  const sortOrder: SortOrder = isSortOrder(sortOrderParam) ? sortOrderParam : "desc";
-  const stockTrackingEnabled = parseBooleanFilter(searchParams.get("stockTrackingEnabled"));
   const lowStock = parseBooleanFilter(searchParams.get("lowStock"));
   const categoryId = searchParams.get("categoryId") ?? "";
-  const unitId = searchParams.get("unitId") ?? "";
-  const gstRate = searchParams.get("gstRate") ?? "";
 
   const updateQuery = useCallback(
     (updates: Record<string, string | null>) => {
@@ -254,6 +227,21 @@ export const ProductsPage = () => {
   useEffect(() => {
     setSearchInput(searchParams.get("search") ?? "");
   }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab !== "products") {
+      return;
+    }
+
+    const removableKeys = ["unitId", "gstRate", "stockTrackingEnabled", "taxType", "sortBy", "sortOrder"];
+    if (!removableKeys.some((key) => searchParams.has(key))) {
+      return;
+    }
+
+    const next = new URLSearchParams(searchParams);
+    removableKeys.forEach((key) => next.delete(key));
+    setSearchParams(next, { replace: true });
+  }, [activeTab, searchParams, setSearchParams]);
 
   useEffect(() => {
     const currentSearch = searchParams.get("search") ?? "";
@@ -281,14 +269,8 @@ export const ProductsPage = () => {
         search: searchParams.get("search") || undefined,
         productType: productType || undefined,
         categoryId: categoryId || undefined,
-        unitId: unitId || undefined,
-        gstRate: gstRate ? Number(gstRate) : undefined,
         status: status || undefined,
-        stockTrackingEnabled: stockTrackingEnabled === "" ? undefined : stockTrackingEnabled === "true",
         lowStock: lowStock === "" ? undefined : lowStock === "true",
-        taxType: taxType || undefined,
-        sortBy,
-        sortOrder,
       });
       setProductsData(response.data);
     } catch (loadError) {
@@ -299,17 +281,11 @@ export const ProductsPage = () => {
   }, [
     canViewProducts,
     categoryId,
-    gstRate,
     lowStock,
     page,
     productType,
     searchParams,
-    sortBy,
-    sortOrder,
     status,
-    stockTrackingEnabled,
-    taxType,
-    unitId,
   ]);
 
   useEffect(() => {
@@ -623,14 +599,8 @@ export const ProductsPage = () => {
                       search: searchParams.get("search") || undefined,
                       productType: productType || undefined,
                       categoryId: categoryId || undefined,
-                      unitId: unitId || undefined,
-                      gstRate: gstRate ? Number(gstRate) : undefined,
                       status: status || undefined,
-                      stockTrackingEnabled: stockTrackingEnabled === "" ? undefined : stockTrackingEnabled === "true",
                       lowStock: lowStock === "" ? undefined : lowStock === "true",
-                      taxType: taxType || undefined,
-                      sortBy,
-                      sortOrder,
                     });
                     saveDownloadedFile(file.blob, file.fileName);
                     toast.success("Product list exported");
@@ -680,7 +650,7 @@ export const ProductsPage = () => {
       />
 
       <Card>
-        <CardContent className="flex flex-wrap items-center gap-2">
+        <CardContent className="flex gap-5 overflow-x-auto px-3 py-0 sm:px-4">
           {internalTabs
             .filter((tab) => tab.visible)
             .map((tab) => (
@@ -688,13 +658,12 @@ export const ProductsPage = () => {
                 key={tab.key}
                 type="button"
                 onClick={() => updateQuery({ tab: tab.key, page: tab.key === "products" ? String(page) : null })}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  activeTab === tab.key
-                    ? "bg-emerald-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`relative whitespace-nowrap pb-3 pt-4 text-sm font-medium transition ${
+                  activeTab === tab.key ? "text-slate-900" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 {tab.label}
+                {activeTab === tab.key ? <span className="app-accent-bg absolute inset-x-0 bottom-0 h-0.5 rounded-full" /> : null}
               </button>
             ))}
         </CardContent>
@@ -705,40 +674,22 @@ export const ProductsPage = () => {
           <ProductFilters
             search={searchInput}
             categories={categoryOptions}
-            units={unitOptions}
             values={{
               productType: productType || "",
               categoryId,
-              unitId,
-              gstRate,
               status: status || "",
-              stockTrackingEnabled,
               lowStock,
-              taxType: taxType || "",
-              sortBy,
-              sortOrder,
             }}
             onSearchChange={setSearchInput}
             onChange={(values) =>
               updateQuery({
                 productType: values.productType !== undefined ? values.productType || null : productType || null,
                 categoryId: values.categoryId !== undefined ? values.categoryId || null : categoryId || null,
-                unitId: values.unitId !== undefined ? values.unitId || null : unitId || null,
-                gstRate: values.gstRate !== undefined ? values.gstRate || null : gstRate || null,
                 status: values.status !== undefined ? values.status || null : status || null,
-                stockTrackingEnabled:
-                  values.stockTrackingEnabled !== undefined ? values.stockTrackingEnabled || null : stockTrackingEnabled || null,
                 lowStock: values.lowStock !== undefined ? values.lowStock || null : lowStock || null,
-                taxType: values.taxType !== undefined ? values.taxType || null : taxType || null,
-                sortBy: values.sortBy ?? sortBy,
-                sortOrder: values.sortOrder ?? sortOrder,
                 page: "1",
               })
             }
-            onReset={() => {
-              setSearchInput("");
-              setSearchParams(new URLSearchParams());
-            }}
           />
 
           {productsLoading && !productsData ? (
@@ -777,7 +728,6 @@ export const ProductsPage = () => {
                           "Product Code",
                           "Product Name",
                           "Type",
-                          "SKU / Barcode",
                           "Category",
                           "Unit",
                           "GST %",
@@ -801,16 +751,11 @@ export const ProductsPage = () => {
                         >
                           <td className="px-4 py-4 font-medium text-slate-900">{item.productCode}</td>
                           <td className="px-4 py-4">
-                            <div className="space-y-1">
+                            <div>
                               <p className="font-medium text-slate-900">{item.name}</p>
-                              <div className="flex flex-wrap gap-2">
-                                <Badge tone="neutral">{PRODUCT_TYPE_LABELS[item.productType]}</Badge>
-                                <Badge tone={getTaxTypeTone(item.taxType)}>{TAX_TYPE_LABELS[item.taxType]}</Badge>
-                              </div>
                             </div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">{PRODUCT_TYPE_LABELS[item.productType]}</td>
-                          <td className="px-4 py-4 whitespace-nowrap">{item.sku || item.barcode || "-"}</td>
                           <td className="px-4 py-4 whitespace-nowrap">{item.category.name || "-"}</td>
                           <td className="px-4 py-4 whitespace-nowrap">{item.unit.symbol || item.unit.name || "-"}</td>
                           <td className="px-4 py-4 whitespace-nowrap">{formatPercent(item.gstRate)}</td>

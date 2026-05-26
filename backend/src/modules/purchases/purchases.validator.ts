@@ -160,6 +160,7 @@ const basePurchaseSchema = z
     }
 
     if (
+      value.paidAmount > 0 &&
       value.paymentMode &&
       ["bank", "upi", "card", "cheque"].includes(value.paymentMode) &&
       !value.bankAccountId

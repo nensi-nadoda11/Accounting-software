@@ -1,9 +1,10 @@
 import path from "path";
+import { lookup } from "node:dns/promises";
 
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 import { env } from "./config/env";
-import { db, pool } from "./db";
+import { db, dbConnectionTarget, pool } from "./db";
 import { logger } from "./config/logger";
 import { cleanupService } from "./services/cleanup.service";
 import { distributedLockService } from "./services/distributed-lock.service";
@@ -40,9 +41,23 @@ const getNestedCause = (error: unknown): NodeJS.ErrnoException | undefined => {
 const getStartupErrorCode = (error: unknown) =>
   (error as NodeJS.ErrnoException | undefined)?.code ?? getNestedCause(error)?.code;
 
+const getStartupErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  const cause = getNestedCause(error);
+  return cause?.message ?? String(error);
+};
+
+const isTimeoutLikeStartupError = (error: unknown) => {
+  const message = getStartupErrorMessage(error).toLowerCase();
+  return message.includes("timeout") || message.includes("timed out");
+};
+
 const isTransientStartupError = (error: unknown) => {
   const code = getStartupErrorCode(error);
-  return Boolean(code && TRANSIENT_STARTUP_ERROR_CODES.has(code));
+  return Boolean((code && TRANSIENT_STARTUP_ERROR_CODES.has(code)) || isTimeoutLikeStartupError(error));
 };
 
 const logDatabaseStartupHelp = (error: unknown) => {
@@ -59,12 +74,38 @@ const logDatabaseStartupHelp = (error: unknown) => {
     logger.warn(
       "Database host resolved but the TCP connection failed. Check whether your network, firewall, VPN, or ISP is blocking outbound Postgres traffic on ports 5432/6543."
     );
+    return;
   }
+
+  if (isTimeoutLikeStartupError(error)) {
+    logger.warn(
+      "Database connection timed out. If you are using Supabase, copy the exact connection string from the Supabase dashboard and verify the host, port, and pooler mode."
+    );
+  }
+};
+
+const logSupabaseSpecificHelp = () => {
+  if (!dbConnectionTarget.host?.endsWith(".pooler.supabase.com")) {
+    return;
+  }
+
+  logger.warn(
+    `Supabase pooler target: ${dbConnectionTarget.host}:${dbConnectionTarget.port ?? 5432} (ssl=${dbConnectionTarget.ssl ? "on" : "off"}). If this hostname does not resolve, replace DATABASE_URL in backend/.env with the exact "Connect" string from your Supabase project dashboard.`
+  );
+};
+
+const verifyDatabaseHostname = async () => {
+  if (!dbConnectionTarget.host) {
+    return;
+  }
+
+  await lookup(dbConnectionTarget.host);
 };
 
 const ensureDatabaseConnection = async () => {
   for (let attempt = 1; attempt <= STARTUP_DB_CONNECT_ATTEMPTS; attempt += 1) {
     try {
+      await verifyDatabaseHostname();
       await pool.query("select 1");
 
       if (attempt > 1) {
@@ -78,9 +119,13 @@ const ensureDatabaseConnection = async () => {
 
       logger.warn(`Database connection attempt ${attempt}/${STARTUP_DB_CONNECT_ATTEMPTS} failed`, {
         code,
-        message: error instanceof Error ? error.message : String(error)
+        message: getStartupErrorMessage(error),
+        host: dbConnectionTarget.host,
+        port: dbConnectionTarget.port ?? 5432,
+        ssl: dbConnectionTarget.ssl
       });
       logDatabaseStartupHelp(error);
+      logSupabaseSpecificHelp();
 
       if (!isTransientStartupError(error) || isLastAttempt) {
         throw error;

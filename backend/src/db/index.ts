@@ -7,13 +7,15 @@ import * as schema from "./schema";
 
 const poolMax = Math.max(1, Math.min(env.DB_POOL_MAX, 5));
 const poolMin = Math.max(0, Math.min(env.DB_POOL_MIN, poolMax));
-const databaseHost = (() => {
+const databaseUrl = (() => {
   try {
-    return new URL(env.DATABASE_URL).hostname;
+    return new URL(env.DATABASE_URL);
   } catch {
     return null;
   }
 })();
+const databaseHost = databaseUrl?.hostname ?? null;
+const databasePort = databaseUrl?.port ? Number(databaseUrl.port) : null;
 
 const isLocalDatabaseHost = (host: string | null) =>
   !host || host === "localhost" || host === "127.0.0.1" || host === "::1";
@@ -48,4 +50,9 @@ pool.on("error", (error) => {
 });
 
 export const db = drizzle(pool, { schema });
+export const dbConnectionTarget = {
+  host: databaseHost,
+  port: databasePort,
+  ssl: shouldUseSsl
+};
 export { pool };

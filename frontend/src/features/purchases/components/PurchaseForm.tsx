@@ -547,6 +547,7 @@ export const PurchaseForm = ({
   }, [form, values.items]);
 
   const currentPaymentMode = (form.watch("paymentMode") as PurchasePaymentMode | null | undefined) ?? null;
+  const hasDirectPayment = Number(values.paidAmount ?? 0) > 0;
   const handleSupplierCreated = async (values: SupplierFormInput, setError: UseFormSetError<SupplierFormValues>) => {
     try {
       setSubmittingSupplier(true);
@@ -804,8 +805,8 @@ export const PurchaseForm = ({
           <Card>
             <CardHeader title="Payment" />
             <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <Input type="number" min="0" step="0.01" label="Paid Amount" required {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
-              <Select label="Payment Mode" required {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
+              <Input type="number" min="0" step="0.01" label="Paid Amount" {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
+              <Select label="Payment Mode" required={hasDirectPayment} {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
                 <option value="">Select payment mode</option>
                 {PURCHASE_PAYMENT_MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -819,8 +820,8 @@ export const PurchaseForm = ({
                 {...form.register("paymentReference")}
                 error={form.formState.errors.paymentReference?.message}
               />
-              {isBankPaymentMode(currentPaymentMode) ? (
-                <Select label="Bank Account" required {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
+              {hasDirectPayment && isBankPaymentMode(currentPaymentMode) ? (
+                <Select label="Bank Account" required={hasDirectPayment} {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
                   <option value="">Select Bank Account</option>
                   {bankAccounts.map((bankAccount) => (
                     <option key={bankAccount.id} value={bankAccount.id}>

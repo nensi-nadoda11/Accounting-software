@@ -19,7 +19,8 @@ const toParams = (filters?: DashboardFilters) => ({
 });
 
 export const dashboardApi = {
-  getSummary: async () => (await client.get<ApiResponse<DashboardSummary>>("/dashboard/summary")).data,
+  getSummary: async (filters?: DashboardFilters) =>
+    (await client.get<ApiResponse<DashboardSummary>>("/dashboard/summary", { params: toParams(filters) })).data,
 
   getChart: async (chart: DashboardChartKey, filters: DashboardFilters) =>
     (await client.get<ApiResponse<DashboardChartResponse>>(`/dashboard/charts/${chart}`, { params: toParams(filters) })).data,

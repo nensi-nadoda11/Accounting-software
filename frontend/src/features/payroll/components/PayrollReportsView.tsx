@@ -1,5 +1,3 @@
-import { Download } from "lucide-react";
-
 import { AmountText } from "../../../components/ui/AmountText";
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent } from "../../../components/ui/Card";
@@ -27,7 +25,6 @@ export const PayrollReportsView = ({
   onTabChange,
   onFiltersChange,
   onResetFilters,
-  onExport,
   onPageChange,
 }: {
   activeTab: ReportTab;
@@ -57,26 +54,28 @@ export const PayrollReportsView = ({
     includeCancelled: boolean;
   }>) => void;
   onResetFilters: () => void;
-  onExport: () => void;
   onPageChange: (page: number) => void;
 }) => {
   const headers = data[0] ? Object.keys(data[0]) : [];
 
   return (
     <div className="space-y-4">
-      <div className="overflow-x-auto">
-        <div className="inline-flex min-w-full gap-2 rounded-2xl border border-slate-200 bg-white p-2">
-          {PAYROLL_REPORT_OPTIONS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onTabChange(tab.id)}
-              className={activeTab === tab.id ? "rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white" : "rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex gap-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white px-3 sm:px-4">
+        {PAYROLL_REPORT_OPTIONS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onTabChange(tab.id)}
+            className={
+              activeTab === tab.id
+                ? "relative whitespace-nowrap pb-3 pt-4 text-sm font-medium text-slate-900"
+                : "relative whitespace-nowrap pb-3 pt-4 text-sm font-medium text-slate-500 transition hover:text-slate-800"
+            }
+          >
+            {tab.label}
+            {activeTab === tab.id ? <span className="app-accent-bg absolute inset-x-0 bottom-0 h-0.5 rounded-full" /> : null}
+          </button>
+        ))}
       </div>
 
       <Card>
@@ -142,10 +141,6 @@ export const PayrollReportsView = ({
           <div className="flex justify-end gap-2 xl:col-span-5">
             <Button variant="secondary" onClick={onResetFilters}>
               Reset
-            </Button>
-            <Button variant="secondary" onClick={onExport}>
-              <Download className="mr-2 size-4" />
-              Export
             </Button>
           </div>
         </CardContent>

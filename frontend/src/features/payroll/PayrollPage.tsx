@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Download, Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
@@ -27,7 +27,6 @@ import type {
   Attendance,
   Employee,
   PaginationMeta,
-  PayrollExportFormat,
   PayrollItem,
   PayrollPaymentMode,
   PayrollRun,
@@ -267,8 +266,6 @@ export const PayrollPage = () => {
   const [reportData, setReportData] = useState<Array<Record<string, unknown>>>([]);
   const [reportSummary, setReportSummary] = useState<Array<{ label: string; value: string | number }>>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
-  const [exportingReport, setExportingReport] = useState(false);
-  const [exportFormat, setExportFormat] = useState<PayrollExportFormat>("pdf");
 
   const runForm = useForm<z.input<typeof payrollRunFormSchema>, undefined, PayrollRunFormValues>({
     resolver: zodResolver(payrollRunFormSchema),
@@ -826,32 +823,12 @@ export const PayrollPage = () => {
         page: 1,
         limit: 100,
         runId: run.id,
-        format: exportFormat,
+        format: "pdf",
       });
       saveDownloadedFile(file.blob, file.fileName);
       toast.success("Payroll exported");
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to export payroll run"));
-    }
-  };
-
-  const handleReportExport = async () => {
-    try {
-      setExportingReport(true);
-      const file = await payrollApi.exportPayroll({
-        page: 1,
-        limit: 100,
-        month: reportFilters.month || undefined,
-        employeeId: reportFilters.employeeId || undefined,
-        department: reportFilters.department || undefined,
-        format: exportFormat,
-      });
-      saveDownloadedFile(file.blob, file.fileName);
-      toast.success("Report exported");
-    } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to export report"));
-    } finally {
-      setExportingReport(false);
     }
   };
 
@@ -865,11 +842,19 @@ export const PayrollPage = () => {
         <PageHeader
           title="Payroll"
           actions={
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => void loadReferenceData()} loading={referenceLoading}>
-                <RefreshCw className="mr-2 size-4" />
-                Refresh
-              </Button>
+            <div
+              className={
+                activeTab === "payroll-runs"
+                  ? "flex items-center gap-2 overflow-x-auto whitespace-nowrap"
+                  : "flex flex-wrap items-center gap-2"
+              }
+            >
+              {activeTab !== "payroll-runs" && activeTab !== "reports" ? (
+                <Button variant="secondary" onClick={() => void loadReferenceData()} loading={referenceLoading}>
+                  <RefreshCw className="mr-2 size-4" />
+                  Refresh
+                </Button>
+              ) : null}
               {activeTab === "employees" && canManageEmployees ? (
                 <Button
                   onClick={() => {
@@ -910,20 +895,6 @@ export const PayrollPage = () => {
                   <Plus className="mr-2 size-4" />
                   Create Run
                 </Button>
-              ) : null}
-              {(activeTab === "reports" || activeTab === "payroll-runs") && canExport ? (
-                <>
-                  <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PayrollExportFormat)} className="w-28">
-                    <option value="xlsx">XLSX</option>
-                    <option value="pdf">PDF</option>
-                  </Select>
-                  {activeTab === "reports" ? (
-                    <Button variant="secondary" loading={exportingReport} onClick={() => void handleReportExport()}>
-                      <Download className="mr-2 size-4" />
-                      Export
-                    </Button>
-                  ) : null}
-                </>
               ) : null}
             </div>
           }
@@ -1578,7 +1549,6 @@ export const PayrollPage = () => {
               });
               setReportPage(1);
             }}
-            onExport={() => void handleReportExport()}
             onPageChange={setReportPage}
           />
         ) : null}

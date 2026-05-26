@@ -18,7 +18,7 @@ const getContext = (request: Request) => ({
 
 export class DashboardController {
   public getSummary = async (request: Request, response: Response) => {
-    const data = await dashboardService.getSummary(getActor(request), getContext(request));
+    const data = await dashboardService.getSummary(getActor(request), request.query as never, getContext(request));
     response.json(successResponse("Dashboard summary fetched successfully", data));
   };
 

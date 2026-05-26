@@ -40,11 +40,16 @@ const chartBucketLiterals = {
 } as const;
 
 export class DashboardRepository {
-  public async getSummary(companyId: string, today: PeriodBounds, month: PeriodBounds) {
+  public async getSummary(
+    companyId: string,
+    current: PeriodBounds,
+    comparison: PeriodBounds,
+    gstBounds: PeriodBounds
+  ) {
     const salesTotals = await db
       .select({
-        todaySales: sql<string>`coalesce(sum(case when ${salesInvoices.invoiceDate} between ${today.start} and ${today.end} then ${salesInvoices.grandTotal} else 0 end), 0)`,
-        monthSales: sql<string>`coalesce(sum(case when ${salesInvoices.invoiceDate} between ${month.start} and ${month.end} then ${salesInvoices.grandTotal} else 0 end), 0)`,
+        currentSales: sql<string>`coalesce(sum(case when ${salesInvoices.invoiceDate} between ${current.start} and ${current.end} then ${salesInvoices.grandTotal} else 0 end), 0)`,
+        comparisonSales: sql<string>`coalesce(sum(case when ${salesInvoices.invoiceDate} between ${comparison.start} and ${comparison.end} then ${salesInvoices.grandTotal} else 0 end), 0)`,
         totalSales: sql<string>`coalesce(sum(${salesInvoices.grandTotal}), 0)`,
         receivable: sql<string>`coalesce(sum(${salesInvoices.dueAmount}), 0)`
       })
@@ -59,8 +64,8 @@ export class DashboardRepository {
 
     const purchaseTotals = await db
       .select({
-        todayPurchase: sql<string>`coalesce(sum(case when ${purchaseInvoices.invoiceDate} between ${today.start} and ${today.end} then ${purchaseInvoices.grandTotal} else 0 end), 0)`,
-        monthPurchase: sql<string>`coalesce(sum(case when ${purchaseInvoices.invoiceDate} between ${month.start} and ${month.end} then ${purchaseInvoices.grandTotal} else 0 end), 0)`,
+        currentPurchase: sql<string>`coalesce(sum(case when ${purchaseInvoices.invoiceDate} between ${current.start} and ${current.end} then ${purchaseInvoices.grandTotal} else 0 end), 0)`,
+        comparisonPurchase: sql<string>`coalesce(sum(case when ${purchaseInvoices.invoiceDate} between ${comparison.start} and ${comparison.end} then ${purchaseInvoices.grandTotal} else 0 end), 0)`,
         payable: sql<string>`coalesce(sum(${purchaseInvoices.dueAmount}), 0)`
       })
       .from(purchaseInvoices)
@@ -95,7 +100,7 @@ export class DashboardRepository {
 
     const expenseTotals = await db
       .select({
-        monthlyExpense: sql<string>`coalesce(sum(case when ${expenses.expenseDate} between ${month.start} and ${month.end} then ${expenses.totalAmount} else 0 end), 0)`
+        currentExpense: sql<string>`coalesce(sum(case when ${expenses.expenseDate} between ${current.start} and ${current.end} then ${expenses.totalAmount} else 0 end), 0)`
       })
       .from(expenses)
       .where(
@@ -108,7 +113,7 @@ export class DashboardRepository {
 
     const payrollTotals = await db
       .select({
-        payrollCost: sql<string>`coalesce(sum(case when ${payrollRuns.periodEnd} between ${month.start} and ${month.end} then ${payrollRuns.netPayableTotal} else 0 end), 0)`,
+        payrollCost: sql<string>`coalesce(sum(case when ${payrollRuns.periodEnd} between ${current.start} and ${current.end} then ${payrollRuns.netPayableTotal} else 0 end), 0)`,
         pendingSalary: sql<string>`coalesce(sum(${payrollItems.netSalary} - ${payrollItems.paidAmount}), 0)`
       })
       .from(payrollItems)
@@ -135,7 +140,13 @@ export class DashboardRepository {
         gstPayable: sql<string>`coalesce(sum(${gstMonthlySummaries.netGstPayable}), 0)`
       })
       .from(gstMonthlySummaries)
-      .where(and(eq(gstMonthlySummaries.companyId, companyId), gte(gstMonthlySummaries.periodMonth, month.start), lte(gstMonthlySummaries.periodMonth, month.end)));
+      .where(
+        and(
+          eq(gstMonthlySummaries.companyId, companyId),
+          gte(gstMonthlySummaries.periodMonth, gstBounds.start),
+          lte(gstMonthlySummaries.periodMonth, gstBounds.end)
+        )
+      );
 
     return {
       salesTotals: salesTotals[0] ?? null,

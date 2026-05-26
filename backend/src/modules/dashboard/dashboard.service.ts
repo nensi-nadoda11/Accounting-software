@@ -73,6 +73,53 @@ const getTodayBounds = (anchor: Date): Bounds => ({
   end: endOfDay(anchor)
 });
 
+const getSummaryBounds = (query: DashboardDateRangeQuery): { current: Bounds; comparison: Bounds; gst: Bounds } => {
+  const today = new Date();
+  const todayBounds = getTodayBounds(today);
+
+  switch (query.range) {
+    case "daily": {
+      const comparisonDate = addDays(todayBounds.start, -1);
+      return {
+        current: todayBounds,
+        comparison: { start: startOfDay(comparisonDate), end: endOfDay(comparisonDate) },
+        gst: getMonthBounds(today)
+      };
+    }
+    case "weekly": {
+      const current = { start: startOfDay(addDays(todayBounds.start, -6)), end: todayBounds.end };
+      const comparisonEnd = endOfDay(addDays(current.start, -1));
+      const comparisonStart = startOfDay(addDays(current.start, -7));
+      return {
+        current,
+        comparison: { start: comparisonStart, end: comparisonEnd },
+        gst: { start: startOfMonth(current.start), end: endOfMonth(current.end) }
+      };
+    }
+    case "monthly": {
+      const current = getMonthBounds(today);
+      const previousMonthAnchor = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+      return {
+        current,
+        comparison: getMonthBounds(previousMonthAnchor),
+        gst: current
+      };
+    }
+    case "custom": {
+      const current = { start: startOfDay(query.dateFrom!), end: endOfDay(query.dateTo!) };
+      const rangeLength = Math.floor((current.end.getTime() - current.start.getTime()) / DAY_MS) + 1;
+      const comparisonEnd = endOfDay(addDays(current.start, -1));
+      const comparisonStart = startOfDay(addDays(current.start, -rangeLength));
+
+      return {
+        current,
+        comparison: { start: comparisonStart, end: comparisonEnd },
+        gst: { start: startOfMonth(current.start), end: endOfMonth(current.end) }
+      };
+    }
+  }
+};
+
 const getRangeBounds = (query: DashboardDateRangeQuery): { range: Bounds; bucket: "day" | "week" | "month" } => {
   const today = startOfDay(new Date());
 
@@ -119,21 +166,29 @@ export class DashboardService {
     }
   }
 
-  public async getSummary(actor: DashboardActor, context: DashboardRequestContext): Promise<DashboardSummary> {
+  public async getSummary(
+    actor: DashboardActor,
+    query: DashboardDateRangeQuery,
+    context: DashboardRequestContext
+  ): Promise<DashboardSummary> {
     this.ensureAccess(actor);
 
-    const today = getTodayBounds(new Date());
-    const month = getMonthBounds(new Date());
-    const data = await dashboardRepository.getSummary(actor.companyId, today, month);
+    const { current, comparison, gst } = getSummaryBounds(query);
+    const data = await dashboardRepository.getSummary(actor.companyId, current, comparison, gst);
+    const currentSales = Number(data.salesTotals?.currentSales ?? 0);
+    const currentPurchases = Number(data.purchaseTotals?.currentPurchase ?? 0);
+    const currentExpense = Number(data.expenseTotals?.currentExpense ?? 0);
+    const payrollCost = Number(data.payrollTotals?.payrollCost ?? 0);
+    const netProfit = currentSales - currentPurchases - currentExpense - payrollCost;
 
-    await this.logView(actor, "dashboard_summary_viewed", context);
+    await this.logView(actor, "dashboard_summary_viewed", context, { range: query.range });
 
     return {
-      todaySales: clampMoney(data.salesTotals?.todaySales),
-      monthSales: clampMoney(data.salesTotals?.monthSales),
+      todaySales: clampMoney(data.salesTotals?.comparisonSales),
+      monthSales: clampMoney(data.salesTotals?.currentSales),
       totalSales: clampMoney(data.salesTotals?.totalSales),
-      todayPurchase: clampMoney(data.purchaseTotals?.todayPurchase),
-      monthPurchase: clampMoney(data.purchaseTotals?.monthPurchase),
+      todayPurchase: clampMoney(data.purchaseTotals?.comparisonPurchase),
+      monthPurchase: clampMoney(data.purchaseTotals?.currentPurchase),
       receivable: clampMoney(data.salesTotals?.receivable),
       payable: clampMoney(data.purchaseTotals?.payable),
       cashBalance: clampMoney(data.accountBalances?.cashBalance),
@@ -141,8 +196,8 @@ export class DashboardService {
       totalProducts: clampCount(data.productTotals?.totalProducts),
       lowStockCount: clampCount(data.productTotals?.lowStockCount),
       expiringCount: clampCount(data.productTotals?.expiringCount),
-      monthlyExpense: clampMoney(data.expenseTotals?.monthlyExpense),
-      netProfit: clampMoney(data.accountBalances?.netProfit),
+      monthlyExpense: clampMoney(data.expenseTotals?.currentExpense),
+      netProfit: clampMoney(String(netProfit)),
       gstPayable: clampMoney(data.gstTotals?.gstPayable),
       payrollCost: clampMoney(data.payrollTotals?.payrollCost),
       pendingSalary: clampMoney(data.payrollTotals?.pendingSalary)

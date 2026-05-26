@@ -58,7 +58,7 @@ export const NestedRouteSidebar = ({
           </Button>
         </div>
 
-        <nav className="space-y-1 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+        <nav className="app-hide-scrollbar space-y-1 overscroll-contain lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
           {tabs.map((tab) => {
             const active = isTabActive(currentPath, tab.href);
             return (

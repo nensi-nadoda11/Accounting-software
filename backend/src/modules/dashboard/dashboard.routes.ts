@@ -16,7 +16,7 @@ const router = Router();
 
 router.use(requireAuth, requireCompanyAccess, requirePermission(["dashboard.view"]));
 
-router.get("/summary", asyncHandler(dashboardController.getSummary));
+router.get("/summary", validateRequest({ query: dashboardDateRangeQuerySchema }), asyncHandler(dashboardController.getSummary));
 router.get("/charts/sales", validateRequest({ query: dashboardDateRangeQuerySchema }), asyncHandler(dashboardController.getSalesChart));
 router.get("/charts/purchases", validateRequest({ query: dashboardDateRangeQuerySchema }), asyncHandler(dashboardController.getPurchasesChart));
 router.get("/charts/expenses", validateRequest({ query: dashboardDateRangeQuerySchema }), asyncHandler(dashboardController.getExpensesChart));

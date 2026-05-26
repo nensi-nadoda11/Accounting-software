@@ -40,6 +40,19 @@ const createLoadable = <T,>(data: T | null = null): Loadable<T> => ({
   error: null
 });
 
+const toInputDate = (date: Date) => date.toISOString().slice(0, 10);
+
+const getDefaultCustomRange = (): Pick<DashboardFilters, "dateFrom" | "dateTo"> => {
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(today.getDate() - 29);
+
+  return {
+    dateFrom: toInputDate(start),
+    dateTo: toInputDate(today)
+  };
+};
+
 const initialFilters: DashboardFilters = { range: "monthly" };
 const RANGE_OPTIONS: Array<{ label: string; value: DashboardRange }> = [
   { label: "Daily", value: "daily" },
@@ -68,33 +81,37 @@ export const DashboardPage = () => {
     expenses: createLoadable(),
     payments: createLoadable()
   });
-  const [filtersPending, setFiltersPending] = useState(false);
+  const [filtersError, setFiltersError] = useState<string | null>(null);
 
   const visibleActions = useMemo(
     () => (roleDashboard.data?.quickActions ?? []).filter((action) => !action.permission || auth.hasPermission(action.permission as never)),
     [auth, roleDashboard.data?.quickActions]
   );
 
-  const loadCore = useCallback(async () => {
+  const loadSummary = useCallback(async (activeFilters: DashboardFilters) => {
     setSummary((current) => ({ ...current, loading: true, error: null }));
+
+    try {
+      const response = await dashboardApi.getSummary(activeFilters);
+      setSummary({ data: response.data, loading: false, error: null });
+    } catch {
+      const message = "Dashboard summary could not be loaded.";
+      setSummary((current) => ({ ...current, loading: false, error: current.data ? current.error : message }));
+    }
+  }, []);
+
+  const loadStaticCore = useCallback(async () => {
     setRoleDashboard((current) => ({ ...current, loading: true, error: null }));
     setAlerts((current) => ({ ...current, loading: true, error: null }));
     setTasks((current) => ({ ...current, loading: true, error: null }));
 
-    const [summaryResponse, roleResponse, alertsResponse, tasksResponse] = await Promise.allSettled([
-      dashboardApi.getSummary(),
+    const [roleResponse, alertsResponse, tasksResponse] = await Promise.allSettled([
       dashboardApi.getRoleDashboard(),
       dashboardApi.getAlerts(),
       dashboardApi.getPendingTasks()
     ]);
 
     const message = "Dashboard widgets could not be loaded.";
-
-    setSummary((current) =>
-      summaryResponse.status === "fulfilled"
-        ? { data: summaryResponse.value.data, loading: false, error: null }
-        : { ...current, loading: false, error: current.data ? current.error : message }
-    );
 
     setRoleDashboard((current) =>
       roleResponse.status === "fulfilled"
@@ -140,8 +157,12 @@ export const DashboardPage = () => {
   }, [loadChart]);
 
   useEffect(() => {
-    void loadCore();
-  }, [loadCore]);
+    void loadStaticCore();
+  }, [loadStaticCore]);
+
+  useEffect(() => {
+    void loadSummary(filters);
+  }, [filters, loadSummary]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -151,10 +172,40 @@ export const DashboardPage = () => {
     return () => window.clearTimeout(timer);
   }, [filters, loadCharts]);
 
-  const handleApplyFilters = async () => {
-    setFiltersPending(true);
-    setFilters(draftFilters);
-    setFiltersPending(false);
+  const isRefreshing = summary.loading || Object.values(charts).some((chart) => chart.loading);
+
+  const handleRangeSelect = (range: DashboardRange) => {
+    setFiltersError(null);
+    setDraftFilters((current) => {
+      if (range !== "custom") {
+        return { range };
+      }
+
+      const fallbackRange = getDefaultCustomRange();
+
+      return {
+        range,
+        dateFrom: current.dateFrom ?? fallbackRange.dateFrom,
+        dateTo: current.dateTo ?? fallbackRange.dateTo
+      };
+    });
+  };
+
+  const handleApplyFilters = () => {
+    if (draftFilters.range === "custom") {
+      if (!draftFilters.dateFrom || !draftFilters.dateTo) {
+        setFiltersError("Custom range ke liye start aur end date select karni hogi.");
+        return;
+      }
+
+      if (draftFilters.dateFrom > draftFilters.dateTo) {
+        setFiltersError("Start date end date se badi nahi ho sakti.");
+        return;
+      }
+    }
+
+    setFiltersError(null);
+    setFilters({ ...draftFilters });
   };
 
   if (summary.loading && !summary.data && roleDashboard.loading && !roleDashboard.data) {
@@ -166,7 +217,14 @@ export const DashboardPage = () => {
       <ErrorState
         title="Dashboard could not be loaded."
         action={
-          <Button variant="secondary" onClick={() => void loadCore()}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void loadStaticCore();
+              void loadSummary(filters);
+              void loadCharts();
+            }}
+          >
             Retry
           </Button>
         }
@@ -179,47 +237,56 @@ export const DashboardPage = () => {
       <PageHeader
         title="Dashboard"
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {RANGE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setDraftFilters({ ...draftFilters, range: option.value })}
-                className={cn(
-                  "rounded-xl border px-3 py-1.5 text-sm font-medium transition",
-                  draftFilters.range === option.value
-                    ? "app-accent-surface text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-            {draftFilters.range === "custom" && draftFilters.dateFrom && draftFilters.dateTo ? (
-              <>
-                <input
-                  type="date"
-                  value={draftFilters.dateFrom}
-                  onChange={(event) => setDraftFilters({ ...draftFilters, dateFrom: event.target.value })}
-                  className="app-input-focus rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none"
-                />
-                <input
-                  type="date"
-                  value={draftFilters.dateTo}
-                  onChange={(event) => setDraftFilters({ ...draftFilters, dateTo: event.target.value })}
-                  className="app-input-focus rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none"
-                />
-              </>
-            ) : null}
-            <Button variant="secondary" onClick={() => void handleApplyFilters()} loading={filtersPending}>
-              <CalendarRange className="mr-2 size-4" />
-              Refresh
-            </Button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {RANGE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleRangeSelect(option.value)}
+                  className={cn(
+                    "rounded-xl border px-3 py-1.5 text-sm font-medium transition",
+                    draftFilters.range === option.value
+                      ? "app-accent-surface text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+              {draftFilters.range === "custom" ? (
+                <>
+                  <input
+                    type="date"
+                    value={draftFilters.dateFrom ?? ""}
+                    onChange={(event) => {
+                      setFiltersError(null);
+                      setDraftFilters((current) => ({ ...current, dateFrom: event.target.value }));
+                    }}
+                    className="app-input-focus rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none"
+                  />
+                  <input
+                    type="date"
+                    value={draftFilters.dateTo ?? ""}
+                    onChange={(event) => {
+                      setFiltersError(null);
+                      setDraftFilters((current) => ({ ...current, dateTo: event.target.value }));
+                    }}
+                    className="app-input-focus rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none"
+                  />
+                </>
+              ) : null}
+              <Button variant="secondary" onClick={handleApplyFilters} loading={isRefreshing}>
+                <CalendarRange className="mr-2 size-4" />
+                Refresh
+              </Button>
+            </div>
+            {filtersError ? <p className="text-sm text-rose-600">{filtersError}</p> : null}
           </div>
         }
       />
 
-      <DashboardSummaryCards summary={summary.data} loading={summary.loading && !summary.data} />
+      <DashboardSummaryCards summary={summary.data} range={filters.range} loading={summary.loading && !summary.data} />
 
       <div className="grid gap-4 xl:grid-cols-2">
         {chartConfig.map((chart) => (

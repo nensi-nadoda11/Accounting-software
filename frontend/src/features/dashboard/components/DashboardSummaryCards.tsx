@@ -12,14 +12,29 @@ import {
 import { AmountText } from "../../../components/ui/AmountText";
 import { Card } from "../../../components/ui/Card";
 import { cn } from "../../../lib/utils";
-import type { DashboardSummary } from "../../../types/dashboard";
+import type { DashboardRange, DashboardSummary } from "../../../types/dashboard";
 
 type Props = {
   summary: DashboardSummary | null;
+  range: DashboardRange;
   loading?: boolean;
 };
 
-const cards = [
+const getComparisonLabel = (range: DashboardRange) => {
+  switch (range) {
+    case "daily":
+      return "Yesterday";
+    case "weekly":
+      return "Prev 7 Days";
+    case "custom":
+      return "Previous Period";
+    case "monthly":
+    default:
+      return "Previous Month";
+  }
+};
+
+const baseCards = [
   { key: "monthSales", label: "Sales", icon: TrendingUp, tone: "emerald", subKey: "todaySales", subLabel: "Today" },
   { key: "monthPurchase", label: "Purchase", icon: TrendingDown, tone: "amber", subKey: "todayPurchase", subLabel: "Today" },
   { key: "receivable", label: "Receivable", icon: HandCoins, tone: "sky", subKey: "payable", subLabel: "Payable" },
@@ -41,50 +56,59 @@ const toneStyles: Record<string, string> = {
   slate: "bg-slate-100 text-slate-700"
 };
 
-export const DashboardSummaryCards = ({ summary, loading = false }: Props) => (
-  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    {cards.map((card) => {
-      const Icon = card.icon;
-      const primary = summary?.[card.key];
-      const secondary = summary?.[card.subKey];
+export const DashboardSummaryCards = ({ summary, range, loading = false }: Props) => {
+  const comparisonLabel = getComparisonLabel(range);
+  const cards = baseCards.map((card) =>
+    card.key === "monthSales" || card.key === "monthPurchase"
+      ? { ...card, subLabel: comparisonLabel }
+      : card
+  );
 
-      return (
-        <Card key={card.key} className="p-4">
-          {loading || !summary ? (
-            <div className="space-y-3 animate-pulse">
-              <div className="h-4 w-24 rounded bg-slate-100" />
-              <div className="h-7 w-32 rounded bg-slate-100" />
-              <div className="h-4 w-20 rounded bg-slate-100" />
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{card.label}</p>
-                <div className={cn("flex size-9 items-center justify-center rounded-xl", toneStyles[card.tone])}>
-                  <Icon className="size-4" />
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        const primary = summary?.[card.key];
+        const secondary = summary?.[card.subKey];
+
+        return (
+          <Card key={card.key} className="p-4">
+            {loading || !summary ? (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-4 w-24 rounded bg-slate-100" />
+                <div className="h-7 w-32 rounded bg-slate-100" />
+                <div className="h-4 w-20 rounded bg-slate-100" />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{card.label}</p>
+                  <div className={cn("flex size-9 items-center justify-center rounded-xl", toneStyles[card.tone])}>
+                    <Icon className="size-4" />
+                  </div>
                 </div>
-              </div>
-              <div>
-                {typeof primary === "number" ? (
-                  <p className="text-2xl font-semibold text-slate-900">{primary}</p>
-                ) : (
-                  <AmountText value={primary} className="text-2xl font-semibold text-slate-900" tone="default" />
-                )}
-              </div>
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>{card.subLabel}</span>
-                {typeof secondary === "number" ? <span>{secondary}</span> : <AmountText value={secondary} className="text-xs" tone="default" />}
-              </div>
-              {card.key === "totalProducts" ? (
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <PackageSearch className="size-3.5" />
-                  <span>{summary.expiringCount} expiring</span>
+                <div>
+                  {typeof primary === "number" ? (
+                    <p className="text-2xl font-semibold text-slate-900">{primary}</p>
+                  ) : (
+                    <AmountText value={primary} className="text-2xl font-semibold text-slate-900" tone="default" />
+                  )}
                 </div>
-              ) : null}
-            </div>
-          )}
-        </Card>
-      );
-    })}
-  </div>
-);
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>{card.subLabel}</span>
+                  {typeof secondary === "number" ? <span>{secondary}</span> : <AmountText value={secondary} className="text-xs" tone="default" />}
+                </div>
+                {card.key === "totalProducts" ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <PackageSearch className="size-3.5" />
+                    <span>{summary.expiringCount} expiring</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+};

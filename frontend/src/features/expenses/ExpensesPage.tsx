@@ -75,11 +75,12 @@ import { ExpensesTable } from "./components/ExpensesTable";
 import { RecurringExpenseDrawer } from "./components/RecurringExpenseDrawer";
 import { RecurringExpensesTable } from "./components/RecurringExpensesTable";
 
-type ExpenseTab = (typeof EXPENSE_TABS)[number]["id"];
+type VisibleExpenseTab = (typeof EXPENSE_TABS)[number]["id"];
+type ExpenseTab = VisibleExpenseTab | "reports";
 type ReportTab = "category-wise" | "monthly" | "payment-mode" | "gst";
 type UploadingFile = { id: string; file: File; progress: number };
 
-const getFirstAvailableTab = (tabs: ExpenseTab[]) => tabs[0] ?? "expenses";
+const getFirstAvailableTab = (tabs: VisibleExpenseTab[]) => tabs[0] ?? "expenses";
 
 export const ExpensesPage = () => {
   const auth = useAuth();
@@ -112,7 +113,8 @@ export const ExpensesPage = () => {
   );
 
   const requestedTab = (searchParams.get("tab") as ExpenseTab | null) ?? null;
-  const activeTab = visibleTabs.includes(requestedTab as ExpenseTab) ? (requestedTab as ExpenseTab) : getFirstAvailableTab(visibleTabs);
+  const activeTab: ExpenseTab =
+    visibleTabs.includes(requestedTab as VisibleExpenseTab) ? (requestedTab as VisibleExpenseTab) : getFirstAvailableTab(visibleTabs);
 
   useEffect(() => {
     if (requestedTab !== activeTab) {
@@ -382,7 +384,7 @@ export const ExpensesPage = () => {
   }, [activeTab, debouncedRecurringSearch, recurringFilters, recurringPage, recurringRefreshKey, toast]);
 
   useEffect(() => {
-    if (activeTab !== "reports") {
+    if ((activeTab as ExpenseTab) !== "reports") {
       return;
     }
 
@@ -1018,7 +1020,7 @@ export const ExpensesPage = () => {
           </div>
         ) : null}
 
-        {activeTab === "reports" ? (
+        {(activeTab as ExpenseTab) === "reports" ? (
           <ExpenseReportsView
             activeTab={activeReportTab}
             filters={reportFilters}

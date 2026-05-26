@@ -14,7 +14,6 @@ export const EXPENSE_TABS = [
   { id: "expenses", label: "Expenses" },
   { id: "categories", label: "Categories" },
   { id: "recurring", label: "Recurring" },
-  { id: "reports", label: "Reports" },
 ] as const;
 
 export const REPORT_TABS = [

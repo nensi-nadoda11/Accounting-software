@@ -12,6 +12,7 @@ export type SearchableSelectOption = {
 
 export const SearchableSelect = ({
   label,
+  required,
   value,
   options,
   onChange,
@@ -23,6 +24,7 @@ export const SearchableSelect = ({
   allowClear = false,
 }: {
   label?: string;
+  required?: boolean;
   value: string | null | undefined;
   options: SearchableSelectOption[];
   onChange: (value: string) => void;
@@ -81,7 +83,7 @@ export const SearchableSelect = ({
   }, [open]);
 
   return (
-    <FormField label={label} error={error}>
+    <FormField label={label} error={error} required={required}>
       <div ref={containerRef} className="relative">
         <div
           className={cn(

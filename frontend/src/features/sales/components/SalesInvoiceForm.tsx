@@ -646,7 +646,7 @@ export const SalesInvoiceForm = ({
               <Card>
                 <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-slate-700">Customer</span>
+                    <span className="text-sm font-medium text-slate-700">Customer <span className="text-rose-500">*</span></span>
                     <div className="flex gap-2">
                       <div className="min-w-0 flex-1">
                         <AsyncLookupSelect
@@ -696,18 +696,19 @@ export const SalesInvoiceForm = ({
                     />
                   </div>
 
-                  <Input type="date" label="Invoice Date" {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
-                  <Input label="Place of Supply" {...form.register("placeOfSupply")} error={form.formState.errors.placeOfSupply?.message} />
+                  <Input type="date" label="Invoice Date" required {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
+                  <Input label="Place of Supply" required {...form.register("placeOfSupply")} error={form.formState.errors.placeOfSupply?.message} />
 
                   {isWalkIn ? (
                     <>
-                      <Input label="Walk-in Name" {...form.register("walkInName")} error={form.formState.errors.walkInName?.message} />
+                      <Input label="Walk-in Name" required={Boolean(isWalkIn)} {...form.register("walkInName")} error={form.formState.errors.walkInName?.message} />
                       <Input label="Walk-in Mobile" {...form.register("walkInMobile")} error={form.formState.errors.walkInMobile?.message} />
                     </>
                   ) : null}
 
                   <SearchableSelect
                     label="Warehouse"
+                    required
                     value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
                     options={warehouses.map((warehouse) => ({
                       value: warehouse.id,
@@ -720,7 +721,7 @@ export const SalesInvoiceForm = ({
                     onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
                   />
 
-                  <Select label="Price Tax Type" {...form.register("priceTaxType")} error={form.formState.errors.priceTaxType?.message}>
+                  <Select label="Price Tax Type" required {...form.register("priceTaxType")} error={form.formState.errors.priceTaxType?.message}>
                     {SALES_PRICE_TAX_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -758,8 +759,8 @@ export const SalesInvoiceForm = ({
               <Card>
                 <CardHeader title="Payment" />
                 <CardContent className="space-y-4">
-                  <Input type="number" min="0" step="0.01" label="Paid Amount" {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
-                  <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
+                  <Input type="number" min="0" step="0.01" label="Paid Amount" required {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
+                  <Select label="Payment Mode" required {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
                     <option value="">Select Payment Mode</option>
                     {SALES_PAYMENT_MODE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -768,7 +769,7 @@ export const SalesInvoiceForm = ({
                     ))}
                   </Select>
                   {isBankPaymentMode(currentPaymentMode) ? (
-                    <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
+                    <Select label="Bank Account" required {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
                       <option value="">Select Bank Account</option>
                       {bankAccounts.map((bankAccount) => (
                         <option key={bankAccount.id} value={bankAccount.id}>
@@ -833,6 +834,7 @@ export const SalesInvoiceForm = ({
               <div className="flex flex-col gap-2">
                 <AsyncLookupSelect
                   label="Customer"
+                  required
                   value={customerLookupValue}
                   loading={customerLoading}
                   options={customerLookup}
@@ -873,15 +875,16 @@ export const SalesInvoiceForm = ({
               />
               {isWalkIn ? (
                 <>
-                  <Input label="Walk-in Name" {...form.register("walkInName")} error={form.formState.errors.walkInName?.message} />
+                  <Input label="Walk-in Name" required={Boolean(isWalkIn)} {...form.register("walkInName")} error={form.formState.errors.walkInName?.message} />
                   <Input label="Walk-in Mobile" {...form.register("walkInMobile")} error={form.formState.errors.walkInMobile?.message} />
                 </>
               ) : null}
-              <Input type="date" label="Invoice Date" {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
+              <Input type="date" label="Invoice Date" required {...form.register("invoiceDate")} error={form.formState.errors.invoiceDate?.message} />
               <Input type="date" label="Due Date" {...form.register("dueDate")} error={form.formState.errors.dueDate?.message} />
-              <Input label="Place of Supply" {...form.register("placeOfSupply")} error={form.formState.errors.placeOfSupply?.message} />
+              <Input label="Place of Supply" required {...form.register("placeOfSupply")} error={form.formState.errors.placeOfSupply?.message} />
               <SearchableSelect
                 label="Warehouse"
+                required
                 value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
                 options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name, description: warehouse.warehouseCode ?? null }))}
                 placeholder="Select Warehouse"
@@ -889,7 +892,7 @@ export const SalesInvoiceForm = ({
                 error={form.formState.errors.warehouseId?.message}
                 onChange={(value) => form.setValue("warehouseId", value, { shouldDirty: true, shouldValidate: true })}
               />
-              <Select label="Price Tax Type" {...form.register("priceTaxType")} error={form.formState.errors.priceTaxType?.message}>
+              <Select label="Price Tax Type" required {...form.register("priceTaxType")} error={form.formState.errors.priceTaxType?.message}>
                 {SALES_PRICE_TAX_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -897,7 +900,7 @@ export const SalesInvoiceForm = ({
                 ))}
               </Select>
               <Textarea label="Notes" rows={3} {...form.register("notes")} error={form.formState.errors.notes?.message} />
-              <Textarea label="Terms" rows={3} {...form.register("termsConditions")} error={form.formState.errors.termsConditions?.message} />
+              <Textarea label="Terms" required rows={3} {...form.register("termsConditions")} error={form.formState.errors.termsConditions?.message} />
             </CardContent>
           </Card>
 
@@ -925,8 +928,8 @@ export const SalesInvoiceForm = ({
               <Card>
                 <CardHeader title="Payment" />
                 <CardContent className="grid gap-4 md:grid-cols-2">
-                  <Input type="number" min="0" step="0.01" label="Paid Amount" {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
-                  <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
+                  <Input type="number" min="0" step="0.01" label="Paid Amount" required {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
+                  <Select label="Payment Mode" required {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
                     <option value="">Select Payment Mode</option>
                     {SALES_PAYMENT_MODE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -935,7 +938,7 @@ export const SalesInvoiceForm = ({
                     ))}
                   </Select>
                   {isBankPaymentMode(currentPaymentMode) ? (
-                    <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
+                    <Select label="Bank Account" required {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
                       <option value="">Select Bank Account</option>
                       {bankAccounts.map((bankAccount) => (
                         <option key={bankAccount.id} value={bankAccount.id}>

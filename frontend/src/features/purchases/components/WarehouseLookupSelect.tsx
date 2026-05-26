@@ -24,6 +24,7 @@ const matchesWarehouse = (warehouse: Warehouse, search: string) => {
 
 export const WarehouseLookupSelect = ({
   label = "Warehouse",
+  required,
   value,
   warehouses,
   error,
@@ -32,6 +33,7 @@ export const WarehouseLookupSelect = ({
   onChange,
 }: {
   label?: string;
+  required?: boolean;
   value: string | null | undefined;
   warehouses: Warehouse[];
   error?: string;
@@ -49,6 +51,7 @@ export const WarehouseLookupSelect = ({
   return (
     <AsyncLookupSelect
       label={label}
+      required={required}
       value={selectedOption ? buildWarehouseLookupOption(selectedOption) : null}
       options={options}
       placeholder={placeholder}

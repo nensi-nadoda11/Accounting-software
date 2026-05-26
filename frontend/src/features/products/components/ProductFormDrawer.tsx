@@ -172,14 +172,14 @@ export const ProductFormDrawer = ({
           <CardHeader title="Basic" />
           <CardContent>
             <SectionGrid>
-              <Select label="Product Type" {...form.register("productType")} error={form.formState.errors.productType?.message}>
+              <Select label="Product Type" required {...form.register("productType")} error={form.formState.errors.productType?.message}>
                 {FORM_PRODUCT_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </Select>
-              <Input label="Product Name" {...form.register("name")} error={form.formState.errors.name?.message} />
+              <Input label="Product Name" required {...form.register("name")} error={form.formState.errors.name?.message} />
               <Input
                 label="SKU"
                 {...form.register("sku")}
@@ -203,7 +203,7 @@ export const ProductFormDrawer = ({
                   ) : null}
                 </div>
               </FormField>
-              <Select label="Category" {...form.register("categoryId")} error={form.formState.errors.categoryId?.message}>
+              <Select label="Category" required {...form.register("categoryId")} error={form.formState.errors.categoryId?.message}>
                 <option value="">Select Category</option>
                 {categories
                   .filter((item) => item.status !== "deleted")
@@ -213,7 +213,7 @@ export const ProductFormDrawer = ({
                     </option>
                   ))}
               </Select>
-              <Select label="Unit" {...form.register("unitId")} error={form.formState.errors.unitId?.message}>
+              <Select label="Unit" required {...form.register("unitId")} error={form.formState.errors.unitId?.message}>
                 <option value="">Select Unit</option>
                 {units
                   .filter((item) => item.status !== "deleted")
@@ -250,7 +250,7 @@ export const ProductFormDrawer = ({
                 value={watchInputValue("hsnSacCode")}
                 error={form.formState.errors.hsnSacCode?.message}
               />
-              <Select label="Tax Type" {...form.register("taxType")} error={form.formState.errors.taxType?.message}>
+              <Select label="Tax Type" required {...form.register("taxType")} error={form.formState.errors.taxType?.message}>
                 {FORM_TAX_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -275,6 +275,7 @@ export const ProductFormDrawer = ({
               />
               <Select
                 label="Price Tax Type"
+                required
                 {...form.register("priceTaxType")}
                 error={form.formState.errors.priceTaxType?.message}
               >
@@ -294,6 +295,7 @@ export const ProductFormDrawer = ({
             <SectionGrid>
               <Input
                 label="Purchase Price"
+                required
                 type="number"
                 min="0"
                 step="0.01"
@@ -302,6 +304,7 @@ export const ProductFormDrawer = ({
               />
               <Input
                 label="Sale Price"
+                required
                 type="number"
                 min="0"
                 step="0.01"

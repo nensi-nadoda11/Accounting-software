@@ -6,12 +6,14 @@ export const FormField = ({
   label,
   htmlFor,
   error,
+  required,
   children,
   className,
 }: {
   label?: string;
   htmlFor?: string;
   error?: string;
+  required?: boolean;
   children: ReactNode;
   className?: string;
 }) => (
@@ -19,6 +21,7 @@ export const FormField = ({
     {label ? (
       <label htmlFor={htmlFor} className="text-sm font-medium text-slate-700">
         {label}
+        {required ? <span className="ml-1 text-rose-500">*</span> : null}
       </label>
     ) : null}
     {children}

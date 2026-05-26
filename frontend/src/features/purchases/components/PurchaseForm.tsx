@@ -663,6 +663,7 @@ export const PurchaseForm = ({
             <Input
               type="date"
               label="Invoice Date"
+              required
               {...form.register("invoiceDate")}
               error={form.formState.errors.invoiceDate?.message}
             />
@@ -672,6 +673,7 @@ export const PurchaseForm = ({
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)]">
             <WarehouseLookupSelect
               label="Default Warehouse"
+              required
               value={(form.watch("warehouseId") as string | null | undefined) ?? ""}
               warehouses={warehouses}
               error={form.formState.errors.warehouseId?.message}
@@ -740,8 +742,8 @@ export const PurchaseForm = ({
           <Card>
             <CardHeader title="Payment" />
             <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <Input type="number" min="0" step="0.01" label="Paid Amount" {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
-              <Select label="Payment Mode" {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
+              <Input type="number" min="0" step="0.01" label="Paid Amount" required {...form.register("paidAmount")} error={form.formState.errors.paidAmount?.message} />
+              <Select label="Payment Mode" required {...form.register("paymentMode")} error={form.formState.errors.paymentMode?.message}>
                 <option value="">Select payment mode</option>
                 {PURCHASE_PAYMENT_MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -756,7 +758,7 @@ export const PurchaseForm = ({
                 error={form.formState.errors.paymentReference?.message}
               />
               {isBankPaymentMode(currentPaymentMode) ? (
-                <Select label="Bank Account" {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
+                <Select label="Bank Account" required {...form.register("bankAccountId")} error={form.formState.errors.bankAccountId?.message}>
                   <option value="">Select Bank Account</option>
                   {bankAccounts.map((bankAccount) => (
                     <option key={bankAccount.id} value={bankAccount.id}>

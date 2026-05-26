@@ -287,7 +287,7 @@ export const listMovementsQuerySchema = z.object({
 });
 
 export const exportMovementsQuerySchema = listMovementsQuerySchema.extend({
-  format: z.enum(INVENTORY_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(INVENTORY_EXPORT_FORMATS).optional().default("pdf")
 });
 
 export const listStockQuerySchema = z.object({
@@ -311,7 +311,7 @@ export const stockSummaryQuerySchema = z.object({
 });
 
 export const exportStockQuerySchema = listStockQuerySchema.extend({
-  format: z.enum(INVENTORY_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(INVENTORY_EXPORT_FORMATS).optional().default("pdf")
 });
 
 export const listAlertsQuerySchema = z.object({
@@ -344,7 +344,7 @@ export const valuationQuerySchema = z.object({
 });
 
 export const exportValuationQuerySchema = valuationQuerySchema.extend({
-  format: z.enum(INVENTORY_EXPORT_FORMATS).optional().default("csv")
+  format: z.enum(INVENTORY_EXPORT_FORMATS).optional().default("pdf")
 });
 
 export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>;

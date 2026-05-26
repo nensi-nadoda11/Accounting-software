@@ -1,5 +1,4 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -26,7 +25,6 @@ import type {
   DueTrackingResponse,
   PartyType,
   Payment,
-  PaymentExportFormat,
   PaymentFormAllocationInput,
   PaymentListQuery,
   PaymentListResponse,
@@ -143,7 +141,6 @@ export const PaymentsPage = () => {
   const canPay = auth.hasPermission("payment.pay");
   const canUpdate = auth.hasPermission("payment.update");
   const canCancel = auth.hasPermission("payment.cancel");
-  const canExport = auth.hasPermission("payment.export");
   const canReceiptPrint = auth.hasPermission("payment.receipt.print");
   const canReminderManage = auth.hasPermission("payment.reminder.manage");
 
@@ -180,8 +177,6 @@ export const PaymentsPage = () => {
     dateFrom: "",
     dateTo: "",
   });
-  const [exporting, setExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<PaymentExportFormat>("pdf");
 
   const [detailPayment, setDetailPayment] = useState<Payment | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -531,45 +526,10 @@ export const PaymentsPage = () => {
         <PageHeader
           title="Payment Management"
           actions={
-            activeTab === "list" && canExport ? (
-              <div className="flex flex-wrap gap-2">
-                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PaymentExportFormat)} className="w-28">
-                  <option value="xlsx">XLSX</option>
-                  <option value="pdf">PDF</option>
-                </Select>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={exporting}
-                  onClick={async () => {
-                    try {
-                      setExporting(true);
-                      const file = await paymentsApi.exportList({
-                        page: 1,
-                        limit: ALL_FETCH_LIMIT,
-                        search: debouncedPaymentsSearch || undefined,
-                        partyType: (paymentsFilters.partyType as PartyType | "") || undefined,
-                        paymentType: (paymentsFilters.paymentType as PaymentListQuery["paymentType"]) || undefined,
-                        partyId: (paymentsFilters.partyId as string | undefined) || undefined,
-                        paymentMode: (paymentsFilters.paymentMode as PaymentListQuery["paymentMode"]) || undefined,
-                        status: (paymentsFilters.status as PaymentListQuery["status"]) || undefined,
-                        dateFrom: (paymentsFilters.dateFrom as string) || undefined,
-                        dateTo: (paymentsFilters.dateTo as string) || undefined,
-                        format: exportFormat,
-                      });
-                      saveDownloadedFile(file.blob, file.fileName);
-                      toast.success("Payments export downloaded");
-                    } catch (error) {
-                      toast.error(getErrorMessage(error, "Failed to export payments"));
-                    } finally {
-                      setExporting(false);
-                    }
-                  }}
-                >
-                  <Download className="mr-2 size-4" />
-                  Export
-                </Button>
-              </div>
+            activeTab === "reminders" && canReminderManage ? (
+              <Button type="button" onClick={() => openReminderForm()}>
+                New Reminder
+              </Button>
             ) : null
           }
         />
@@ -666,19 +626,6 @@ export const PaymentsPage = () => {
                 setPaymentsFilters((current) => ({ ...current, ...updates }));
                 setPaymentsPage(1);
               }}
-              onReset={() => {
-                setPaymentsSearch("");
-                setPaymentsPage(1);
-                setPaymentsFilters({
-                  partyType: "",
-                  paymentType: "",
-                  partyId: undefined,
-                  paymentMode: "",
-                  status: "",
-                  dateFrom: "",
-                  dateTo: "",
-                });
-              }}
             />
 
             <PaymentsListTable
@@ -720,18 +667,19 @@ export const PaymentsPage = () => {
 
         {activeTab === "dues" ? (
           <div className="space-y-4">
-            <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2">
+            <div className="flex gap-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white px-3 sm:px-4">
               {(["customer", "supplier"] as PartyType[]).map((scope) => (
                 <button
                   key={scope}
                   type="button"
-                  className={`rounded-xl px-3 py-2 text-sm font-medium transition ${dueScope === scope ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                  className={`relative whitespace-nowrap pb-3 pt-4 text-sm font-medium transition ${dueScope === scope ? "text-slate-900" : "text-slate-500 hover:text-slate-800"}`}
                   onClick={() => {
                     setDueScope(scope);
                     setDuePage(1);
                   }}
                 >
                   {scope === "customer" ? "Customer Dues" : "Supplier Dues"}
+                  {dueScope === scope ? <span className="app-accent-bg absolute inset-x-0 bottom-0 h-0.5 rounded-full" /> : null}
                 </button>
               ))}
             </div>
@@ -743,16 +691,6 @@ export const PaymentsPage = () => {
               partyLabel={dueScope === "customer" ? "Customers" : "Suppliers"}
               onChange={(updates) => {
                 setDueFilters((current) => ({ ...current, ...updates }));
-                setDuePage(1);
-              }}
-              onReset={() => {
-                setDueFilters({
-                  partyId: undefined,
-                  dateFrom: "",
-                  dateTo: "",
-                  overdueOnly: false,
-                  agingBucket: "",
-                });
                 setDuePage(1);
               }}
             />
@@ -819,18 +757,19 @@ export const PaymentsPage = () => {
 
         {activeTab === "advances" ? (
           <div className="space-y-4">
-            <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2">
+            <div className="flex gap-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white px-3 sm:px-4">
               {(["customer", "supplier"] as PartyType[]).map((scope) => (
                 <button
                   key={scope}
                   type="button"
-                  className={`rounded-xl px-3 py-2 text-sm font-medium transition ${advanceScope === scope ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                  className={`relative whitespace-nowrap pb-3 pt-4 text-sm font-medium transition ${advanceScope === scope ? "text-slate-900" : "text-slate-500 hover:text-slate-800"}`}
                   onClick={() => {
                     setAdvanceScope(scope);
                     setAdvancePage(1);
                   }}
                 >
                   {scope === "customer" ? "Customer Advances" : "Supplier Advances"}
+                  {advanceScope === scope ? <span className="app-accent-bg absolute inset-x-0 bottom-0 h-0.5 rounded-full" /> : null}
                 </button>
               ))}
             </div>
@@ -842,15 +781,6 @@ export const PaymentsPage = () => {
               partyLabel={advanceScope === "customer" ? "Customers" : "Suppliers"}
               onChange={(updates) => {
                 setAdvanceFilters((current) => ({ ...current, ...updates }));
-                setAdvancePage(1);
-              }}
-              onReset={() => {
-                setAdvanceFilters({
-                  partyId: undefined,
-                  paymentMode: "",
-                  dateFrom: "",
-                  dateTo: "",
-                });
                 setAdvancePage(1);
               }}
             />
@@ -888,26 +818,7 @@ export const PaymentsPage = () => {
                 setReminderFilters((current) => ({ ...current, ...updates }));
                 setReminderPage(1);
               }}
-              onReset={() => {
-                setReminderFilters({
-                  partyType: "",
-                  partyId: undefined,
-                  channel: "",
-                  status: "",
-                  dateFrom: "",
-                  dateTo: "",
-                });
-                setReminderPage(1);
-              }}
             />
-
-            {canReminderManage ? (
-              <div className="flex justify-end">
-                <Button type="button" onClick={() => openReminderForm()}>
-                  New Reminder
-                </Button>
-              </div>
-            ) : null}
 
             <RemindersTable
               data={remindersData}

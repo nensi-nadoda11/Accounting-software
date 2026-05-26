@@ -1,6 +1,5 @@
 import { Search } from "lucide-react";
 
-import { Button } from "../../../components/ui/Button";
 import { Card, CardContent } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
@@ -20,7 +19,6 @@ export const PaymentFilters = ({
   partyOptions,
   partyLabel,
   onChange,
-  onReset,
 }: {
   variant: "list" | "due" | "advance" | "reminder";
   search?: string;
@@ -29,13 +27,18 @@ export const PaymentFilters = ({
   partyOptions: PartyOption[];
   partyLabel: string;
   onChange: (updates: Record<string, string | boolean | undefined>) => void;
-  onReset: () => void;
 }) => (
   <Card>
     <CardContent className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <div
+        className={
+          variant === "list"
+            ? "grid gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[minmax(0,1.2fr)_repeat(5,minmax(0,0.9fr))_minmax(0,0.9fr)]"
+            : "grid gap-3 md:grid-cols-2 xl:grid-cols-6"
+        }
+      >
         {variant === "list" && onSearchChange ? (
-          <label className="relative xl:col-span-2">
+          <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -75,14 +78,16 @@ export const PaymentFilters = ({
           </Select>
         ) : null}
 
-        <Select value={String(values.partyId ?? "")} onChange={(event) => onChange({ partyId: event.target.value || undefined })}>
-          <option value="">All {partyLabel}</option>
-          {partyOptions.map((party) => (
-            <option key={party.id} value={party.id}>
-              {party.label}
-            </option>
-          ))}
-        </Select>
+        {variant !== "list" ? (
+          <Select value={String(values.partyId ?? "")} onChange={(event) => onChange({ partyId: event.target.value || undefined })}>
+            <option value="">All {partyLabel}</option>
+            {partyOptions.map((party) => (
+              <option key={party.id} value={party.id}>
+                {party.label}
+              </option>
+            ))}
+          </Select>
+        ) : null}
 
         {variant === "list" || variant === "advance" ? (
           <Select
@@ -164,8 +169,8 @@ export const PaymentFilters = ({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {variant === "due" ? (
+      {variant === "due" ? (
+        <div className="flex flex-wrap items-center gap-3">
           <label className="inline-flex items-center gap-2 text-sm text-slate-600">
             <input
               type="checkbox"
@@ -174,13 +179,8 @@ export const PaymentFilters = ({
             />
             Overdue only
           </label>
-        ) : (
-          <div />
-        )}
-        <Button type="button" variant="secondary" className="h-9 px-3" onClick={onReset}>
-          Reset
-        </Button>
-      </div>
+        </div>
+      ) : null}
     </CardContent>
   </Card>
 );

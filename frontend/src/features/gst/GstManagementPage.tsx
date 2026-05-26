@@ -2,7 +2,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Download,
   Plus,
-  RefreshCcw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -35,7 +34,6 @@ import { suppliersApi } from "../../services/suppliersApi";
 import type { CompanyFinancialYear } from "../../types/company";
 import type {
   GstAdjustment,
-  GstExportFormat,
   GstExportType,
   GstFilters,
   GstListResponse,
@@ -149,7 +147,6 @@ export const GstManagementPage = () => {
   }, [activeTab, requestedTab, setSearchParams]);
 
   const [financialYears, setFinancialYears] = useState<CompanyFinancialYear[]>([]);
-  const [customerOptions, setCustomerOptions] = useState<Option[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<Option[]>([]);
 
   const [summaryFinancialYearId, setSummaryFinancialYearId] = useState<string>("");
@@ -162,7 +159,6 @@ export const GstManagementPage = () => {
 
   const [salesDateFrom, setSalesDateFrom] = useState(getMonthStartInput());
   const [salesDateTo, setSalesDateTo] = useState(getTodayInput());
-  const [salesCustomerId, setSalesCustomerId] = useState("");
   const [salesState, setSalesState] = useState("");
   const [salesInvoiceType, setSalesInvoiceType] = useState("");
   const [salesPartyType, setSalesPartyType] = useState("");
@@ -171,14 +167,13 @@ export const GstManagementPage = () => {
   const [salesData, setSalesData] = useState<GstListResponse<SalesGstRow>>({ items: [], pagination: EMPTY_PAGINATION });
   const [salesLoading, setSalesLoading] = useState(false);
   const [salesError, setSalesError] = useState<string | null>(null);
-  const [salesRefreshKey, setSalesRefreshKey] = useState(0);
+  const [salesRefreshKey] = useState(0);
   const debouncedSalesState = useDebouncedValue(salesState, 350);
 
   const [purchaseDateFrom, setPurchaseDateFrom] = useState(getMonthStartInput());
   const [purchaseDateTo, setPurchaseDateTo] = useState(getTodayInput());
   const [purchaseSupplierId, setPurchaseSupplierId] = useState("");
   const [purchaseState, setPurchaseState] = useState("");
-  const [purchaseGstRate, setPurchaseGstRate] = useState("");
   const [purchaseEligibilityStatus, setPurchaseEligibilityStatus] = useState("");
   const [purchaseClaimStatus, setPurchaseClaimStatus] = useState("");
   const [purchasePage, setPurchasePage] = useState(1);
@@ -210,7 +205,7 @@ export const GstManagementPage = () => {
   const [outputData, setOutputData] = useState<OutputTaxSummary | null>(null);
   const [outputLoading, setOutputLoading] = useState(false);
   const [outputError, setOutputError] = useState<string | null>(null);
-  const [outputRefreshKey, setOutputRefreshKey] = useState(0);
+  const [outputRefreshKey] = useState(0);
   const debouncedOutputState = useDebouncedValue(outputState, 350);
 
   const [hsnDateFrom, setHsnDateFrom] = useState(getMonthStartInput());
@@ -219,14 +214,14 @@ export const GstManagementPage = () => {
   const [hsnData, setHsnData] = useState<HsnSacSummaryRow[]>([]);
   const [hsnLoading, setHsnLoading] = useState(false);
   const [hsnError, setHsnError] = useState<string | null>(null);
-  const [hsnRefreshKey, setHsnRefreshKey] = useState(0);
+  const [hsnRefreshKey] = useState(0);
 
   const [taxDateFrom, setTaxDateFrom] = useState(getMonthStartInput());
   const [taxDateTo, setTaxDateTo] = useState(getTodayInput());
   const [taxData, setTaxData] = useState<TaxSummaryRow[]>([]);
   const [taxLoading, setTaxLoading] = useState(false);
   const [taxError, setTaxError] = useState<string | null>(null);
-  const [taxRefreshKey, setTaxRefreshKey] = useState(0);
+  const [taxRefreshKey] = useState(0);
 
   const [adjustmentDateFrom, setAdjustmentDateFrom] = useState(getMonthStartInput());
   const [adjustmentDateTo, setAdjustmentDateTo] = useState(getTodayInput());
@@ -244,11 +239,10 @@ export const GstManagementPage = () => {
   const [cancelTarget, setCancelTarget] = useState<GstAdjustment | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
-  const [exportDateFrom, setExportDateFrom] = useState(getMonthStartInput());
-  const [exportDateTo, setExportDateTo] = useState(getTodayInput());
-  const [exportSource, setExportSource] = useState<"sales" | "purchase" | "expense" | "all">("all");
+  const [exportDateFrom] = useState(getMonthStartInput());
+  const [exportDateTo] = useState(getTodayInput());
+  const [exportSource] = useState<"sales" | "purchase" | "expense" | "all">("all");
   const [exportLoadingType, setExportLoadingType] = useState<GstExportType | null>(null);
-  const [exportFormat, setExportFormat] = useState<GstExportFormat>("pdf");
 
   const cancelForm = useForm<GstAdjustmentCancelFormInputValues, undefined, GstAdjustmentCancelFormValues>({
     resolver: zodResolver(gstAdjustmentCancelSchema),
@@ -271,10 +265,6 @@ export const GstManagementPage = () => {
         if (activeYear && !summaryFinancialYearId) {
           setSummaryFinancialYearId(activeYear.id);
         }
-      }
-
-      if (customersResult.status === "fulfilled") {
-        setCustomerOptions(customersResult.value.data.items.map((item) => ({ id: item.id, label: item.name })));
       }
 
       if (suppliersResult.status === "fulfilled") {
@@ -300,7 +290,6 @@ export const GstManagementPage = () => {
     limit: PAGE_LIMIT,
     dateFrom: salesDateFrom,
     dateTo: salesDateTo,
-    customerId: salesCustomerId || undefined,
     state: debouncedSalesState || undefined,
     invoiceType: salesInvoiceType ? (salesInvoiceType as "gst_invoice" | "pos") : undefined,
     partyType: salesPartyType ? (salesPartyType as "b2b" | "b2c") : undefined,
@@ -331,7 +320,6 @@ export const GstManagementPage = () => {
     dateTo: purchaseDateTo,
     supplierId: purchaseSupplierId || undefined,
     state: debouncedPurchaseState || undefined,
-    gstRate: purchaseGstRate ? Number(purchaseGstRate) : undefined,
     eligibilityStatus: purchaseEligibilityStatus ? (purchaseEligibilityStatus as keyof typeof GST_ELIGIBILITY_LABELS) : undefined,
     claimStatus: purchaseClaimStatus ? (purchaseClaimStatus as keyof typeof GST_CLAIM_STATUS_LABELS) : undefined,
   });
@@ -424,7 +412,7 @@ export const GstManagementPage = () => {
     };
 
     void loadSales();
-  }, [activeTab, canView, debouncedSalesState, salesCustomerId, salesDateFrom, salesDateTo, salesGstRate, salesInvoiceType, salesPage, salesPartyType, salesRefreshKey]);
+  }, [activeTab, canView, debouncedSalesState, salesDateFrom, salesDateTo, salesGstRate, salesInvoiceType, salesPage, salesPartyType, salesRefreshKey]);
 
   useEffect(() => {
     if (!canView || activeTab !== "purchases") {
@@ -446,7 +434,7 @@ export const GstManagementPage = () => {
     };
 
     void loadPurchases();
-  }, [activeTab, canView, debouncedPurchaseState, purchaseClaimStatus, purchaseDateFrom, purchaseDateTo, purchaseEligibilityStatus, purchaseGstRate, purchasePage, purchaseRefreshKey, purchaseSupplierId]);
+  }, [activeTab, canView, debouncedPurchaseState, purchaseClaimStatus, purchaseDateFrom, purchaseDateTo, purchaseEligibilityStatus, purchasePage, purchaseRefreshKey, purchaseSupplierId]);
 
   useEffect(() => {
     if (!canView || activeTab !== "itc") {
@@ -558,26 +546,6 @@ export const GstManagementPage = () => {
     void loadAdjustments();
   }, [activeTab, adjustmentComponentFilter, adjustmentDateFrom, adjustmentDateTo, adjustmentPage, adjustmentRefreshKey, adjustmentStatusFilter, adjustmentTypeFilter, canView]);
 
-  const refreshActiveTab = () => {
-    if (activeTab === "summary") {
-      setSummaryRefreshKey((value) => value + 1);
-    } else if (activeTab === "sales") {
-      setSalesRefreshKey((value) => value + 1);
-    } else if (activeTab === "purchases") {
-      setPurchaseRefreshKey((value) => value + 1);
-    } else if (activeTab === "itc") {
-      setItcRefreshKey((value) => value + 1);
-    } else if (activeTab === "output-tax") {
-      setOutputRefreshKey((value) => value + 1);
-    } else if (activeTab === "hsn-sac") {
-      setHsnRefreshKey((value) => value + 1);
-    } else if (activeTab === "tax-summary") {
-      setTaxRefreshKey((value) => value + 1);
-    } else if (activeTab === "adjustments") {
-      setAdjustmentRefreshKey((value) => value + 1);
-    }
-  };
-
   const handleExport = async (type: GstExportType) => {
     const parsed = gstExportFiltersSchema.safeParse({
       dateFrom: exportDateFrom,
@@ -595,18 +563,18 @@ export const GstManagementPage = () => {
       const filters: GstExportFiltersValues = parsed.data;
       const file =
         type === "sales"
-          ? await gstApi.exportSales({ ...filters, format: exportFormat })
+          ? await gstApi.exportSales({ ...filters, format: "pdf" })
           : type === "purchases"
-          ? await gstApi.exportPurchases({ ...filters, format: exportFormat })
+          ? await gstApi.exportPurchases({ ...filters, format: "pdf" })
           : type === "itc"
-          ? await gstApi.exportItc({ ...filters, format: exportFormat })
+          ? await gstApi.exportItc({ ...filters, format: "pdf" })
           : type === "hsn-summary"
-          ? await gstApi.exportHsnSummary({ ...filters, source: filters.source, format: exportFormat })
+          ? await gstApi.exportHsnSummary({ ...filters, source: filters.source, format: "pdf" })
           : type === "tax-summary"
-          ? await gstApi.exportTaxSummary({ ...filters, format: exportFormat })
+          ? await gstApi.exportTaxSummary({ ...filters, format: "pdf" })
           : type === "gstr-1"
-          ? await gstApi.exportGstr1({ ...filters, format: exportFormat })
-          : await gstApi.exportGstr3b({ ...filters, format: exportFormat });
+          ? await gstApi.exportGstr1({ ...filters, format: "pdf" })
+          : await gstApi.exportGstr3b({ ...filters, format: "pdf" });
       toDownload(file);
       toast.success("Export downloaded");
     } catch (error) {
@@ -639,16 +607,6 @@ export const GstManagementPage = () => {
         }}
         actions={
           <div className="flex items-center gap-2">
-            {canExport ? (
-              <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as GstExportFormat)} className="w-28">
-                <option value="xlsx">XLSX</option>
-                <option value="pdf">PDF</option>
-              </Select>
-            ) : null}
-            <Button type="button" variant="secondary" onClick={refreshActiveTab}>
-              <RefreshCcw className="mr-2 size-4" />
-              Refresh
-            </Button>
             {activeTab === "adjustments" && canAdjustmentManage ? (
               <Button
                 type="button"
@@ -681,7 +639,7 @@ export const GstManagementPage = () => {
                     <Button type="button" variant="secondary" loading={exportLoadingType === "gstr-1"} onClick={async () => {
                       try {
                         setExportLoadingType("gstr-1");
-                        const file = await gstApi.exportGstr1({ ...getSummaryExportRange(), format: exportFormat });
+                        const file = await gstApi.exportGstr1({ ...getSummaryExportRange(), format: "pdf" });
                         toDownload(file);
                         toast.success("GSTR-1 exported");
                       } catch (error) {
@@ -696,7 +654,7 @@ export const GstManagementPage = () => {
                     <Button type="button" variant="secondary" loading={exportLoadingType === "gstr-3b"} onClick={async () => {
                       try {
                         setExportLoadingType("gstr-3b");
-                        const file = await gstApi.exportGstr3b({ ...getSummaryExportRange(), format: exportFormat });
+                        const file = await gstApi.exportGstr3b({ ...getSummaryExportRange(), format: "pdf" });
                         toDownload(file);
                         toast.success("GSTR-3B exported");
                       } catch (error) {
@@ -770,19 +728,13 @@ export const GstManagementPage = () => {
             <GstFiltersPanel>
               <Input type="date" value={salesDateFrom} onChange={(event) => { setSalesDateFrom(event.target.value); setSalesPage(1); }} />
               <Input type="date" value={salesDateTo} onChange={(event) => { setSalesDateTo(event.target.value); setSalesPage(1); }} />
-              <Select value={salesCustomerId} onChange={(event) => { setSalesCustomerId(event.target.value); setSalesPage(1); }}>
-                <option value="">All Customers</option>
-                {customerOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{item.label}</option>
-                ))}
-              </Select>
               <Input placeholder="State" value={salesState} onChange={(event) => { setSalesState(event.target.value); setSalesPage(1); }} />
               <Select value={salesInvoiceType} onChange={(event) => { setSalesInvoiceType(event.target.value); setSalesPage(1); }}>
                 <option value="">All Invoice Types</option>
                 <option value="gst_invoice">GST Invoice</option>
                 <option value="pos">POS</option>
               </Select>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-2 md:min-w-[360px]">
                 <Select value={salesPartyType} onChange={(event) => { setSalesPartyType(event.target.value); setSalesPage(1); }}>
                   <option value="">B2B / B2C</option>
                   <option value="b2b">B2B</option>
@@ -796,25 +748,6 @@ export const GstManagementPage = () => {
                 </Select>
               </div>
             </GstFiltersPanel>
-            <div className="flex justify-end">
-              {canExport ? (
-                <Button type="button" variant="secondary" loading={exportLoadingType === "sales"} onClick={async () => {
-                  try {
-                    setExportLoadingType("sales");
-                    const file = await gstApi.exportSales({ ...buildSalesFilters(), format: exportFormat });
-                    toDownload(file);
-                    toast.success("Sales GST exported");
-                  } catch (error) {
-                    toast.error(getErrorMessage(error, "Failed to export sales GST"));
-                  } finally {
-                    setExportLoadingType(null);
-                  }
-                }}>
-                  <Download className="mr-2 size-4" />
-                  Export
-                </Button>
-              ) : null}
-            </div>
             {salesLoading ? <LoadingState label="Loading sales GST..." /> : null}
             {salesError ? <InlineErrorState title={salesError} /> : null}
             {!salesLoading && !salesError ? (
@@ -835,12 +768,6 @@ export const GstManagementPage = () => {
                 ))}
               </Select>
               <Input placeholder="State" value={purchaseState} onChange={(event) => { setPurchaseState(event.target.value); setPurchasePage(1); }} />
-              <Select value={purchaseGstRate} onChange={(event) => { setPurchaseGstRate(event.target.value); setPurchasePage(1); }}>
-                <option value="">GST Rate</option>
-                {GST_RATE_OPTIONS.map((rate) => (
-                  <option key={rate} value={rate}>{rate}%</option>
-                ))}
-              </Select>
               <Select value={purchaseEligibilityStatus} onChange={(event) => { setPurchaseEligibilityStatus(event.target.value); setPurchasePage(1); }}>
                 <option value="">ITC Status</option>
                 {Object.entries(GST_ELIGIBILITY_LABELS).map(([value, label]) => (
@@ -854,25 +781,6 @@ export const GstManagementPage = () => {
                 ))}
               </Select>
             </GstFiltersPanel>
-            <div className="flex justify-end">
-              {canExport ? (
-                <Button type="button" variant="secondary" loading={exportLoadingType === "purchases"} onClick={async () => {
-                  try {
-                    setExportLoadingType("purchases");
-                    const file = await gstApi.exportPurchases({ ...buildPurchaseFilters(), format: exportFormat });
-                    toDownload(file);
-                    toast.success("Purchase GST exported");
-                  } catch (error) {
-                    toast.error(getErrorMessage(error, "Failed to export purchase GST"));
-                  } finally {
-                    setExportLoadingType(null);
-                  }
-                }}>
-                  <Download className="mr-2 size-4" />
-                  Export
-                </Button>
-              ) : null}
-            </div>
             {purchaseLoading ? <LoadingState label="Loading purchase GST..." /> : null}
             {purchaseError ? <InlineErrorState title={purchaseError} /> : null}
             {!purchaseLoading && !purchaseError ? (
@@ -906,25 +814,6 @@ export const GstManagementPage = () => {
               </Select>
               <Input placeholder="Supplier / GSTIN" value={itcSupplierSearch} onChange={(event) => { setItcSupplierSearch(event.target.value); setItcPage(1); }} />
             </GstFiltersPanel>
-            <div className="flex justify-end">
-              {canExport ? (
-                <Button type="button" variant="secondary" loading={exportLoadingType === "itc"} onClick={async () => {
-                  try {
-                    setExportLoadingType("itc");
-                    const file = await gstApi.exportItc({ ...buildItcFilters(), format: exportFormat });
-                    toDownload(file);
-                    toast.success("ITC exported");
-                  } catch (error) {
-                    toast.error(getErrorMessage(error, "Failed to export ITC"));
-                  } finally {
-                    setExportLoadingType(null);
-                  }
-                }}>
-                  <Download className="mr-2 size-4" />
-                  Export
-                </Button>
-              ) : null}
-            </div>
             {itcLoading ? <LoadingState label="Loading ITC..." /> : null}
             {itcError ? <InlineErrorState title={itcError} /> : null}
             {!itcLoading && !itcError ? (
@@ -973,7 +862,7 @@ export const GstManagementPage = () => {
                   <Button type="button" variant="secondary" loading={exportLoadingType === "hsn-summary"} onClick={async () => {
                     try {
                       setExportLoadingType("hsn-summary");
-                      const file = await gstApi.exportHsnSummary({ ...buildHsnFilters(), format: exportFormat });
+                      const file = await gstApi.exportHsnSummary({ ...buildHsnFilters(), format: "pdf" });
                       toDownload(file);
                       toast.success("HSN/SAC exported");
                     } catch (error) {
@@ -1004,7 +893,7 @@ export const GstManagementPage = () => {
                   <Button type="button" variant="secondary" loading={exportLoadingType === "tax-summary"} onClick={async () => {
                     try {
                       setExportLoadingType("tax-summary");
-                      const file = await gstApi.exportTaxSummary({ ...buildTaxFilters(), format: exportFormat });
+                      const file = await gstApi.exportTaxSummary({ ...buildTaxFilters(), format: "pdf" });
                       toDownload(file);
                       toast.success("Tax summary exported");
                     } catch (error) {
@@ -1071,15 +960,6 @@ export const GstManagementPage = () => {
 
         {activeTab === "exports" ? (
           <div className="space-y-4">
-            <GstFiltersPanel>
-              <Input type="date" value={exportDateFrom} onChange={(event) => setExportDateFrom(event.target.value)} />
-              <Input type="date" value={exportDateTo} onChange={(event) => setExportDateTo(event.target.value)} />
-              <Select value={exportSource} onChange={(event) => setExportSource(event.target.value as "sales" | "purchase" | "expense" | "all")}>
-                {Object.entries(GST_REPORT_SOURCE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </Select>
-            </GstFiltersPanel>
             <GstExportCenter loadingType={exportLoadingType} onExport={handleExport} />
           </div>
         ) : null}

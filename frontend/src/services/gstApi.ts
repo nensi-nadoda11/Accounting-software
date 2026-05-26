@@ -92,7 +92,7 @@ export const gstApi = {
           invoiceType: query.invoiceType || undefined,
           partyType: query.partyType || undefined,
           gstRate: query.gstRate,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
@@ -127,7 +127,7 @@ export const gstApi = {
           gstRate: query.gstRate,
           eligibilityStatus: query.eligibilityStatus || undefined,
           claimStatus: query.claimStatus || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
@@ -160,7 +160,7 @@ export const gstApi = {
           eligibilityStatus: query.eligibilityStatus || undefined,
           claimStatus: query.claimStatus || undefined,
           supplier: query.supplier || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
@@ -221,7 +221,7 @@ export const gstApi = {
         params: {
           ...buildDateParams(query),
           source: query.source || undefined,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
@@ -240,7 +240,7 @@ export const gstApi = {
       client.get("/gst/tax-summary/export", {
         params: {
           ...buildDateParams(query),
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
@@ -279,7 +279,7 @@ export const gstApi = {
           invoiceType: query.invoiceType || undefined,
           partyType: query.partyType || undefined,
           gstRate: query.gstRate,
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),
@@ -291,7 +291,7 @@ export const gstApi = {
       client.get("/gst/gstr-3b/export", {
         params: {
           ...buildDateParams(query),
-          format: query.format ?? "csv",
+          format: query.format ?? "pdf",
         },
         responseType: "blob",
       }),

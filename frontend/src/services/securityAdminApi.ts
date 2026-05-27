@@ -94,7 +94,6 @@ export const securityAdminApi = {
     formData.append("restoreMode", payload.restoreMode);
 
     if (payload.file) {
-      formData.append("uploadedFileName", payload.file.name);
       formData.append("file", payload.file);
     }
 
@@ -103,6 +102,7 @@ export const securityAdminApi = {
         `/security-admin/backups/${backupId}/restore`,
         formData,
         {
+          timeout: 180_000,
           headers: {
             "Content-Type": "multipart/form-data"
           }

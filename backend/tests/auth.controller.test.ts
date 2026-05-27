@@ -109,3 +109,34 @@ test("refresh preserves rememberMe when rewriting the refresh cookie", async () 
     }
   });
 });
+
+test("refresh cookie stays persistent even when rememberMe is false", async () => {
+  const { authService } = await import("../src/modules/auth/auth.service.js");
+
+  const originalNow = Date.now;
+  const fixedNow = new Date("2030-01-01T00:00:00.000Z").getTime();
+  Date.now = () => fixedNow;
+
+  let cookieName: string | undefined;
+  let cookieValue: string | undefined;
+  let cookieOptions: Record<string, unknown> | undefined;
+  const response = {
+    cookie(name: string, value: string, options: Record<string, unknown>) {
+      cookieName = name;
+      cookieValue = value;
+      cookieOptions = options;
+      return this;
+    }
+  } as never;
+
+  try {
+    authService.applyRefreshCookie(response, "refresh-token", new Date("2030-01-08T00:00:00.000Z"), false);
+  } finally {
+    Date.now = originalNow;
+  }
+
+  assert.equal(cookieName, "refresh_token");
+  assert.equal(cookieValue, "refresh-token");
+  assert.equal(cookieOptions?.path, "/");
+  assert.equal(cookieOptions?.maxAge, 7 * 24 * 60 * 60 * 1000);
+});

@@ -12,19 +12,21 @@ type BackupTableDefinition = {
   deleteSql?: string | null;
   replaceStrategy?: "delete-and-upsert" | "upsert-only" | "replace-user-permissions";
   userReferenceColumns?: string[];
+  selfReferenceColumns?: string[];
 };
 
 const companyScopedTable = (
   name: string,
   include: BackupIncludeKey,
-  options?: Pick<BackupTableDefinition, "replaceStrategy" | "userReferenceColumns">
+  options?: Pick<BackupTableDefinition, "replaceStrategy" | "userReferenceColumns" | "selfReferenceColumns">
 ): BackupTableDefinition => ({
   name,
   include,
   selectSql: `select * from "${name}" where company_id = $1 order by id asc`,
   deleteSql: `delete from "${name}" where company_id = $1`,
   replaceStrategy: options?.replaceStrategy ?? "delete-and-upsert",
-  userReferenceColumns: options?.userReferenceColumns ?? []
+  userReferenceColumns: options?.userReferenceColumns ?? [],
+  selfReferenceColumns: options?.selfReferenceColumns ?? []
 });
 
 const BACKUP_INCLUDE_DEPENDENCIES: Record<BackupIncludeKey, BackupIncludeKey[]> = {
@@ -99,19 +101,31 @@ const BACKUP_TABLES: BackupTableDefinition[] = [
   },
   companyScopedTable("customers", "customers", { userReferenceColumns: ["created_by", "updated_by"] }),
   companyScopedTable("suppliers", "suppliers", { userReferenceColumns: ["created_by", "updated_by"] }),
-  companyScopedTable("product_categories", "products", { userReferenceColumns: ["created_by", "updated_by"] }),
-  companyScopedTable("product_units", "products", { userReferenceColumns: ["created_by", "updated_by"] }),
+  companyScopedTable("product_categories", "products", {
+    userReferenceColumns: ["created_by", "updated_by"],
+    selfReferenceColumns: ["parent_id"]
+  }),
+  companyScopedTable("product_units", "products", {
+    userReferenceColumns: ["created_by", "updated_by"],
+    selfReferenceColumns: ["base_unit_id"]
+  }),
   companyScopedTable("products", "products", { userReferenceColumns: ["created_by", "updated_by"] }),
   companyScopedTable("product_price_history", "products", { userReferenceColumns: ["changed_by"] }),
   companyScopedTable("warehouses", "inventory", { userReferenceColumns: ["created_by", "updated_by"] }),
-  companyScopedTable("chart_of_accounts", "accounting", { userReferenceColumns: ["created_by", "updated_by"] }),
+  companyScopedTable("chart_of_accounts", "accounting", {
+    userReferenceColumns: ["created_by", "updated_by"],
+    selfReferenceColumns: ["parent_id"]
+  }),
   companyScopedTable("product_batches", "inventory", { userReferenceColumns: ["created_by", "updated_by"] }),
   companyScopedTable("stock_balances", "inventory"),
   companyScopedTable("stock_movements", "inventory", { userReferenceColumns: ["created_by"] }),
   companyScopedTable("stock_adjustments", "inventory", { userReferenceColumns: ["created_by"] }),
   companyScopedTable("inventory_alerts", "inventory"),
   companyScopedTable("inventory_valuation_snapshots", "inventory", { userReferenceColumns: ["created_by"] }),
-  companyScopedTable("expense_categories", "expenses", { userReferenceColumns: ["created_by", "updated_by"] }),
+  companyScopedTable("expense_categories", "expenses", {
+    userReferenceColumns: ["created_by", "updated_by"],
+    selfReferenceColumns: ["parent_id"]
+  }),
   companyScopedTable("recurring_expenses", "expenses", { userReferenceColumns: ["created_by", "updated_by"] }),
   companyScopedTable("expenses", "expenses", { userReferenceColumns: ["created_by", "updated_by"] }),
   companyScopedTable("expense_attachments", "expenses", { userReferenceColumns: ["uploaded_by"] }),
@@ -131,7 +145,10 @@ const BACKUP_TABLES: BackupTableDefinition[] = [
   companyScopedTable("payment_receipts", "payments", { userReferenceColumns: ["created_by"] }),
   companyScopedTable("payment_reminders", "payments", { userReferenceColumns: ["created_by"] }),
   companyScopedTable("cheque_transactions", "payments", { userReferenceColumns: ["created_by"] }),
-  companyScopedTable("journal_entries", "accounting", { userReferenceColumns: ["created_by", "updated_by"] }),
+  companyScopedTable("journal_entries", "accounting", {
+    userReferenceColumns: ["created_by", "updated_by"],
+    selfReferenceColumns: ["reversed_from_id"]
+  }),
   companyScopedTable("journal_entry_lines", "accounting"),
   companyScopedTable("account_opening_balances", "accounting", { userReferenceColumns: ["created_by", "updated_by"] }),
   companyScopedTable("financial_period_locks", "accounting", { userReferenceColumns: ["locked_by"] }),
@@ -150,6 +167,7 @@ const BACKUP_TABLES: BackupTableDefinition[] = [
 ];
 
 const toQuotedIdentifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
+const RESTORE_BATCH_SIZE = 100;
 
 const buildUpsertStatement = (tableName: string, row: Record<string, unknown>) => {
   const columns = Object.keys(row);
@@ -173,12 +191,49 @@ const buildUpsertStatement = (tableName: string, row: Record<string, unknown>) =
   };
 };
 
+const buildBulkUpsertStatement = (tableName: string, rows: Record<string, unknown>[]) => {
+  const columns = Object.keys(rows[0] ?? {});
+  const quotedColumns = columns.map(toQuotedIdentifier);
+  const values = rows.flatMap((row) => columns.map((column) => row[column] ?? null));
+  const valueGroups = rows.map((_, rowIndex) => {
+    const placeholders = columns.map((__, columnIndex) => `$${rowIndex * columns.length + columnIndex + 1}`);
+    return `(${placeholders.join(", ")})`;
+  });
+  const updateColumns = columns.filter((column) => column !== "id");
+  const updateSet =
+    updateColumns.length > 0
+      ? updateColumns.map((column) => `${toQuotedIdentifier(column)} = excluded.${toQuotedIdentifier(column)}`).join(", ")
+      : `"id" = excluded."id"`;
+
+  return {
+    text: `
+      insert into ${toQuotedIdentifier(tableName)} (${quotedColumns.join(", ")})
+      values ${valueGroups.join(", ")}
+      on conflict ("id") do update
+      set ${updateSet}
+    `,
+    values
+  };
+};
+
+const createChunks = <T>(items: T[], size: number) => {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+
+  return chunks;
+};
+
 const sanitizeRowForRestore = (
   row: Record<string, unknown>,
   availableUserIds: Set<string>,
-  userReferenceColumns: string[]
+  userReferenceColumns: string[],
+  selfReferenceColumns: string[] = [],
+  availableSelfReferenceIds?: Set<string>
 ) => {
-  if (userReferenceColumns.length === 0) {
+  if (userReferenceColumns.length === 0 && selfReferenceColumns.length === 0) {
     return row;
   }
 
@@ -190,7 +245,39 @@ const sanitizeRowForRestore = (
     }
   }
 
+  if (availableSelfReferenceIds) {
+    for (const column of selfReferenceColumns) {
+      const value = nextRow[column];
+      if (typeof value === "string" && !availableSelfReferenceIds.has(value)) {
+        nextRow[column] = null;
+      }
+    }
+  }
+
   return nextRow;
+};
+
+const canRestoreSelfReferences = (
+  row: Record<string, unknown>,
+  selfReferenceColumns: string[],
+  availableSelfReferenceIds: Set<string>
+) =>
+  selfReferenceColumns.every((column) => {
+    const value = row[column];
+    return value === null || value === undefined || (typeof value === "string" && availableSelfReferenceIds.has(value));
+  });
+
+const upsertRows = async (client: PoolClient, tableName: string, rows: Record<string, unknown>[]) => {
+  for (const chunk of createChunks(rows, RESTORE_BATCH_SIZE)) {
+    if (chunk.length === 1) {
+      const statement = buildUpsertStatement(tableName, chunk[0]!);
+      await client.query(statement.text, statement.values);
+      continue;
+    }
+
+    const statement = buildBulkUpsertStatement(tableName, chunk);
+    await client.query(statement.text, statement.values);
+  }
 };
 
 export class SecurityAdminBackupRepository {
@@ -379,10 +466,79 @@ export class SecurityAdminBackupRepository {
           await client.query(definition.deleteSql, [companyId]);
         }
 
-        for (const row of rows) {
-          const sanitizedRow = sanitizeRowForRestore(row, availableUserIds, definition.userReferenceColumns ?? []);
-          const statement = buildUpsertStatement(definition.name, sanitizedRow);
-          await client.query(statement.text, statement.values);
+        const selfReferenceColumns = definition.selfReferenceColumns ?? [];
+        if (selfReferenceColumns.length === 0) {
+          const sanitizedRows = rows.map((row) =>
+            sanitizeRowForRestore(row, availableUserIds, definition.userReferenceColumns ?? [])
+          );
+          await upsertRows(client, definition.name, sanitizedRows);
+
+          continue;
+        }
+
+        const availableSelfReferenceIds = new Set<string>();
+        if (restoreMode === "merge") {
+          const existingRows = await client.query<{ id: string }>(
+            `select id from "${definition.name}" where company_id = $1`,
+            [companyId]
+          );
+          existingRows.rows.forEach((row) => availableSelfReferenceIds.add(row.id));
+        }
+
+        const pendingRows = [...rows];
+        while (pendingRows.length > 0) {
+          // Restore self-referencing rows in dependency order so parent records land before children.
+          const readyRows = pendingRows.filter((row) =>
+            canRestoreSelfReferences(row, selfReferenceColumns, availableSelfReferenceIds)
+          );
+
+          if (readyRows.length === 0) {
+            const sanitizedRows = pendingRows.map((row) =>
+              sanitizeRowForRestore(
+                row,
+                availableUserIds,
+                definition.userReferenceColumns ?? [],
+                selfReferenceColumns,
+                availableSelfReferenceIds
+              )
+            );
+            await upsertRows(client, definition.name, sanitizedRows);
+
+            for (const row of pendingRows) {
+              if (typeof row.id === "string") {
+                availableSelfReferenceIds.add(row.id);
+              }
+            }
+
+            break;
+          }
+
+          const sanitizedRows = readyRows.map((row) =>
+            sanitizeRowForRestore(
+              row,
+              availableUserIds,
+              definition.userReferenceColumns ?? [],
+              selfReferenceColumns,
+              availableSelfReferenceIds
+            )
+          );
+          await upsertRows(client, definition.name, sanitizedRows);
+
+          for (const row of readyRows) {
+            if (typeof row.id === "string") {
+              availableSelfReferenceIds.add(row.id);
+            }
+          }
+
+          const restoredIds = new Set(
+            readyRows.map((row) => row.id).filter((value): value is string => typeof value === "string")
+          );
+          for (let index = pendingRows.length - 1; index >= 0; index -= 1) {
+            const rowId = pendingRows[index]?.id;
+            if (typeof rowId === "string" && restoredIds.has(rowId)) {
+              pendingRows.splice(index, 1);
+            }
+          }
         }
       }
 

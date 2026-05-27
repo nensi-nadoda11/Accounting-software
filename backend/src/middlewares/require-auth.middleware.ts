@@ -15,10 +15,17 @@ export const requireAuth = async (request: Request, response: Response, next: Ne
     return;
   }
 
-  try {
-    const token = authorization.replace("Bearer ", "");
-    const payload = verifyAccessToken(token);
+  const token = authorization.replace("Bearer ", "");
+  let payload: ReturnType<typeof verifyAccessToken>;
 
+  try {
+    payload = verifyAccessToken(token);
+  } catch (_error) {
+    response.status(401).json(errorResponse("Invalid or expired token"));
+    return;
+  }
+
+  try {
     const session = await authRepository.findSessionById(payload.sessionId);
     if (!session || session.revokedAt || session.expiresAt <= new Date()) {
       response.status(401).json(errorResponse("Session expired. Please login again."));
@@ -38,7 +45,7 @@ export const requireAuth = async (request: Request, response: Response, next: Ne
     request.permissions = await permissionService.getEffectivePermissions(user.id, user.role, user.companyId);
 
     next();
-  } catch (_error) {
-    response.status(401).json(errorResponse("Invalid or expired token"));
+  } catch (error) {
+    next(error);
   }
 };

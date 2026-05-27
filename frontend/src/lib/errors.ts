@@ -29,6 +29,10 @@ const looksTechnical = (message: string): boolean => {
 
 export const getErrorMessage = (error: unknown, fallback = "Something went wrong. Please try again."): string => {
   if (error instanceof AxiosError) {
+    if (error.code === "ECONNABORTED") {
+      return "Server is taking longer than usual. Please wait a bit and check again.";
+    }
+
     if (!error.response) {
       return "Unable to connect to server. Please try again.";
     }

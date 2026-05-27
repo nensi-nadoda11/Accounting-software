@@ -37,8 +37,7 @@ export const createBackupSchema = z
 
 export const restoreBackupSchema = z
   .object({
-    restoreMode: z.enum(RESTORE_MODES),
-    uploadedFileName: z.preprocess(trimToUndefined, z.string().max(255).optional())
+    restoreMode: z.enum(RESTORE_MODES)
   })
   .strict();
 

@@ -23,8 +23,10 @@ type RequestContext = {
   userAgent: string;
 };
 
+const MINIMUM_PERSISTENT_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+
 class AuthService {
-  private readonly refreshTtlMs = parseDurationToMs(env.REFRESH_TOKEN_EXPIRES_IN);
+  private readonly refreshTtlMs = Math.max(parseDurationToMs(env.REFRESH_TOKEN_EXPIRES_IN), MINIMUM_PERSISTENT_SESSION_MS);
 
   public async register(
     input: {
@@ -304,11 +306,12 @@ class AuthService {
     const sessionId = randomUUID();
     const sessionExpiresAt = new Date(Date.now() + this.refreshTtlMs);
     const tokens = this.buildTokens(user.id, user.companyId, user.role, sessionId);
+    const rememberMe = input.rememberMe ?? true;
     const session = await authRepository.createSession({
       id: sessionId,
       userId: user.id,
       refreshTokenHash: hashToken(tokens.refreshToken),
-      rememberMe: input.rememberMe ?? false,
+      rememberMe,
       userAgent: context.userAgent,
       ipAddress: context.ipAddress,
       expiresAt: sessionExpiresAt
@@ -339,7 +342,7 @@ class AuthService {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       refreshExpiresAt: sessionExpiresAt,
-      rememberMe: input.rememberMe ?? false,
+      rememberMe,
       user: usersRepository.toSafeUser(user),
       company: companiesRepository.toSafeCompany(company),
       permissions: Array.from(permissions)
@@ -569,7 +572,7 @@ class AuthService {
       secure: env.COOKIE_SECURE,
       sameSite: env.COOKIE_SAME_SITE,
       path: "/",
-      maxAge: rememberMe ? expiresAt.getTime() - Date.now() : undefined
+      maxAge: Math.max(expiresAt.getTime() - Date.now(), MINIMUM_PERSISTENT_SESSION_MS)
     });
   }
 

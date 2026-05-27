@@ -54,7 +54,8 @@ export const RestoreBackupModal = ({
           <option value="replace">Replace</option>
         </Select>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700">Upload file</p>
+          <p className="text-sm font-medium text-slate-700">Upload file (optional)</p>
+          <p className="text-xs text-slate-500">Leave this empty to restore directly from the selected backup.</p>
           <Input
             type="file"
             accept="application/json,.json"

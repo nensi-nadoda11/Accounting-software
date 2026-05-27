@@ -1,0 +1,1518 @@
+{
+  "_meta": {
+    "purpose": "Dummy test data for manual UI/API testing across major modules without changing app code.",
+    "usage_order": [
+      "1. Create company setup records first",
+      "2. Create units, categories, warehouses, accounts, expense categories",
+      "3. Create customers, suppliers, employees",
+      "4. Create products",
+      "5. Create inventory opening stock and batches",
+      "6. Create purchase and sales transactions",
+      "7. Create payments, expenses, accounting, GST and payroll entries"
+    ],
+    "notes": [
+      "All IDs below are sample UUIDs so you can use this file for API payload testing too.",
+      "If a UI select field auto-generates IDs from database, use the matching name/code from this file instead of the UUID.",
+      "Dates are kept in the past so validation should pass.",
+      "GST, PAN, IFSC, mobile, pincode and password formats follow project validation rules."
+    ]
+  },
+
+  "ids": {
+    "companyId": "11111111-1111-1111-1111-111111111111",
+    "financialYear2025Id": "11111111-1111-1111-1111-111111111201",
+    "financialYear2026Id": "11111111-1111-1111-1111-111111111202",
+    "bankCurrentId": "11111111-1111-1111-1111-111111111301",
+    "bankSavingsId": "11111111-1111-1111-1111-111111111302",
+    "branchHeadOfficeId": "11111111-1111-1111-1111-111111111401",
+    "branchSuratId": "11111111-1111-1111-1111-111111111402",
+    "customerRetailId": "22222222-2222-2222-2222-222222222201",
+    "customerWholesaleId": "22222222-2222-2222-2222-222222222202",
+    "supplierRawMaterialId": "33333333-3333-3333-3333-333333333301",
+    "supplierPackagingId": "33333333-3333-3333-3333-333333333302",
+    "unitPieceId": "44444444-4444-4444-4444-444444444401",
+    "unitBoxId": "44444444-4444-4444-4444-444444444402",
+    "unitKgId": "44444444-4444-4444-4444-444444444403",
+    "categoryTeaId": "55555555-5555-5555-5555-555555555501",
+    "categoryServicesId": "55555555-5555-5555-5555-555555555502",
+    "productMasalaTeaId": "66666666-6666-6666-6666-666666666601",
+    "productPackingBoxId": "66666666-6666-6666-6666-666666666602",
+    "productConsultingId": "66666666-6666-6666-6666-666666666603",
+    "warehouseMainId": "77777777-7777-7777-7777-777777777701",
+    "warehouseOutletId": "77777777-7777-7777-7777-777777777702",
+    "batchTeaMainId": "88888888-8888-8888-8888-888888888801",
+    "expenseCategoryRentId": "99999999-9999-9999-9999-999999999901",
+    "expenseCategoryTravelId": "99999999-9999-9999-9999-999999999902",
+    "accountCashId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01",
+    "accountBankId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02",
+    "accountSalesId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa03",
+    "accountPurchaseId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa04",
+    "accountRentExpenseId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa05",
+    "employeeRiyaId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+    "employeeAmanId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+    "salesInvoiceId": "cccccccc-cccc-cccc-cccc-cccccccccc01",
+    "salesInvoiceItemTeaId": "cccccccc-cccc-cccc-cccc-cccccccccc11",
+    "purchaseInvoiceId": "dddddddd-dddd-dddd-dddd-dddddddddd01",
+    "purchaseInvoiceItemTeaId": "dddddddd-dddd-dddd-dddd-dddddddddd11",
+    "journalManualId": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01"
+  },
+
+  "auth": {
+    "register": {
+      "fullName": "Jaimin Patel",
+      "email": "admin@acmetrading.in",
+      "mobileNumber": "9876543210",
+      "password": "Admin@1234",
+      "confirmPassword": "Admin@1234",
+      "companyName": "Acme Trading Private Limited",
+      "gstNumber": "24AABCU9603R1ZV",
+      "city": "Ahmedabad",
+      "state": "Gujarat",
+      "termsAccepted": true
+    },
+    "login": {
+      "identifier": "admin@acmetrading.in",
+      "password": "Admin@1234",
+      "rememberMe": true
+    },
+    "verifyOtp": {
+      "email": "admin@acmetrading.in",
+      "otp": "123456"
+    },
+    "forgotPassword": {
+      "identifier": "admin@acmetrading.in"
+    },
+    "resetPassword": {
+      "email": "admin@acmetrading.in",
+      "otp": "123456",
+      "newPassword": "Reset@1234",
+      "confirmPassword": "Reset@1234"
+    },
+    "acceptInvite": {
+      "password": "Invite@1234",
+      "confirmPassword": "Invite@1234"
+    },
+    "changePassword": {
+      "currentPassword": "Admin@1234",
+      "newPassword": "Admin@5678",
+      "confirmPassword": "Admin@5678"
+    }
+  },
+
+  "companySetup": {
+    "companyProfile": {
+      "name": "Acme Trading Pvt Ltd",
+      "legalName": "Acme Trading Private Limited",
+      "businessType": "Private Limited Company",
+      "industryType": "FMCG Distribution",
+      "gstNumber": "24AABCU9603R1ZV",
+      "panNumber": "AABCU9603R",
+      "cinNumber": "U51909GJ2020PTC123456",
+      "email": "accounts@acmetrading.in",
+      "mobileNumber": "9898989898",
+      "website": "https://www.acmetrading.in",
+      "addressLine1": "301, Shreeji Corporate House",
+      "addressLine2": "Near Prahladnagar Garden",
+      "city": "Ahmedabad",
+      "state": "Gujarat",
+      "pincode": "380015",
+      "country": "India",
+      "timezone": "Asia/Kolkata",
+      "currency": "INR",
+      "language": "en"
+    },
+    "taxSettings": {
+      "gstEnabled": true,
+      "gstType": "regular",
+      "compositionScheme": false,
+      "taxInclusivePricing": false,
+      "defaultGstRate": "18",
+      "hsnSacEnabled": true,
+      "eInvoiceEnabled": true,
+      "eWayBillEnabled": true,
+      "gstFilingFrequency": "monthly",
+      "tanNumber": "ABCD12345E"
+    },
+    "financialYears": [
+      {
+        "id": "11111111-1111-1111-1111-111111111201",
+        "name": "FY 2024-25",
+        "startDate": "2024-04-01",
+        "endDate": "2025-03-31",
+        "isActive": false
+      },
+      {
+        "id": "11111111-1111-1111-1111-111111111202",
+        "name": "FY 2025-26",
+        "startDate": "2025-04-01",
+        "endDate": "2026-03-31",
+        "isActive": true
+      }
+    ],
+    "bankAccounts": [
+      {
+        "id": "11111111-1111-1111-1111-111111111301",
+        "bankName": "HDFC Bank",
+        "accountHolderName": "Acme Trading Private Limited",
+        "accountNumber": "50200012345678",
+        "ifscCode": "HDFC0001234",
+        "branchName": "Prahladnagar",
+        "upiId": "acmetrading@okhdfcbank",
+        "qrImageUrl": "",
+        "openingBalance": "250000",
+        "accountType": "current",
+        "isDefault": true,
+        "isActive": true
+      },
+      {
+        "id": "11111111-1111-1111-1111-111111111302",
+        "bankName": "State Bank of India",
+        "accountHolderName": "Acme Trading Private Limited",
+        "accountNumber": "123456789012",
+        "ifscCode": "SBIN0000456",
+        "branchName": "Navrangpura",
+        "upiId": "acmesbi@oksbi",
+        "qrImageUrl": "",
+        "openingBalance": "85000",
+        "accountType": "savings",
+        "isDefault": false,
+        "isActive": true
+      }
+    ],
+    "invoiceSettings": {
+      "salesInvoicePrefix": "SAL",
+      "purchaseInvoicePrefix": "PUR",
+      "creditNotePrefix": "CRN",
+      "debitNotePrefix": "DBN",
+      "autoNumbering": true,
+      "nextSalesInvoiceNumber": "101",
+      "nextPurchaseInvoiceNumber": "51",
+      "numberPadding": "5",
+      "termsAndConditions": "Goods once sold will not be taken back without approval. Payment due as per agreed credit terms.",
+      "footerNote": "Thank you for doing business with Acme Trading.",
+      "showCompanyLogo": true,
+      "showBankDetails": true,
+      "showQrCode": true,
+      "showSignature": false,
+      "roundOffEnabled": true,
+      "decimalPrecision": "2",
+      "taxDisplayFormat": "both",
+      "invoiceTemplate": "gst_a4"
+    },
+    "branches": [
+      {
+        "id": "11111111-1111-1111-1111-111111111401",
+        "branchName": "Head Office Ahmedabad",
+        "branchCode": "AHM-HO",
+        "gstNumber": "24AABCU9603R1ZV",
+        "email": "ho@acmetrading.in",
+        "mobileNumber": "9876500001",
+        "addressLine1": "301, Shreeji Corporate House",
+        "addressLine2": "Prahladnagar",
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "pincode": "380015",
+        "managerName": "Nirav Shah",
+        "isActive": true
+      },
+      {
+        "id": "11111111-1111-1111-1111-111111111402",
+        "branchName": "Surat Distribution Branch",
+        "branchCode": "SURAT01",
+        "gstNumber": "24AABCU9603R2ZU",
+        "email": "surat@acmetrading.in",
+        "mobileNumber": "9876500002",
+        "addressLine1": "Plot 18, GIDC Road",
+        "addressLine2": "Udhna",
+        "city": "Surat",
+        "state": "Gujarat",
+        "pincode": "394210",
+        "managerName": "Karan Desai",
+        "isActive": true
+      }
+    ],
+    "preferences": {
+      "dateFormat": "DD/MM/YYYY",
+      "currencyFormat": "symbol_first",
+      "numberFormat": "indian",
+      "decimalPrecision": "2",
+      "timezone": "Asia/Kolkata",
+      "language": "en",
+      "autoLogoutMinutes": "30",
+      "notificationEmailEnabled": true,
+      "notificationSmsEnabled": true,
+      "notificationWhatsappEnabled": false
+    }
+  },
+
+  "settingsAndUsers": {
+    "inviteUser": {
+      "fullName": "Riya Sharma",
+      "email": "riya.sharma@acmetrading.in",
+      "mobileNumber": "9876543201",
+      "role": "accountant",
+      "permissions": [
+        "dashboard.view",
+        "customer.view",
+        "supplier.view",
+        "product.view",
+        "inventory.view",
+        "purchase.view",
+        "sales.view",
+        "payment.view",
+        "expense.view",
+        "accounting.view",
+        "gst.view",
+        "payroll.view",
+        "reports.view",
+        "settings.view"
+      ]
+    },
+    "updateProfile": {
+      "fullName": "Jaimin Patel",
+      "mobileNumber": "9876543210"
+    },
+    "updatePermissions": {
+      "permissions": [
+        "customer.view",
+        "customer.create",
+        "customer.update",
+        "supplier.view",
+        "supplier.create",
+        "product.view",
+        "product.create",
+        "inventory.view",
+        "inventory.manage",
+        "sales.view",
+        "sales.create",
+        "purchase.view",
+        "purchase.create",
+        "payment.view",
+        "expense.view"
+      ]
+    },
+    "invoiceTemplate": {
+      "templateKey": "DEFAULT-GST-A4",
+      "templateName": "Default GST A4 Template",
+      "invoiceType": "sales",
+      "layoutConfig": {
+        "showLogo": true,
+        "showSignature": false,
+        "showBankDetails": true,
+        "showQrCode": true,
+        "termsFooter": "Subject to Ahmedabad jurisdiction.",
+        "footerNote": "Computer generated invoice."
+      },
+      "isDefault": true,
+      "isActive": true
+    },
+    "paymentMode": {
+      "modeKey": "upi",
+      "modeName": "UPI",
+      "isEnabled": true,
+      "isDefault": false,
+      "requiresReference": true,
+      "requiresBankAccount": true,
+      "chequeWorkflowEnabled": false
+    },
+    "taxSettingsFinal": {
+      "gstEnabled": true,
+      "defaultGstRate": 18,
+      "taxInclusiveDefault": false,
+      "roundOffEnabled": true,
+      "hsnSacRequired": true,
+      "gstFilingFrequency": "monthly",
+      "compositionScheme": false
+    },
+    "uiPreferences": {
+      "accentColor": "#0F766E",
+      "compactMode": false,
+      "tableDensity": "normal",
+      "dateFormat": "DD/MM/YYYY",
+      "currencyFormat": "symbol_first",
+      "numberFormat": "indian"
+    },
+    "profileSettings": {
+      "fullName": "Jaimin Patel",
+      "mobileNumber": "9876543210"
+    },
+    "passwordChange": {
+      "currentPassword": "Admin@1234",
+      "newPassword": "Admin@5678",
+      "confirmPassword": "Admin@5678"
+    }
+  },
+
+  "masters": {
+    "customers": [
+      {
+        "id": "22222222-2222-2222-2222-222222222201",
+        "name": "Raj Retail Mart",
+        "customerType": "business",
+        "businessName": "Raj Retail Mart",
+        "contactPerson": "Rajesh Patel",
+        "mobile": "9876543211",
+        "alternateMobile": "9876543212",
+        "email": "orders@rajretail.in",
+        "gstNumber": "24AABCR1234K1Z7",
+        "panNumber": "AABCR1234K",
+        "taxType": "registered",
+        "billingAddressLine1": "12, MG Road",
+        "billingAddressLine2": "Navrangpura",
+        "billingCity": "Ahmedabad",
+        "billingState": "Gujarat",
+        "billingPincode": "380009",
+        "billingCountry": "India",
+        "shippingAddressLine1": "Warehouse 4, SG Highway",
+        "shippingAddressLine2": "Near Iskcon",
+        "shippingCity": "Ahmedabad",
+        "shippingState": "Gujarat",
+        "shippingPincode": "380054",
+        "shippingCountry": "India",
+        "sameAsBilling": false,
+        "creditLimit": 250000,
+        "creditDays": 21,
+        "defaultDiscount": 5,
+        "status": "active",
+        "isBlacklisted": false,
+        "blacklistReason": null,
+        "notes": "Regular B2B customer"
+      },
+      {
+        "id": "22222222-2222-2222-2222-222222222202",
+        "name": "Anita Shah",
+        "customerType": "individual",
+        "businessName": null,
+        "contactPerson": null,
+        "mobile": "9876543213",
+        "alternateMobile": null,
+        "email": "anita.shah@gmail.com",
+        "gstNumber": null,
+        "panNumber": null,
+        "taxType": "unregistered",
+        "billingAddressLine1": "7, River View Apartments",
+        "billingAddressLine2": "Paldi",
+        "billingCity": "Ahmedabad",
+        "billingState": "Gujarat",
+        "billingPincode": "380007",
+        "billingCountry": "India",
+        "shippingAddressLine1": "7, River View Apartments",
+        "shippingAddressLine2": "Paldi",
+        "shippingCity": "Ahmedabad",
+        "shippingState": "Gujarat",
+        "shippingPincode": "380007",
+        "shippingCountry": "India",
+        "sameAsBilling": true,
+        "creditLimit": 15000,
+        "creditDays": 7,
+        "defaultDiscount": 0,
+        "status": "active",
+        "isBlacklisted": false,
+        "blacklistReason": null,
+        "notes": "Retail walk-in repeat customer"
+      }
+    ],
+    "suppliers": [
+      {
+        "id": "33333333-3333-3333-3333-333333333301",
+        "name": "Shree Raw Materials",
+        "supplierType": "manufacturer",
+        "businessName": "Shree Raw Materials LLP",
+        "contactPerson": "Mahesh Jain",
+        "mobile": "9876543221",
+        "alternateMobile": "9876543222",
+        "email": "sales@shreeraw.in",
+        "website": "https://www.shreeraw.in",
+        "gstNumber": "24AAKCS4567L1ZU",
+        "panNumber": "AAKCS4567L",
+        "tanNumber": "SHRE12345M",
+        "taxType": "registered",
+        "gstState": "Gujarat",
+        "reverseChargeApplicable": false,
+        "msmeRegistered": true,
+        "billingAddressLine1": "Plot 45, Industrial Estate",
+        "billingAddressLine2": "Vatva",
+        "billingCity": "Ahmedabad",
+        "billingState": "Gujarat",
+        "billingPincode": "382445",
+        "billingCountry": "India",
+        "shippingAddressLine1": "Plot 45, Industrial Estate",
+        "shippingAddressLine2": "Vatva",
+        "shippingCity": "Ahmedabad",
+        "shippingState": "Gujarat",
+        "shippingPincode": "382445",
+        "shippingCountry": "India",
+        "sameAsBilling": true,
+        "creditLimit": 500000,
+        "creditDays": 30,
+        "paymentTerms": "30 days credit from invoice date",
+        "defaultGstRate": 5,
+        "defaultDiscount": 2,
+        "bankName": "ICICI Bank",
+        "accountHolderName": "Shree Raw Materials LLP",
+        "accountNumber": "001234567890",
+        "ifscCode": "ICIC0001234",
+        "bankBranch": "Vatva",
+        "upiId": "shreeraw@okicici",
+        "status": "active",
+        "isBlacklisted": false,
+        "blacklistReason": null,
+        "isPreferred": true,
+        "notes": "Primary tea/raw material supplier"
+      },
+      {
+        "id": "33333333-3333-3333-3333-333333333302",
+        "name": "PackPro Industries",
+        "supplierType": "distributor",
+        "businessName": "PackPro Industries",
+        "contactPerson": "Pooja Mehta",
+        "mobile": "9876543223",
+        "alternateMobile": null,
+        "email": "support@packpro.in",
+        "website": "https://www.packpro.in",
+        "gstNumber": "24AABCP6789D1ZX",
+        "panNumber": "AABCP6789D",
+        "tanNumber": "PACK12345P",
+        "taxType": "registered",
+        "gstState": "Gujarat",
+        "reverseChargeApplicable": false,
+        "msmeRegistered": false,
+        "billingAddressLine1": "22, Ring Road",
+        "billingAddressLine2": "Odhav",
+        "billingCity": "Ahmedabad",
+        "billingState": "Gujarat",
+        "billingPincode": "382415",
+        "billingCountry": "India",
+        "shippingAddressLine1": "22, Ring Road",
+        "shippingAddressLine2": "Odhav",
+        "shippingCity": "Ahmedabad",
+        "shippingState": "Gujarat",
+        "shippingPincode": "382415",
+        "shippingCountry": "India",
+        "sameAsBilling": true,
+        "creditLimit": 150000,
+        "creditDays": 15,
+        "paymentTerms": "15 days credit",
+        "defaultGstRate": 18,
+        "defaultDiscount": 0,
+        "bankName": "Axis Bank",
+        "accountHolderName": "PackPro Industries",
+        "accountNumber": "918273645001",
+        "ifscCode": "UTIB0000789",
+        "bankBranch": "Odhav",
+        "upiId": "packpro@okaxis",
+        "status": "active",
+        "isBlacklisted": false,
+        "blacklistReason": null,
+        "isPreferred": false,
+        "notes": "Packaging material supplier"
+      }
+    ],
+    "productCategories": [
+      {
+        "id": "55555555-5555-5555-5555-555555555501",
+        "name": "Tea Products",
+        "parentId": null,
+        "description": "Packaged tea products",
+        "status": "active"
+      },
+      {
+        "id": "55555555-5555-5555-5555-555555555502",
+        "name": "Professional Services",
+        "parentId": null,
+        "description": "Service-based offerings",
+        "status": "active"
+      }
+    ],
+    "productUnits": [
+      {
+        "id": "44444444-4444-4444-4444-444444444401",
+        "name": "Piece",
+        "symbol": "PCS",
+        "decimalAllowed": false,
+        "baseUnitId": null,
+        "conversionRate": null,
+        "status": "active"
+      },
+      {
+        "id": "44444444-4444-4444-4444-444444444402",
+        "name": "Box",
+        "symbol": "BOX",
+        "decimalAllowed": false,
+        "baseUnitId": "44444444-4444-4444-4444-444444444401",
+        "conversionRate": 10,
+        "status": "active"
+      },
+      {
+        "id": "44444444-4444-4444-4444-444444444403",
+        "name": "Kilogram",
+        "symbol": "KG",
+        "decimalAllowed": true,
+        "baseUnitId": null,
+        "conversionRate": null,
+        "status": "active"
+      }
+    ],
+    "products": [
+      {
+        "id": "66666666-6666-6666-6666-666666666601",
+        "productType": "goods",
+        "name": "Masala Tea 1kg Pack",
+        "sku": "TEA-1KG-MASALA",
+        "barcode": "TEA1001",
+        "categoryId": "55555555-5555-5555-5555-555555555501",
+        "unitId": "44444444-4444-4444-4444-444444444403",
+        "brand": "Acme Fresh",
+        "description": "Premium masala tea pouch",
+        "hsnSacCode": "0902",
+        "taxType": "taxable",
+        "gstRate": 5,
+        "cessRate": 0,
+        "priceTaxType": "exclusive",
+        "purchasePrice": 210,
+        "salePrice": 260,
+        "mrp": 280,
+        "wholesalePrice": 245,
+        "minimumSalePrice": 235,
+        "defaultDiscount": 3,
+        "stockTrackingEnabled": true,
+        "openingStockQuantity": 125.5,
+        "openingStockRate": 210,
+        "minimumStockLevel": 25,
+        "reorderLevel": 40,
+        "maximumStockLevel": 300,
+        "batchTrackingEnabled": true,
+        "expiryTrackingEnabled": true,
+        "serialTrackingEnabled": false,
+        "negativeStockAllowed": false,
+        "status": "active"
+      },
+      {
+        "id": "66666666-6666-6666-6666-666666666602",
+        "productType": "goods",
+        "name": "Printed Packing Box",
+        "sku": "BOX-PRINT-001",
+        "barcode": "BOX1002",
+        "categoryId": "55555555-5555-5555-5555-555555555501",
+        "unitId": "44444444-4444-4444-4444-444444444401",
+        "brand": "PackPro",
+        "description": "Printed mono carton box",
+        "hsnSacCode": "4819",
+        "taxType": "taxable",
+        "gstRate": 18,
+        "cessRate": 0,
+        "priceTaxType": "exclusive",
+        "purchasePrice": 12,
+        "salePrice": 18,
+        "mrp": 20,
+        "wholesalePrice": 16,
+        "minimumSalePrice": 15,
+        "defaultDiscount": 0,
+        "stockTrackingEnabled": true,
+        "openingStockQuantity": 600,
+        "openingStockRate": 12,
+        "minimumStockLevel": 100,
+        "reorderLevel": 150,
+        "maximumStockLevel": 1200,
+        "batchTrackingEnabled": false,
+        "expiryTrackingEnabled": false,
+        "serialTrackingEnabled": false,
+        "negativeStockAllowed": false,
+        "status": "active"
+      },
+      {
+        "id": "66666666-6666-6666-6666-666666666603",
+        "productType": "service",
+        "name": "Business Consulting Service",
+        "sku": "CONSULT-SVC",
+        "barcode": "SRV1003",
+        "categoryId": "55555555-5555-5555-5555-555555555502",
+        "unitId": "44444444-4444-4444-4444-444444444401",
+        "brand": "Acme Advisory",
+        "description": "Monthly consulting retainer",
+        "hsnSacCode": "998312",
+        "taxType": "taxable",
+        "gstRate": 18,
+        "cessRate": 0,
+        "priceTaxType": "exclusive",
+        "purchasePrice": 0,
+        "salePrice": 15000,
+        "mrp": 15000,
+        "wholesalePrice": 15000,
+        "minimumSalePrice": 12000,
+        "defaultDiscount": 0,
+        "stockTrackingEnabled": false,
+        "openingStockQuantity": 0,
+        "openingStockRate": 0,
+        "minimumStockLevel": 0,
+        "reorderLevel": 0,
+        "maximumStockLevel": 0,
+        "batchTrackingEnabled": false,
+        "expiryTrackingEnabled": false,
+        "serialTrackingEnabled": false,
+        "negativeStockAllowed": false,
+        "status": "active"
+      }
+    ],
+    "warehouses": [
+      {
+        "id": "77777777-7777-7777-7777-777777777701",
+        "warehouseCode": "MAIN-AHM",
+        "name": "Main Warehouse Ahmedabad",
+        "addressLine1": "Godown No 3, Sarkhej",
+        "addressLine2": "Near Highway Yard",
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "pincode": "382210",
+        "contactPerson": "Hemant Joshi",
+        "mobile": "9876543231",
+        "isDefault": true,
+        "status": "active"
+      },
+      {
+        "id": "77777777-7777-7777-7777-777777777702",
+        "warehouseCode": "OUTLET-SRT",
+        "name": "Surat Outlet Store",
+        "addressLine1": "Shop 12, Textile Market",
+        "addressLine2": "Ring Road",
+        "city": "Surat",
+        "state": "Gujarat",
+        "pincode": "395002",
+        "contactPerson": "Viral Modi",
+        "mobile": "9876543232",
+        "isDefault": false,
+        "status": "active"
+      }
+    ],
+    "batches": [
+      {
+        "id": "88888888-8888-8888-8888-888888888801",
+        "productId": "66666666-6666-6666-6666-666666666601",
+        "warehouseId": "77777777-7777-7777-7777-777777777701",
+        "batchNumber": "TEA-APR-2025-A1",
+        "manufacturingDate": "2025-04-10",
+        "expiryDate": "2026-03-31",
+        "purchaseRate": 210,
+        "status": "active"
+      }
+    ],
+    "openingStock": [
+      {
+        "productId": "66666666-6666-6666-6666-666666666601",
+        "warehouseId": "77777777-7777-7777-7777-777777777701",
+        "batchId": "88888888-8888-8888-8888-888888888801",
+        "batchNumber": "TEA-APR-2025-A1",
+        "manufacturingDate": "2025-04-10",
+        "expiryDate": "2026-03-31",
+        "quantity": 125.5,
+        "rate": 210,
+        "movementDate": "2025-04-15",
+        "remarks": "Initial stock setup"
+      }
+    ],
+    "stockAdjustments": [
+      {
+        "productId": "66666666-6666-6666-6666-666666666601",
+        "warehouseId": "77777777-7777-7777-7777-777777777701",
+        "batchId": "88888888-8888-8888-8888-888888888801",
+        "batchNumber": "TEA-APR-2025-A1",
+        "manufacturingDate": "2025-04-10",
+        "expiryDate": "2026-03-31",
+        "adjustmentType": "increase",
+        "quantity": 5.5,
+        "rate": 210,
+        "reason": "Physical stock count adjustment",
+        "adjustmentDate": "2025-05-03",
+        "remarks": "Extra stock found during audit"
+      }
+    ]
+  },
+
+  "purchases": {
+    "purchaseInvoice": {
+      "supplierId": "33333333-3333-3333-3333-333333333301",
+      "supplierInvoiceNumber": "SRM-4587",
+      "invoiceDate": "2025-05-05",
+      "dueDate": "2025-06-04",
+      "warehouseId": "77777777-7777-7777-7777-777777777701",
+      "purchaseStatus": "posted",
+      "items": [
+        {
+          "productId": "66666666-6666-6666-6666-666666666601",
+          "warehouseId": "77777777-7777-7777-7777-777777777701",
+          "batchId": "88888888-8888-8888-8888-888888888801",
+          "batchNumber": "TEA-MAY-2025-B1",
+          "quantity": 50,
+          "freeQuantity": 2,
+          "purchaseRate": 205,
+          "priceTaxType": "exclusive",
+          "discountPercent": 2,
+          "discountAmount": 0,
+          "gstRate": 5,
+          "cessRate": 0,
+          "manufacturingDate": "2025-05-01",
+          "expiryDate": "2026-04-30",
+          "remarks": "Fresh monthly lot",
+          "productType": "goods",
+          "decimalAllowed": true,
+          "batchTrackingEnabled": true,
+          "expiryTrackingEnabled": true
+        },
+        {
+          "productId": "66666666-6666-6666-6666-666666666602",
+          "warehouseId": "77777777-7777-7777-7777-777777777701",
+          "batchId": null,
+          "batchNumber": null,
+          "quantity": 200,
+          "freeQuantity": 0,
+          "purchaseRate": 11.5,
+          "priceTaxType": "exclusive",
+          "discountPercent": 0,
+          "discountAmount": 0,
+          "gstRate": 18,
+          "cessRate": 0,
+          "manufacturingDate": null,
+          "expiryDate": null,
+          "remarks": "Box stock",
+          "productType": "goods",
+          "decimalAllowed": false,
+          "batchTrackingEnabled": false,
+          "expiryTrackingEnabled": false
+        }
+      ],
+      "invoiceDiscountTotal": 150,
+      "additionalCharges": 100,
+      "freightCharges": 250,
+      "paidAmount": 5000,
+      "paymentMode": "bank",
+      "paymentReference": "UTR20250505001",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "notes": "Monthly raw material purchase",
+      "termsConditions": "Material subject to quality check",
+      "attachmentUrl": "",
+      "grandTotalPreview": 16271.25
+    },
+    "purchasePayment": {
+      "paymentDate": "2025-05-20",
+      "amount": 3000,
+      "paymentMode": "upi",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "UPI-PUR-5201",
+      "notes": "Part payment against supplier invoice",
+      "maxAmount": 11271.25
+    },
+    "purchaseReturn": {
+      "purchaseInvoiceId": "dddddddd-dddd-dddd-dddd-dddddddddd01",
+      "returnDate": "2025-05-25",
+      "warehouseId": "77777777-7777-7777-7777-777777777701",
+      "refundAmountReceived": 820,
+      "refundPaymentMode": "bank",
+      "refundBankAccountId": "11111111-1111-1111-1111-111111111301",
+      "refundReferenceNumber": "REF-PUR-2501",
+      "refundNotes": "Damaged bags refund",
+      "notes": "Returned damaged tea stock",
+      "items": [
+        {
+          "purchaseInvoiceItemId": "dddddddd-dddd-dddd-dddd-dddddddddd11",
+          "quantity": 4,
+          "remarks": "Moisture damage",
+          "maxReturnableQty": 50
+        }
+      ]
+    },
+    "purchaseReturnRefund": {
+      "refundDate": "2025-05-26",
+      "amount": 500,
+      "paymentMode": "bank",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "PUR-REFUND-001",
+      "notes": "Partial refund received",
+      "maxAmount": 820
+    }
+  },
+
+  "sales": {
+    "salesInvoice": {
+      "invoiceType": "gst_invoice",
+      "invoiceStatus": "posted",
+      "invoiceDate": "2025-05-08",
+      "dueDate": "2025-05-29",
+      "customerId": "22222222-2222-2222-2222-222222222201",
+      "isWalkIn": false,
+      "walkInName": null,
+      "walkInMobile": null,
+      "placeOfSupply": "Gujarat",
+      "warehouseId": "77777777-7777-7777-7777-777777777701",
+      "priceTaxType": "exclusive",
+      "items": [
+        {
+          "productId": "66666666-6666-6666-6666-666666666601",
+          "warehouseId": "77777777-7777-7777-7777-777777777701",
+          "batchId": "88888888-8888-8888-8888-888888888801",
+          "quantity": 20,
+          "saleRate": 255,
+          "mrp": 280,
+          "priceTaxType": "exclusive",
+          "discountPercent": 5,
+          "discountAmount": 0,
+          "gstRate": 5,
+          "cessRate": 0,
+          "remarks": "Festival supply",
+          "productType": "goods",
+          "decimalAllowed": true,
+          "batchTrackingEnabled": true,
+          "expiryTrackingEnabled": true,
+          "minimumSalePrice": 235,
+          "batchStatus": "active",
+          "batchExpiryDate": "2026-03-31",
+          "availableQuantity": 125.5
+        },
+        {
+          "productId": "66666666-6666-6666-6666-666666666603",
+          "warehouseId": null,
+          "batchId": null,
+          "quantity": 1,
+          "saleRate": 15000,
+          "mrp": 15000,
+          "priceTaxType": "exclusive",
+          "discountPercent": 0,
+          "discountAmount": 0,
+          "gstRate": 18,
+          "cessRate": 0,
+          "remarks": "Monthly advisory service",
+          "productType": "service",
+          "decimalAllowed": false,
+          "batchTrackingEnabled": false,
+          "expiryTrackingEnabled": false,
+          "minimumSalePrice": 12000,
+          "batchStatus": null,
+          "batchExpiryDate": null,
+          "availableQuantity": 0
+        }
+      ],
+      "invoiceDiscountTotal": 250,
+      "deliveryCharges": 150,
+      "packingCharges": 50,
+      "otherCharges": 0,
+      "paidAmount": 5000,
+      "paymentMode": "upi",
+      "paymentReference": "UPI-SAL-0801",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "notes": "B2B supply invoice",
+      "termsConditions": "Payment due within 21 days",
+      "grandTotalPreview": 20882.5
+    },
+    "posWalkInInvoice": {
+      "invoiceType": "pos",
+      "invoiceStatus": "posted",
+      "invoiceDate": "2025-05-09",
+      "dueDate": null,
+      "customerId": null,
+      "isWalkIn": true,
+      "walkInName": "Counter Customer",
+      "walkInMobile": "9876543299",
+      "placeOfSupply": "Gujarat",
+      "warehouseId": "77777777-7777-7777-7777-777777777702",
+      "priceTaxType": "inclusive",
+      "items": [
+        {
+          "productId": "66666666-6666-6666-6666-666666666602",
+          "warehouseId": "77777777-7777-7777-7777-777777777702",
+          "batchId": null,
+          "quantity": 3,
+          "saleRate": 18,
+          "mrp": 20,
+          "priceTaxType": "inclusive",
+          "discountPercent": 0,
+          "discountAmount": 0,
+          "gstRate": 18,
+          "cessRate": 0,
+          "remarks": "POS counter sale",
+          "productType": "goods",
+          "decimalAllowed": false,
+          "batchTrackingEnabled": false,
+          "expiryTrackingEnabled": false,
+          "minimumSalePrice": 15,
+          "batchStatus": null,
+          "batchExpiryDate": null,
+          "availableQuantity": 100
+        }
+      ],
+      "invoiceDiscountTotal": 0,
+      "deliveryCharges": 0,
+      "packingCharges": 0,
+      "otherCharges": 0,
+      "paidAmount": 54,
+      "paymentMode": "cash",
+      "paymentReference": null,
+      "bankAccountId": null,
+      "notes": "Retail POS bill",
+      "termsConditions": null,
+      "grandTotalPreview": 54
+    },
+    "salesPayment": {
+      "paymentDate": "2025-05-18",
+      "amount": 7000,
+      "paymentMode": "bank",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "NEFT-SAL-1801",
+      "notes": "Part payment received",
+      "maxAmount": 15882.5
+    },
+    "salesReturn": {
+      "salesInvoiceId": "cccccccc-cccc-cccc-cccc-cccccccccc01",
+      "returnDate": "2025-05-22",
+      "warehouseId": "77777777-7777-7777-7777-777777777701",
+      "refundAmountPaid": 600,
+      "refundPaymentMode": "upi",
+      "refundBankAccountId": "11111111-1111-1111-1111-111111111301",
+      "refundReferenceNumber": "SALE-RET-2201",
+      "refundNotes": "Refund for damaged packs",
+      "reason": "Damaged material received by customer",
+      "notes": "Approved by sales manager",
+      "items": [
+        {
+          "salesInvoiceItemId": "cccccccc-cccc-cccc-cccc-cccccccccc11",
+          "quantity": 2,
+          "remarks": "2 packs damaged",
+          "maxReturnableQty": 20
+        }
+      ]
+    },
+    "salesReturnRefund": {
+      "refundDate": "2025-05-23",
+      "amount": 400,
+      "paymentMode": "upi",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "UPI-RET-2301",
+      "notes": "Partial refund paid",
+      "maxAmount": 600
+    },
+    "sendInvoice": {
+      "email": "orders@rajretail.in",
+      "subject": "Your Invoice from Acme Trading",
+      "message": "Please find attached your sales invoice."
+    }
+  },
+
+  "payments": {
+    "customerReceive": {
+      "paymentType": "customer_receive",
+      "partyType": "customer",
+      "partyId": "22222222-2222-2222-2222-222222222201",
+      "paymentDate": "2025-05-18",
+      "amount": 7000,
+      "paymentMode": "neft",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "NEFT-RAJ-1801",
+      "notes": "Received against invoice",
+      "status": "completed",
+      "isAdvance": false,
+      "chequeNumber": null,
+      "chequeDate": null,
+      "chequeBankName": null,
+      "chequeStatus": null,
+      "allocations": [
+        {
+          "allocationType": "sales_invoice",
+          "referenceId": "cccccccc-cccc-cccc-cccc-cccccccccc01",
+          "referenceNumber": "SAL-00101",
+          "allocatedAmount": 7000,
+          "allocationDate": "2025-05-18"
+        }
+      ]
+    },
+    "supplierPay": {
+      "paymentType": "supplier_pay",
+      "partyType": "supplier",
+      "partyId": "33333333-3333-3333-3333-333333333301",
+      "paymentDate": "2025-05-20",
+      "amount": 3000,
+      "paymentMode": "upi",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "UPI-SRM-2001",
+      "notes": "Supplier part payment",
+      "status": "completed",
+      "isAdvance": false,
+      "chequeNumber": null,
+      "chequeDate": null,
+      "chequeBankName": null,
+      "chequeStatus": null,
+      "allocations": [
+        {
+          "allocationType": "purchase_invoice",
+          "referenceId": "dddddddd-dddd-dddd-dddd-dddddddddd01",
+          "referenceNumber": "PUR-00051",
+          "allocatedAmount": 3000,
+          "allocationDate": "2025-05-20"
+        }
+      ]
+    },
+    "advanceCustomerPayment": {
+      "paymentType": "customer_receive",
+      "partyType": "customer",
+      "partyId": "22222222-2222-2222-2222-222222222202",
+      "paymentDate": "2025-05-24",
+      "amount": 2000,
+      "paymentMode": "cash",
+      "bankAccountId": null,
+      "referenceNumber": null,
+      "notes": "Advance booking payment",
+      "status": "completed",
+      "isAdvance": true,
+      "chequeNumber": null,
+      "chequeDate": null,
+      "chequeBankName": null,
+      "chequeStatus": null,
+      "allocations": [
+        {
+          "allocationType": "advance_adjustment",
+          "referenceId": null,
+          "referenceNumber": "ADV-ANITA-001",
+          "allocatedAmount": 2000,
+          "allocationDate": "2025-05-24"
+        }
+      ]
+    },
+    "cancelPayment": {
+      "reason": "Duplicate payment entry"
+    },
+    "sendReceipt": {
+      "email": "orders@rajretail.in",
+      "subject": "Payment Receipt",
+      "message": "Thanks for your payment. Attached is the receipt."
+    },
+    "chequeStatus": {
+      "chequeStatus": "cleared",
+      "statusDate": "2025-05-21",
+      "remarks": "Cheque cleared successfully",
+      "reason": null
+    },
+    "sendReminder": {
+      "partyType": "customer",
+      "partyId": "22222222-2222-2222-2222-222222222201",
+      "referenceType": "sales_invoice",
+      "referenceId": "cccccccc-cccc-cccc-cccc-cccccccccc01",
+      "referenceNumber": "SAL-00101",
+      "dueDate": "2025-05-29",
+      "amountDue": 8882.5,
+      "channel": "email",
+      "message": "Gentle reminder: your invoice payment is due on 29-05-2025."
+    }
+  },
+
+  "expenses": {
+    "expenseCategories": [
+      {
+        "id": "99999999-9999-9999-9999-999999999901",
+        "name": "Office Rent",
+        "parentId": null,
+        "defaultAccountId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa05",
+        "color": "#2563EB",
+        "icon": "building",
+        "description": "Monthly office rent expenses",
+        "status": "active",
+        "currentId": null
+      },
+      {
+        "id": "99999999-9999-9999-9999-999999999902",
+        "name": "Travel Expense",
+        "parentId": null,
+        "defaultAccountId": null,
+        "color": "#16A34A",
+        "icon": "car",
+        "description": "Travel and conveyance costs",
+        "status": "active",
+        "currentId": null
+      }
+    ],
+    "expenseEntry": {
+      "expenseDate": "2025-05-07",
+      "categoryId": "99999999-9999-9999-9999-999999999901",
+      "expenseAccountId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa05",
+      "payeeName": "Sunrise Properties",
+      "vendorGstNumber": "24AALCS1111F1Z1",
+      "vendorPanNumber": "AALCS1111F",
+      "hsnSacCode": "997212",
+      "description": "May 2025 office rent",
+      "amount": 35000,
+      "gstApplicable": true,
+      "gstRate": 18,
+      "priceTaxType": "exclusive",
+      "paymentMode": "bank",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "RENT-MAY-2025",
+      "chequeNumber": null,
+      "chequeDate": null,
+      "chequeStatus": null,
+      "notes": "Paid on time",
+      "status": "posted"
+    },
+    "expenseCancel": {
+      "cancellationReason": "Wrong category selected"
+    },
+    "recurringExpense": {
+      "templateName": "Monthly Office Rent",
+      "categoryId": "99999999-9999-9999-9999-999999999901",
+      "expenseAccountId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa05",
+      "payeeName": "Sunrise Properties",
+      "description": "Monthly office rent recurring entry",
+      "amount": 35000,
+      "gstApplicable": true,
+      "gstRate": 18,
+      "priceTaxType": "exclusive",
+      "paymentMode": "bank",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "frequency": "monthly",
+      "startDate": "2025-04-01",
+      "endDate": "2026-03-31",
+      "nextRunDate": "2025-06-01",
+      "autoCreateEnabled": true,
+      "createAsStatus": "draft",
+      "reminderDaysBefore": 3,
+      "status": "active"
+    }
+  },
+
+  "accounting": {
+    "accounts": [
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01",
+        "accountCode": "CASH01",
+        "accountName": "Cash in Hand",
+        "accountType": "asset",
+        "accountSubtype": "Cash",
+        "parentId": null,
+        "openingBalance": 50000,
+        "openingBalanceType": "debit",
+        "status": "active",
+        "description": "Cash account"
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02",
+        "accountCode": "BANK01",
+        "accountName": "HDFC Current Account",
+        "accountType": "asset",
+        "accountSubtype": "Bank",
+        "parentId": null,
+        "openingBalance": 250000,
+        "openingBalanceType": "debit",
+        "status": "active",
+        "description": "Primary bank account"
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa03",
+        "accountCode": "SALE01",
+        "accountName": "Sales Account",
+        "accountType": "income",
+        "accountSubtype": "Operating Revenue",
+        "parentId": null,
+        "openingBalance": 0,
+        "openingBalanceType": "none",
+        "status": "active",
+        "description": "Revenue from sales"
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa04",
+        "accountCode": "PUR01",
+        "accountName": "Purchase Account",
+        "accountType": "expense",
+        "accountSubtype": "Inventory Purchase",
+        "parentId": null,
+        "openingBalance": 0,
+        "openingBalanceType": "none",
+        "status": "active",
+        "description": "Inventory purchase cost"
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa05",
+        "accountCode": "RENT01",
+        "accountName": "Rent Expense",
+        "accountType": "expense",
+        "accountSubtype": "Administrative",
+        "parentId": null,
+        "openingBalance": 0,
+        "openingBalanceType": "none",
+        "status": "active",
+        "description": "Office rent expense"
+      }
+    ],
+    "openingBalance": {
+      "accountId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01",
+      "financialYearId": "11111111-1111-1111-1111-111111111202",
+      "openingDate": "2025-04-01",
+      "debit": 50000,
+      "credit": 0,
+      "description": "Opening cash balance"
+    },
+    "journalEntry": {
+      "financialYearId": "11111111-1111-1111-1111-111111111202",
+      "journalNumber": "JV-0001",
+      "entryDate": "2025-05-10",
+      "voucherType": "journal",
+      "referenceType": "manual_adjustment",
+      "referenceId": null,
+      "referenceNumber": "MAN-ADJ-001",
+      "description": "Cash withdrawn from bank for office use",
+      "lines": [
+        {
+          "accountId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01",
+          "description": "Cash in hand increased",
+          "debit": 10000,
+          "credit": 0
+        },
+        {
+          "accountId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02",
+          "description": "Bank balance reduced",
+          "debit": 0,
+          "credit": 10000
+        }
+      ]
+    },
+    "journalCancelOrReverse": {
+      "reason": "Wrong amount posted",
+      "reversalDate": "2025-05-11"
+    },
+    "dateRange": {
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31"
+    },
+    "reportRange": {
+      "financialYearId": "11111111-1111-1111-1111-111111111202",
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31"
+    },
+    "balanceSheetFilter": {
+      "financialYearId": "11111111-1111-1111-1111-111111111202",
+      "asOfDate": "2025-05-31"
+    },
+    "periodLock": {
+      "financialYearId": "11111111-1111-1111-1111-111111111202",
+      "periodStart": "2025-04-01",
+      "periodEnd": "2025-04-30",
+      "lockType": "month",
+      "reason": "April books finalized"
+    }
+  },
+
+  "gst": {
+    "reportDateRange": {
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31"
+    },
+    "summaryFilter": {
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31",
+      "financialYearId": "11111111-1111-1111-1111-111111111202"
+    },
+    "gstAdjustment": {
+      "adjustmentDate": "2025-05-28",
+      "adjustmentType": "itc_reversal",
+      "taxComponent": "cgst",
+      "amount": 250,
+      "reason": "Vendor invoice mismatch reversal",
+      "referenceNumber": "GST-ADJ-001",
+      "notes": "Will re-claim after reconciliation"
+    },
+    "gstAdjustmentCancel": {
+      "cancellationReason": "Created against wrong tax component"
+    },
+    "gstItcStatus": {
+      "eligibilityStatus": "eligible",
+      "claimStatus": "partially_claimed",
+      "claimedAmount": 450,
+      "notes": "Balance will be claimed next month"
+    },
+    "gstExportFilters": {
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31",
+      "source": "all"
+    },
+    "gstRateQueryExamples": ["0", "5", "12", "18", "28"]
+  },
+
+  "payroll": {
+    "employees": [
+      {
+        "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+        "fullName": "Riya Sharma",
+        "mobile": "9876543241",
+        "email": "riya.sharma@acmetrading.in",
+        "department": "Accounts",
+        "designation": "Account Executive",
+        "joiningDate": "2024-08-12",
+        "employmentType": "full_time",
+        "salaryType": "monthly",
+        "panNumber": "AQWPS1234L",
+        "aadhaarLast4": "4567",
+        "addressLine1": "Flat 302, Gokul Residency",
+        "addressLine2": "Satellite",
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "pincode": "380015",
+        "emergencyContactName": "Sanjay Sharma",
+        "emergencyContactMobile": "9876543242",
+        "bankName": "HDFC Bank",
+        "accountHolderName": "Riya Sharma",
+        "accountNumber": "50200123456789",
+        "ifscCode": "HDFC0005678",
+        "upiId": "riya.sharma@okhdfcbank",
+        "status": "active"
+      },
+      {
+        "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+        "fullName": "Aman Verma",
+        "mobile": "9876543243",
+        "email": "aman.verma@acmetrading.in",
+        "department": "Warehouse",
+        "designation": "Store Supervisor",
+        "joiningDate": "2025-01-10",
+        "employmentType": "full_time",
+        "salaryType": "monthly",
+        "panNumber": "BCDPV4321K",
+        "aadhaarLast4": "7890",
+        "addressLine1": "11, Patel Nagar",
+        "addressLine2": "",
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "pincode": "380008",
+        "emergencyContactName": "Rakesh Verma",
+        "emergencyContactMobile": "9876543244",
+        "bankName": "SBI",
+        "accountHolderName": "Aman Verma",
+        "accountNumber": "325600123456",
+        "ifscCode": "SBIN0002233",
+        "upiId": "aman.verma@oksbi",
+        "status": "active"
+      }
+    ],
+    "salaryStructure": {
+      "basicSalary": 18000,
+      "hra": 9000,
+      "conveyanceAllowance": 2000,
+      "medicalAllowance": 1500,
+      "otherAllowance": 2500,
+      "pfDeduction": 2160,
+      "esicDeduction": 0,
+      "professionalTax": 200,
+      "tdsDeduction": 0,
+      "otherDeduction": 500,
+      "effectiveFrom": "2025-04-01",
+      "effectiveTo": "",
+      "isActive": true
+    },
+    "attendance": {
+      "employeeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+      "payrollMonth": "2025-05",
+      "workingDays": 26,
+      "presentDays": 23,
+      "absentDays": 1,
+      "paidLeaveDays": 1,
+      "unpaidLeaveDays": 0,
+      "halfDays": 1,
+      "overtimeHours": 4,
+      "remarks": "One half day for personal work"
+    },
+    "attendanceBulk": {
+      "payrollMonth": "2025-05",
+      "rows": [
+        {
+          "employeeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+          "payrollMonth": "2025-05",
+          "workingDays": 26,
+          "presentDays": 23,
+          "absentDays": 1,
+          "paidLeaveDays": 1,
+          "unpaidLeaveDays": 0,
+          "halfDays": 1,
+          "overtimeHours": 4,
+          "remarks": "Accounts team attendance"
+        },
+        {
+          "employeeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+          "payrollMonth": "2025-05",
+          "workingDays": 26,
+          "presentDays": 24,
+          "absentDays": 0,
+          "paidLeaveDays": 1,
+          "unpaidLeaveDays": 0,
+          "halfDays": 1,
+          "overtimeHours": 6,
+          "remarks": "Warehouse supervision"
+        }
+      ]
+    },
+    "payrollRun": {
+      "payrollMonth": "2025-05",
+      "periodStart": "2025-05-01",
+      "periodEnd": "2025-05-31",
+      "notes": "Monthly payroll run for May 2025"
+    },
+    "bonusDeduction": {
+      "entries": [
+        {
+          "type": "bonus",
+          "name": "Performance Bonus",
+          "amount": 3000,
+          "taxable": true,
+          "notes": "Monthly performance incentive"
+        },
+        {
+          "type": "deduction",
+          "name": "Late Mark Deduction",
+          "amount": 250,
+          "taxable": false,
+          "notes": "Attendance related deduction"
+        }
+      ]
+    },
+    "salaryPayment": {
+      "amount": 28140,
+      "paymentDate": "2025-05-31",
+      "paymentMode": "bank",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "SALARY-MAY-RIYA",
+      "notes": "Salary credited for May"
+    },
+    "bulkSalaryPayment": {
+      "paymentDate": "2025-05-31",
+      "paymentMode": "bank",
+      "bankAccountId": "11111111-1111-1111-1111-111111111301",
+      "referenceNumber": "SALARY-MAY-BULK",
+      "notes": "Bulk payroll transfer",
+      "payrollItemIds": [
+        "pay-item-riya-may-2025",
+        "pay-item-aman-may-2025"
+      ]
+    },
+    "salarySlipEmail": {
+      "email": "riya.sharma@acmetrading.in",
+      "subject": "Salary Slip - May 2025",
+      "message": "Please find attached your salary slip for May 2025."
+    }
+  },
+
+  "reports": {
+    "salesReportFilter": {
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31"
+    },
+    "purchaseReportFilter": {
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31"
+    },
+    "inventoryValuationFilter": {
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31"
+    },
+    "expenseReportFilter": {
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31"
+    },
+    "accountingReportFilter": {
+      "financialYearId": "11111111-1111-1111-1111-111111111202",
+      "dateFrom": "2025-04-01",
+      "dateTo": "2025-05-31"
+    }
+  }
+}

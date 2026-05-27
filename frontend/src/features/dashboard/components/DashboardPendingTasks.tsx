@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import { AmountText } from "../../../components/ui/AmountText";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { cn } from "../../../lib/utils";
 import type { DashboardTask } from "../../../types/dashboard";
 
-export const DashboardPendingTasks = ({ items }: { items: DashboardTask[] }) => (
-  <Card className="flex h-full min-h-0 flex-col">
+export const DashboardPendingTasks = ({ items, className }: { items: DashboardTask[]; className?: string }) => (
+  <Card className={cn("flex h-full min-h-0 flex-col", className)}>
     <CardHeader title="Pending Tasks" />
     <CardContent className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4">
       {items.length === 0 ? (

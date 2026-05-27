@@ -5,9 +5,11 @@ import { AmountText } from "../../../components/ui/AmountText";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import type { DashboardAlert } from "../../../types/dashboard";
+import { cn } from "../../../lib/utils";
 
 type Props = {
   alerts: DashboardAlert[];
+  className?: string;
 };
 
 const iconByKind = {
@@ -20,8 +22,8 @@ const iconByKind = {
   notification: Bell
 } as const;
 
-export const DashboardAlertsPanel = ({ alerts }: Props) => (
-  <Card className="flex h-full min-h-0 flex-col">
+export const DashboardAlertsPanel = ({ alerts, className }: Props) => (
+  <Card className={cn("flex h-full min-h-0 flex-col", className)}>
     <CardHeader title="Alerts" />
     <CardContent className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4">
       {alerts.length === 0 ? (

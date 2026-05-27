@@ -90,16 +90,19 @@ export const DashboardSummaryCards = ({ summary, range, loading = false, variant
       ? { ...card, subLabel: comparisonLabel }
       : card
   );
+  const gridClassName =
+    variant === "accountant" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-6" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-4";
+  const valueClassName = variant === "accountant" ? "text-xl font-semibold text-slate-900 2xl:text-2xl" : "text-2xl font-semibold text-slate-900";
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className={gridClassName}>
       {cards.map((card) => {
         const Icon = card.icon;
         const primary = summary?.[card.key];
         const secondary = summary?.[card.subKey];
 
         return (
-          <Card key={card.key} className="p-4">
+          <Card key={card.key} className="min-w-0 p-4">
             {loading || !summary ? (
               <div className="space-y-3 animate-pulse">
                 <div className="h-4 w-24 rounded bg-slate-100" />
@@ -109,21 +112,25 @@ export const DashboardSummaryCards = ({ summary, range, loading = false, variant
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{card.label}</p>
-                  <div className={cn("flex size-9 items-center justify-center rounded-xl", toneStyles[card.tone])}>
+                  <p className="min-w-0 pr-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{card.label}</p>
+                  <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", toneStyles[card.tone])}>
                     <Icon className="size-4" />
                   </div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   {typeof primary === "number" ? (
-                    <p className="text-2xl font-semibold text-slate-900">{primary}</p>
+                    <p className={cn(valueClassName, "break-words leading-tight")}>{primary}</p>
                   ) : (
-                    <AmountText value={primary} className="text-2xl font-semibold text-slate-900" tone="default" />
+                    <AmountText value={primary} className={cn(valueClassName, "break-words leading-tight")} tone="default" />
                   )}
                 </div>
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>{card.subLabel}</span>
-                  {typeof secondary === "number" ? <span>{secondary}</span> : <AmountText value={secondary} className="text-xs" tone="default" />}
+                <div className="flex items-start justify-between gap-3 text-xs text-slate-500">
+                  <span className="min-w-0">{card.subLabel}</span>
+                  {typeof secondary === "number" ? (
+                    <span className="text-right leading-tight">{secondary}</span>
+                  ) : (
+                    <AmountText value={secondary} className="text-right text-xs leading-tight" tone="default" />
+                  )}
                 </div>
                 {card.key === "totalProducts" ? (
                   <div className="flex items-center gap-2 text-xs text-slate-500">

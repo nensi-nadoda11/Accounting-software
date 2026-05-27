@@ -487,8 +487,8 @@ export class DashboardService {
   private getRoleWidgets(role: DashboardActor["role"]) {
     const widgetMap: Record<DashboardActor["role"], string[]> = {
       admin: ["summary", "charts", "quick-actions", "alerts", "recent-activities", "pending-tasks", "top-products", "inventory", "gst", "payroll", "accounting"],
-      accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "top-products", "recent-activities", "gst", "payroll", "accounting"],
-      staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "top-products", "inventory"],
+      accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "gst", "payroll", "accounting"],
+      staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory"],
       auditor: ["summary", "charts", "alerts", "recent-activities", "gst", "payroll", "accounting"]
     };
 

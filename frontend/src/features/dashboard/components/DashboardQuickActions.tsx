@@ -10,6 +10,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
+import { cn } from "../../../lib/utils";
 import type { DashboardQuickAction } from "../../../types/dashboard";
 
 const iconMap = {
@@ -24,12 +25,14 @@ const iconMap = {
 
 type Props = {
   actions: DashboardQuickAction[];
+  className?: string;
+  compact?: boolean;
 };
 
-export const DashboardQuickActions = ({ actions }: Props) => (
-  <Card className="flex h-full flex-col">
+export const DashboardQuickActions = ({ actions, className, compact = false }: Props) => (
+  <Card className={cn("flex h-full min-h-0 flex-col", className)}>
     <CardHeader title="Quick Actions" />
-    <CardContent className="grid flex-1 grid-cols-2 gap-3 p-4">
+    <CardContent className={cn("grid flex-1 min-h-0 content-start grid-cols-2 overflow-y-auto p-4", compact ? "gap-2 p-3" : "gap-3")}>
       {actions.map((action) => {
         const Icon = iconMap[action.icon as keyof typeof iconMap] ?? ReceiptText;
 
@@ -37,12 +40,20 @@ export const DashboardQuickActions = ({ actions }: Props) => (
           <Link
             key={action.id}
             to={action.href}
-            className="group rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-[var(--app-accent)] hover:bg-white"
+            className={cn(
+              "group rounded-2xl border border-slate-200 bg-slate-50 transition hover:border-[var(--app-accent)] hover:bg-white",
+              compact ? "p-2.5" : "p-3"
+            )}
           >
-            <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-white text-[var(--app-accent)] shadow-sm">
-              <Icon className="size-4" />
+            <div
+              className={cn(
+                "flex items-center justify-center rounded-xl bg-white text-[var(--app-accent)] shadow-sm",
+                compact ? "mb-2 size-8" : "mb-3 size-10"
+              )}
+            >
+              <Icon className={compact ? "size-3.5" : "size-4"} />
             </div>
-            <p className="text-sm font-semibold text-slate-900">{action.label}</p>
+            <p className={cn("font-semibold text-slate-900", compact ? "text-xs leading-4" : "text-sm")}>{action.label}</p>
           </Link>
         );
       })}

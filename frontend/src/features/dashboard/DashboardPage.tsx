@@ -87,8 +87,8 @@ const chartConfig: Array<{ key: DashboardChartKey; title: string; color: string 
 
 const widgetFallbackByRole: Record<Role, DashboardWidget[]> = {
   admin: ["summary", "charts", "quick-actions", "alerts", "recent-activities", "pending-tasks", "top-products", "inventory", "gst", "payroll", "accounting"],
-  accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "top-products", "recent-activities", "gst", "payroll", "accounting"],
-  staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "top-products", "inventory"],
+  accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "gst", "payroll", "accounting"],
+  staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory"],
   auditor: ["summary", "charts", "alerts", "recent-activities", "gst", "payroll", "accounting"]
 };
 
@@ -421,21 +421,15 @@ export const DashboardPage = () => {
       {activeRole === "staff" ? (
         <>
           <div className="grid items-stretch gap-4 xl:grid-cols-[1.05fr_1fr_1fr]">
-            {showQuickActions && visibleActions.length > 0 ? <DashboardQuickActions actions={visibleActions} /> : null}
-            {showPendingTasks ? <DashboardPendingTasks items={tasks.data?.items ?? []} /> : null}
-            {showAlerts ? <DashboardAlertsPanel alerts={alerts.data?.items ?? []} /> : null}
+            {showQuickActions && visibleActions.length > 0 ? (
+              <DashboardQuickActions actions={visibleActions} className="h-[20rem]" compact />
+            ) : null}
+            {showPendingTasks ? <DashboardPendingTasks items={tasks.data?.items ?? []} className="h-[20rem]" /> : null}
+            {showAlerts ? <DashboardAlertsPanel alerts={alerts.data?.items ?? []} className="h-[20rem]" /> : null}
           </div>
-          {roleDashboard.data ? (
-            <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-              {showTopProducts ? (
-                <DashboardTopProducts
-                  items={topProducts.data?.items ?? []}
-                  loading={topProducts.loading && !topProducts.data}
-                  error={topProducts.error}
-                  onRetry={() => void loadTopProducts(filters)}
-                />
-              ) : null}
-              {showInventorySnapshot ? <DashboardInventorySnapshot snapshot={roleDashboard.data.inventorySnapshot} /> : null}
+          {roleDashboard.data && showInventorySnapshot ? (
+            <div className="grid gap-4">
+              <DashboardInventorySnapshot snapshot={roleDashboard.data.inventorySnapshot} />
             </div>
           ) : null}
         </>
@@ -445,27 +439,8 @@ export const DashboardPage = () => {
         <>
           <div className="grid items-stretch gap-4 xl:grid-cols-[1.05fr_1fr_1fr]">
             {showQuickActions && visibleActions.length > 0 ? <DashboardQuickActions actions={visibleActions} /> : null}
-            {showAlerts ? <DashboardAlertsPanel alerts={alerts.data?.items ?? []} /> : null}
-            {showPendingTasks ? <DashboardPendingTasks items={tasks.data?.items ?? []} /> : null}
-          </div>
-          <div className="grid gap-4 xl:grid-cols-2">
-            {showTopProducts ? (
-              <DashboardTopProducts
-                items={topProducts.data?.items ?? []}
-                loading={topProducts.loading && !topProducts.data}
-                error={topProducts.error}
-                onRetry={() => void loadTopProducts(filters)}
-              />
-            ) : null}
-            {showRecentActivities ? (
-              <DashboardRecentActivities
-                data={recentActivities.data}
-                loading={recentActivities.loading && !recentActivities.data}
-                error={recentActivities.error}
-                onRetry={() => void loadRecentActivities(activitiesPage)}
-                onPageChange={setActivitiesPage}
-              />
-            ) : null}
+            {showAlerts ? <DashboardAlertsPanel alerts={alerts.data?.items ?? []} className="h-[24rem]" /> : null}
+            {showPendingTasks ? <DashboardPendingTasks items={tasks.data?.items ?? []} className="h-[24rem]" /> : null}
           </div>
           {roleDashboard.data ? (
             <div className="grid gap-4 xl:grid-cols-3">

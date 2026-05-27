@@ -65,6 +65,33 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
   }, [clearSession, setSession]);
 
+  const restoreSessionFromAccessToken = useCallback(async () => {
+    const storedAccessToken = tokenStore.get();
+    if (!storedAccessToken) {
+      return false;
+    }
+
+    try {
+      const session = await authApi.session();
+      setSession({
+        accessToken: storedAccessToken,
+        user: session.data.user,
+        company: session.data.company,
+        permissions: session.data.permissions,
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const status = error.response?.status;
+        if (status === 401 || status === 403) {
+          return false;
+        }
+      }
+
+      throw error;
+    }
+  }, [setSession]);
+
   useEffect(() => {
     const existingBootstrap = authBootstrap.get();
     if (existingBootstrap) {
@@ -76,7 +103,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     const bootstrapPromise = (async () => {
       try {
-        await refreshSession();
+        const restoredFromAccessToken = await restoreSessionFromAccessToken();
+        if (!restoredFromAccessToken) {
+          await refreshSession();
+        }
       } finally {
         setIsInitializing(false);
       }
@@ -86,7 +116,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     void bootstrapPromise.finally(() => {
       authBootstrap.clear(bootstrapPromise);
     });
-  }, [refreshSession]);
+  }, [refreshSession, restoreSessionFromAccessToken]);
 
   useEffect(() => {
     const handleSessionExpired = () => {

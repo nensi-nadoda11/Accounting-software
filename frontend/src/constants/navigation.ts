@@ -23,7 +23,7 @@ export const TOP_NAV_ITEMS: ReadonlyArray<{ label: string; href: string; menu: T
   { label: "Sales", href: "/app/sales", menu: "sales" },
   { label: "Purchases", href: "/app/purchases", menu: "purchases" },
   { label: "Inventory", href: "/app/inventory", menu: "inventory" },
-  { label: "HR & Payroll", href: "/app/hr-payroll", menu: "hr-payroll" },
+  { label: "Payroll", href: "/app/hr-payroll", menu: "hr-payroll" },
   { label: "Reports", href: "/app/reports", menu: "reports" },
   { label: "Settings", href: "/app/settings", menu: "settings" },
 ] as const;
@@ -245,7 +245,7 @@ const SIDEBAR_ROUTE_CONFIGS: ReadonlyArray<{
     matches: ["/app/inventory"],
   },
   {
-    title: "HR & Payroll",
+    title: "Payroll",
     tabs: HR_PAYROLL_TABS,
     matches: ["/app/hr-payroll"],
   },

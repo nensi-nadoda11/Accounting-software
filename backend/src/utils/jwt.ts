@@ -11,14 +11,20 @@ export interface JwtSessionPayload {
   type: "access" | "refresh";
 }
 
-export const signAccessToken = (payload: Omit<JwtSessionPayload, "type">): string =>
+export const signAccessToken = (
+  payload: Omit<JwtSessionPayload, "type">,
+  expiresInSeconds = parseDurationToSeconds(env.ACCESS_TOKEN_EXPIRES_IN)
+): string =>
   jwt.sign({ ...payload, type: "access" }, env.JWT_ACCESS_SECRET, {
-    expiresIn: parseDurationToSeconds(env.ACCESS_TOKEN_EXPIRES_IN)
+    expiresIn: expiresInSeconds
   });
 
-export const signRefreshToken = (payload: Omit<JwtSessionPayload, "type">): string =>
+export const signRefreshToken = (
+  payload: Omit<JwtSessionPayload, "type">,
+  expiresInSeconds = parseDurationToSeconds(env.REFRESH_TOKEN_EXPIRES_IN)
+): string =>
   jwt.sign({ ...payload, type: "refresh" }, env.JWT_REFRESH_SECRET, {
-    expiresIn: parseDurationToSeconds(env.REFRESH_TOKEN_EXPIRES_IN)
+    expiresIn: expiresInSeconds
   });
 
 export const verifyAccessToken = (token: string): JwtSessionPayload =>

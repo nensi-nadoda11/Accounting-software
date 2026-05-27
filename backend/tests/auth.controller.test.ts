@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import jwt from "jsonwebtoken";
 
 const applyTestEnv = () => {
   process.env.NODE_ENV = "test";
@@ -139,4 +140,24 @@ test("refresh cookie stays persistent even when rememberMe is false", async () =
   assert.equal(cookieValue, "refresh-token");
   assert.equal(cookieOptions?.path, "/");
   assert.equal(cookieOptions?.maxAge, 7 * 24 * 60 * 60 * 1000);
+});
+
+test("auth service signs access and refresh tokens with at least a seven day lifetime", async () => {
+  const { authService } = await import("../src/modules/auth/auth.service.js");
+
+  const tokens = (authService as unknown as {
+    buildTokens: (userId: string, companyId: string | null, role: string, sessionId: string) => {
+      accessToken: string;
+      refreshToken: string;
+    };
+  }).buildTokens("user-1", "company-1", "admin", "session-1");
+
+  const decodedAccess = jwt.decode(tokens.accessToken) as { exp?: number; iat?: number } | null;
+  const decodedRefresh = jwt.decode(tokens.refreshToken) as { exp?: number; iat?: number } | null;
+  const expectedLifetimeSeconds = 7 * 24 * 60 * 60;
+
+  assert.ok(decodedAccess?.exp && decodedAccess.iat);
+  assert.ok(decodedRefresh?.exp && decodedRefresh.iat);
+  assert.equal(decodedAccess.exp - decodedAccess.iat, expectedLifetimeSeconds);
+  assert.equal(decodedRefresh.exp - decodedRefresh.iat, expectedLifetimeSeconds);
 });

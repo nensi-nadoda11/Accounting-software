@@ -26,6 +26,8 @@ type RequestContext = {
 const MINIMUM_PERSISTENT_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 
 class AuthService {
+  private readonly accessTtlMs = Math.max(parseDurationToMs(env.ACCESS_TOKEN_EXPIRES_IN), MINIMUM_PERSISTENT_SESSION_MS);
+
   private readonly refreshTtlMs = Math.max(parseDurationToMs(env.REFRESH_TOKEN_EXPIRES_IN), MINIMUM_PERSISTENT_SESSION_MS);
 
   public async register(
@@ -591,14 +593,14 @@ class AuthService {
       sessionId,
       companyId,
       role
-    });
+    }, Math.floor(this.accessTtlMs / 1000));
 
     const refreshToken = signRefreshToken({
       sub: userId,
       sessionId,
       companyId,
       role
-    });
+    }, Math.floor(this.refreshTtlMs / 1000));
 
     return {
       accessToken,

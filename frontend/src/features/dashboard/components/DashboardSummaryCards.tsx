@@ -8,16 +8,29 @@ import {
   TrendingDown,
   TrendingUp
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { AmountText } from "../../../components/ui/AmountText";
 import { Card } from "../../../components/ui/Card";
 import { cn } from "../../../lib/utils";
 import type { DashboardRange, DashboardSummary } from "../../../types/dashboard";
 
+export type DashboardSummaryCardsVariant = "default" | "accountant" | "staff" | "auditor";
+
+type SummaryCardConfig = {
+  key: keyof DashboardSummary;
+  label: string;
+  icon: LucideIcon;
+  tone: keyof typeof toneStyles;
+  subKey: keyof DashboardSummary;
+  subLabel: string;
+};
+
 type Props = {
   summary: DashboardSummary | null;
   range: DashboardRange;
   loading?: boolean;
+  variant?: DashboardSummaryCardsVariant;
 };
 
 const getComparisonLabel = (range: DashboardRange) => {
@@ -34,7 +47,7 @@ const getComparisonLabel = (range: DashboardRange) => {
   }
 };
 
-const baseCards = [
+const baseCards: SummaryCardConfig[] = [
   { key: "monthSales", label: "Sales", icon: TrendingUp, tone: "emerald", subKey: "todaySales", subLabel: "Today" },
   { key: "monthPurchase", label: "Purchase", icon: TrendingDown, tone: "amber", subKey: "todayPurchase", subLabel: "Today" },
   { key: "receivable", label: "Receivable", icon: HandCoins, tone: "sky", subKey: "payable", subLabel: "Payable" },
@@ -56,9 +69,23 @@ const toneStyles: Record<string, string> = {
   slate: "bg-slate-100 text-slate-700"
 };
 
-export const DashboardSummaryCards = ({ summary, range, loading = false }: Props) => {
+const cardPresets: Record<DashboardSummaryCardsVariant, SummaryCardConfig[]> = {
+  default: baseCards,
+  accountant: [
+    baseCards[0],
+    baseCards[1],
+    baseCards[2],
+    baseCards[3],
+    baseCards[4],
+    { key: "cashBalance", label: "Liquidity", icon: ReceiptIndianRupee, tone: "cyan", subKey: "bankBalance", subLabel: "Bank" }
+  ],
+  staff: [baseCards[0], baseCards[1], baseCards[7]],
+  auditor: [baseCards[0], baseCards[1], baseCards[2], baseCards[3], baseCards[4], baseCards[5]]
+};
+
+export const DashboardSummaryCards = ({ summary, range, loading = false, variant = "default" }: Props) => {
   const comparisonLabel = getComparisonLabel(range);
-  const cards = baseCards.map((card) =>
+  const cards = cardPresets[variant].map((card) =>
     card.key === "monthSales" || card.key === "monthPurchase"
       ? { ...card, subLabel: comparisonLabel }
       : card

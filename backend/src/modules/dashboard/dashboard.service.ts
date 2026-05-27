@@ -141,6 +141,20 @@ const getRangeBounds = (query: DashboardDateRangeQuery): { range: Bounds; bucket
 };
 
 export class DashboardService {
+  private readonly alertsByRole: Record<DashboardActor["role"], DashboardAlert["kind"][]> = {
+    admin: ["low_stock", "expiry", "customer_due", "supplier_due", "payroll", "gst", "notification"],
+    accountant: ["customer_due", "supplier_due", "payroll", "gst", "notification"],
+    staff: ["low_stock", "expiry", "notification"],
+    auditor: ["customer_due", "supplier_due", "payroll", "gst", "notification"]
+  };
+
+  private readonly tasksByRole: Record<DashboardActor["role"], DashboardTask["id"][]> = {
+    admin: ["draft-sales", "draft-purchases", "pending-payments", "unpaid-salary", "gst-pending"],
+    accountant: ["draft-sales", "draft-purchases", "pending-payments", "unpaid-salary", "gst-pending"],
+    staff: ["draft-sales", "draft-purchases"],
+    auditor: []
+  };
+
   private async logView(
     actor: DashboardActor,
     action: string,
@@ -305,7 +319,8 @@ export class DashboardService {
         severity: row.severity === "critical" ? "critical" : "warning",
         title: row.productName ? `${row.productName}` : "Inventory alert",
         description: row.message,
-        dueDate: row.expiryDate ? toIsoDate(new Date(row.expiryDate)) : null
+        dueDate: row.expiryDate ? toIsoDate(new Date(row.expiryDate)) : null,
+        actionUrl: "/app/inventory/stock"
       }) satisfies DashboardAlert),
       ...data.customerDueRows.map((row) => ({
         id: row.id,
@@ -356,7 +371,8 @@ export class DashboardService {
       }) satisfies DashboardAlert)
     ];
 
-    return { items: items.slice(0, 12) };
+    const allowedKinds = new Set(this.alertsByRole[actor.role]);
+    return { items: items.filter((item) => allowedKinds.has(item.kind)).slice(0, 12) };
   }
 
   public async getPendingTasks(actor: DashboardActor, context: DashboardRequestContext): Promise<{ items: DashboardTask[] }> {
@@ -366,8 +382,7 @@ export class DashboardService {
 
     await this.logView(actor, "dashboard_pending_tasks_viewed", context);
 
-    return {
-      items: [
+    const items: DashboardTask[] = [
         {
           id: "draft-sales",
           kind: "draft_invoice",
@@ -408,7 +423,12 @@ export class DashboardService {
           amount: clampMoney(data.gstPending.amount),
           href: "/app/accounting/gst"
         }
-      ]
+      ];
+
+    const allowedTaskIds = new Set(this.tasksByRole[actor.role]);
+
+    return {
+      items: items.filter((item) => allowedTaskIds.has(item.id))
     };
   }
 
@@ -466,10 +486,10 @@ export class DashboardService {
 
   private getRoleWidgets(role: DashboardActor["role"]) {
     const widgetMap: Record<DashboardActor["role"], string[]> = {
-      admin: ["summary", "charts", "alerts", "recent-activities", "pending-tasks", "top-products", "inventory", "gst", "payroll", "accounting"],
-      accountant: ["summary", "charts", "alerts", "recent-activities", "pending-tasks", "gst", "payroll", "accounting", "top-products"],
-      staff: ["summary", "charts", "alerts", "pending-tasks", "top-products", "inventory"],
-      auditor: ["summary", "charts", "recent-activities", "gst", "payroll", "accounting"]
+      admin: ["summary", "charts", "quick-actions", "alerts", "recent-activities", "pending-tasks", "top-products", "inventory", "gst", "payroll", "accounting"],
+      accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "top-products", "recent-activities", "gst", "payroll", "accounting"],
+      staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "top-products", "inventory"],
+      auditor: ["summary", "charts", "alerts", "recent-activities", "gst", "payroll", "accounting"]
     };
 
     return widgetMap[role];

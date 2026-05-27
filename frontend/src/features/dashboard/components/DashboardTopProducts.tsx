@@ -1,13 +1,39 @@
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { AmountText } from "../../../components/ui/AmountText";
+import { Button } from "../../../components/ui/Button";
+import { ErrorState } from "../../../components/ui/ErrorState";
 import type { DashboardTopProduct } from "../../../types/dashboard";
 
-export const DashboardTopProducts = ({ items }: { items: DashboardTopProduct[] }) => (
+type Props = {
+  items: DashboardTopProduct[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+};
+
+export const DashboardTopProducts = ({ items, loading = false, error, onRetry }: Props) => (
   <Card>
     <CardHeader title="Top Products" />
     <CardContent className="space-y-3 p-4">
-      {items.length === 0 ? (
+      {loading ? (
+        <div className="space-y-3 animate-pulse">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-16 rounded-2xl bg-slate-50" />
+          ))}
+        </div>
+      ) : error ? (
+        <ErrorState
+          title={error}
+          action={
+            onRetry ? (
+              <Button variant="secondary" onClick={onRetry}>
+                Retry
+              </Button>
+            ) : null
+          }
+        />
+      ) : items.length === 0 ? (
         <EmptyState title="No product movement in this range" />
       ) : (
         items.map((item, index) => (

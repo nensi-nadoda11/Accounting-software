@@ -66,7 +66,7 @@ export const AppLayout = () => {
   }, [user]);
 
   return (
-    <div className="min-h-screen bg-[#F7FAFA]">
+    <div className="app-shell-bg min-h-screen">
       <TopNav />
       {showSubTabs ? <SubTabs /> : null}
       <div

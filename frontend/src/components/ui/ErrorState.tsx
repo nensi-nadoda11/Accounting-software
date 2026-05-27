@@ -14,14 +14,14 @@ export const ErrorState = ({
 }) => (
   <div
     className={cn(
-      "flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-2xl border border-rose-200 bg-white px-6 text-center",
+      "app-feedback-error flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-2xl border px-6 text-center",
       className,
     )}
   >
-    <div className="flex size-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
-      <CircleAlert className="size-6" />
+    <div className="flex size-12 items-center justify-center rounded-2xl bg-white/55">
+      <CircleAlert className="app-feedback-error-icon size-6" />
     </div>
-    <p className="max-w-md text-sm font-medium text-slate-700">{title}</p>
+    <p className="max-w-md text-sm font-medium">{title}</p>
     {action}
   </div>
 );

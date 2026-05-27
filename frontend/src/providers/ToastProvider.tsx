@@ -45,19 +45,19 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
           <div
             key={toast.id}
             className={cn(
-              "pointer-events-auto flex items-start gap-3 rounded-2xl border bg-white px-4 py-3 shadow-sm",
-              toast.tone === "success" ? "border-emerald-200" : "border-rose-200",
+              "pointer-events-auto flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm",
+              toast.tone === "success" ? "app-feedback-success" : "app-feedback-error",
             )}
           >
             {toast.tone === "success" ? (
-              <CheckCircle2 className="mt-0.5 size-5 text-emerald-600" />
+              <CheckCircle2 className="app-feedback-success-icon mt-0.5 size-5" />
             ) : (
-              <CircleAlert className="mt-0.5 size-5 text-rose-600" />
+              <CircleAlert className="app-feedback-error-icon mt-0.5 size-5" />
             )}
-            <p className="flex-1 text-sm font-medium text-slate-700">{toast.title}</p>
+            <p className="flex-1 text-sm font-medium">{toast.title}</p>
             <button
               type="button"
-              className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-full p-1 text-current/60 transition hover:bg-black/5 hover:text-current"
               onClick={() => removeToast(toast.id)}
             >
               <X className="size-4" />

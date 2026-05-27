@@ -697,7 +697,7 @@ export const ProductsPage = () => {
           ) : productsError && !productsData ? (
             <Card>
               <CardContent className="space-y-4 py-6">
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+                <div className="app-feedback-error rounded-2xl border px-4 py-4 text-sm">
                   {productsError}
                 </div>
                 <Button type="button" variant="secondary" onClick={() => void loadProducts()}>
@@ -875,7 +875,7 @@ export const ProductsPage = () => {
             ) : categoriesError && !categoriesData ? (
               <Card>
                 <CardContent className="space-y-4 py-6">
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+                  <div className="app-feedback-error rounded-2xl border px-4 py-4 text-sm">
                     {categoriesError}
                   </div>
                   <Button type="button" variant="secondary" onClick={() => void loadCategories()}>
@@ -999,7 +999,7 @@ export const ProductsPage = () => {
             ) : unitsError && !unitsData ? (
               <Card>
                 <CardContent className="space-y-4 py-6">
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+                  <div className="app-feedback-error rounded-2xl border px-4 py-4 text-sm">
                     {unitsError}
                   </div>
                   <Button type="button" variant="secondary" onClick={() => void loadUnits()}>

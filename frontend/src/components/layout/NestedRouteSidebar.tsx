@@ -44,9 +44,9 @@ export const NestedRouteSidebar = ({
 
   return (
     <aside className="w-full lg:sticky lg:top-4 lg:h-[calc(100svh-5.5rem)] lg:w-64 lg:flex-none lg:self-start">
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden">
-        <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <p className="text-base font-semibold text-slate-900">{title}</p>
+      <div className="app-sidebar-surface rounded-3xl border p-4 shadow-sm lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden">
+        <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--app-shell-border)] pb-3">
+          <p className="app-shell-text text-base font-semibold">{title}</p>
           <Button
             type="button"
             variant="ghost"
@@ -66,10 +66,10 @@ export const NestedRouteSidebar = ({
                 key={tab.href}
                 to={tab.href}
                 className={cn(
-                  "flex min-h-11 items-center rounded-2xl border px-4 py-3 text-sm font-medium transition",
+                  "app-sidebar-link flex min-h-11 items-center rounded-2xl border px-4 py-3 text-sm font-medium transition",
                   active
-                    ? "app-accent-text border-transparent bg-[var(--app-accent-soft)]"
-                    : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                    ? "app-sidebar-link-active"
+                    : "border-transparent",
                 )}
               >
                 {tab.label}

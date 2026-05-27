@@ -39,9 +39,9 @@ export const TopNav = () => {
   }, [profileOpen]);
 
   return (
-    <div className="border-b border-slate-200 bg-white">
+    <div className="app-topbar">
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3 sm:px-6 lg:px-8">
-        <Link to={homeHref} className="mr-4 whitespace-nowrap text-lg font-semibold text-slate-900">
+        <Link to={homeHref} className="app-shell-text mr-4 whitespace-nowrap text-lg font-semibold">
           {auth.company?.name ?? "LedgerFlow"}
         </Link>
         <nav className="flex flex-1 justify-center">
@@ -50,8 +50,8 @@ export const TopNav = () => {
               key={item.menu}
               to={item.href}
               className={cn(
-                "relative mr-6 whitespace-nowrap pb-2 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800",
-                activeMenu === item.menu && "text-slate-900",
+                "app-shell-muted relative mr-6 whitespace-nowrap pb-2 pt-1 text-sm font-medium transition hover:text-[var(--app-shell-text)]",
+                activeMenu === item.menu && "app-shell-text",
               )}
             >
               {item.label}
@@ -68,16 +68,16 @@ export const TopNav = () => {
               <button
                 type="button"
                 onClick={() => setProfileOpen((current) => !current)}
-                className="flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                className="app-shell-surface app-shell-muted flex size-10 items-center justify-center rounded-full border transition hover:bg-[var(--app-accent-subtle)] hover:text-[var(--app-shell-text)]"
                 aria-label="Open profile menu"
               >
                 <UserRound className="size-5" />
               </button>
               {profileOpen ? (
-                <div className="absolute right-0 top-14 z-40 w-72 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-                  <div className="border-b border-slate-100 pb-3">
-                    <p className="text-sm font-semibold text-slate-900">{auth.user.fullName}</p>
-                    <p className="mt-1 break-all text-sm text-slate-500">{auth.user.email}</p>
+                <div className="app-shell-surface absolute right-0 top-14 z-40 w-72 rounded-2xl border p-4 shadow-xl">
+                  <div className="border-b border-[var(--app-shell-border)] pb-3">
+                    <p className="app-shell-text text-sm font-semibold">{auth.user.fullName}</p>
+                    <p className="app-shell-muted mt-1 break-all text-sm">{auth.user.email}</p>
                   </div>
                   <Button
                     variant="secondary"

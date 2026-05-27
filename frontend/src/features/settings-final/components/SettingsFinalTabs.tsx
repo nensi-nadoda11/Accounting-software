@@ -10,7 +10,7 @@ export const SettingsFinalTabs = ({
   activeTab: SettingsTabKey;
   onChange: (tab: SettingsTabKey) => void;
 }) => (
-  <div className="border-b border-slate-200 bg-white/90">
+  <div className="app-topbar">
     <div className="overflow-x-auto px-4 sm:px-5">
       <div className="flex min-w-max items-center gap-8">
         {tabs.map((tab) => {
@@ -22,7 +22,7 @@ export const SettingsFinalTabs = ({
               onClick={() => onChange(tab.key)}
               className={cn(
                 "relative shrink-0 whitespace-nowrap pb-3 pt-4 text-[13px] font-medium transition lg:text-sm",
-                active ? "text-slate-900" : "text-slate-500 hover:text-slate-900",
+                active ? "app-shell-text" : "app-shell-muted hover:text-[var(--app-shell-text)]",
               )}
             >
               {tab.label}

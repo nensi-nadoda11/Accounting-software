@@ -564,7 +564,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
           {pageError && !returnsData ? (
             <Card>
               <CardContent className="space-y-4 py-6">
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{pageError}</div>
+                <div className="app-feedback-error rounded-2xl border px-4 py-4 text-sm">{pageError}</div>
                 <Button type="button" variant="secondary" onClick={() => void loadReturns()}>
                   Retry
                 </Button>
@@ -675,7 +675,7 @@ export const SalesPage = ({ tab }: { tab: SalesPageTab }) => {
           {pageError && !listData ? (
             <Card>
               <CardContent className="space-y-4 py-6">
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{pageError}</div>
+                <div className="app-feedback-error rounded-2xl border px-4 py-4 text-sm">{pageError}</div>
                 <Button type="button" variant="secondary" onClick={() => void loadInvoices()}>
                   Retry
                 </Button>

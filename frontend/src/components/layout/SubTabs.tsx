@@ -17,7 +17,7 @@ export const SubTabs = () => {
   }
 
   return (
-    <div className="border-b border-slate-200 bg-white/90">
+    <div className="app-topbar">
       <div
         className={cn(
           "mx-auto flex max-w-7xl px-4 sm:px-6 lg:px-8",
@@ -34,11 +34,11 @@ export const SubTabs = () => {
                 "relative whitespace-nowrap font-medium transition",
                 wrapTabs
                   ? active
-                    ? "pb-3 pt-4 text-[13px] text-slate-900 lg:text-sm"
-                    : "pb-3 pt-4 text-[13px] text-slate-500 hover:text-slate-800 lg:text-sm"
+                    ? "app-shell-text pb-3 pt-4 text-[13px] lg:text-sm"
+                    : "app-shell-muted pb-3 pt-4 text-[13px] hover:text-[var(--app-shell-text)] lg:text-sm"
                   : active
-                    ? "pb-3 pt-4 text-slate-900"
-                    : "pb-3 pt-4 text-slate-500 hover:text-slate-800",
+                    ? "app-shell-text pb-3 pt-4"
+                    : "app-shell-muted pb-3 pt-4 hover:text-[var(--app-shell-text)]",
               )}
             >
               {tab.label}

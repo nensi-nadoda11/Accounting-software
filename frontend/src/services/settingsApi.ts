@@ -10,11 +10,99 @@ import type {
 } from "../types/settings";
 import type { PermissionKey, Role } from "../types/auth";
 
+type RgbColor = {
+  r: number;
+  g: number;
+  b: number;
+};
+
+const DEFAULT_ACCENT = "#0f9f8a";
+const DEFAULT_ERROR = "#dc2626";
+
+const clampColorChannel = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
+
+const expandHexColor = (value: string) => {
+  const normalized = value.trim().replace("#", "");
+  if (normalized.length === 3) {
+    return normalized
+      .split("")
+      .map((channel) => `${channel}${channel}`)
+      .join("");
+  }
+
+  return normalized;
+};
+
+const parseHexColor = (value: string): RgbColor | null => {
+  const normalized = expandHexColor(value);
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return null;
+  }
+
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16),
+  };
+};
+
+const mixColor = (base: RgbColor, target: RgbColor, ratio: number): RgbColor => ({
+  r: clampColorChannel(base.r * (1 - ratio) + target.r * ratio),
+  g: clampColorChannel(base.g * (1 - ratio) + target.g * ratio),
+  b: clampColorChannel(base.b * (1 - ratio) + target.b * ratio),
+});
+
+const toHexColor = ({ r, g, b }: RgbColor) =>
+  `#${[r, g, b].map((channel) => clampColorChannel(channel).toString(16).padStart(2, "0")).join("")}`;
+
+const toRgbValue = ({ r, g, b }: RgbColor) => `${clampColorChannel(r)} ${clampColorChannel(g)} ${clampColorChannel(b)}`;
+
+const toRgbaColor = ({ r, g, b }: RgbColor, alpha: number) =>
+  `rgba(${clampColorChannel(r)}, ${clampColorChannel(g)}, ${clampColorChannel(b)}, ${alpha})`;
+
 export const applyUiPreferencesToDocument = (preferences: UiPreference | null) => {
   const root = document.documentElement;
-  const accent = preferences?.accentColor?.trim() || "#0f9f8a";
+  const accent = preferences?.accentColor?.trim() || DEFAULT_ACCENT;
+  const accentRgb = parseHexColor(accent) ?? parseHexColor(DEFAULT_ACCENT)!;
+  const errorRgb = parseHexColor(DEFAULT_ERROR)!;
+  const white = { r: 255, g: 255, b: 255 };
+  const darkText = { r: 15, g: 23, b: 42 };
+
+  const accentStrong = mixColor(accentRgb, darkText, 0.18);
+  const appBg = mixColor(accentRgb, white, 0.96);
+  const appBorder = mixColor(accentRgb, white, 0.86);
+  const sidebarBg = mixColor(accentRgb, white, 0.92);
+  const sidebarHoverBg = mixColor(accentRgb, white, 0.84);
+  const sidebarActiveBg = mixColor(accentRgb, white, 0.76);
+  const successBg = mixColor(accentRgb, white, 0.9);
+  const successBorder = mixColor(accentRgb, white, 0.74);
+  const errorBg = mixColor(errorRgb, white, 0.92);
+  const errorBorder = mixColor(errorRgb, white, 0.78);
 
   root.style.setProperty("--app-accent", accent);
+  root.style.setProperty("--app-accent-rgb", toRgbValue(accentRgb));
+  root.style.setProperty("--app-accent-strong", toHexColor(accentStrong));
+  root.style.setProperty("--app-accent-soft", toRgbaColor(accentRgb, 0.16));
+  root.style.setProperty("--app-accent-subtle", toRgbaColor(accentRgb, 0.08));
+  root.style.setProperty("--app-shell-bg", toHexColor(appBg));
+  root.style.setProperty("--app-shell-surface", "#ffffff");
+  root.style.setProperty("--app-shell-surface-muted", toRgbaColor(white, 0.9));
+  root.style.setProperty("--app-shell-border", toHexColor(appBorder));
+  root.style.setProperty("--app-shell-text", "#0f172a");
+  root.style.setProperty("--app-shell-muted", "#64748b");
+  root.style.setProperty("--app-topbar-bg", toRgbaColor(white, 0.92));
+  root.style.setProperty("--app-sidebar-bg", toHexColor(sidebarBg));
+  root.style.setProperty("--app-sidebar-border", toHexColor(appBorder));
+  root.style.setProperty("--app-sidebar-hover-bg", toHexColor(sidebarHoverBg));
+  root.style.setProperty("--app-sidebar-active-bg", toHexColor(sidebarActiveBg));
+  root.style.setProperty("--app-success-bg", toHexColor(successBg));
+  root.style.setProperty("--app-success-border", toHexColor(successBorder));
+  root.style.setProperty("--app-success-text", toHexColor(accentStrong));
+  root.style.setProperty("--app-success-icon", accent);
+  root.style.setProperty("--app-error-bg", toHexColor(errorBg));
+  root.style.setProperty("--app-error-border", toHexColor(errorBorder));
+  root.style.setProperty("--app-error-text", "#b91c1c");
+  root.style.setProperty("--app-error-icon", DEFAULT_ERROR);
   root.dataset.compactMode = preferences?.compactMode === false ? "false" : "true";
   root.dataset.tableDensity = preferences?.tableDensity ?? "compact";
 };

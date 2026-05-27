@@ -363,7 +363,7 @@ export const SuppliersPage = () => {
       ) : error && !data ? (
         <Card>
           <CardContent className="space-y-4 py-6">
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{error}</div>
+            <div className="app-feedback-error rounded-2xl border px-4 py-4 text-sm">{error}</div>
             <Button type="button" variant="secondary" onClick={() => void loadSuppliers()}>
               Retry
             </Button>

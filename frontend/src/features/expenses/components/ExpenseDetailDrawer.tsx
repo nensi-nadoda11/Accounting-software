@@ -6,8 +6,54 @@ import { LoadingState } from "../../../components/ui/LoadingState";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
 import type { Expense } from "../../../types/expense";
-import { EXPENSE_PAYMENT_MODE_LABELS, EXPENSE_STATUS_LABELS } from "../expenseOptions";
+import {
+  EXPENSE_CHEQUE_STATUS_LABELS,
+  EXPENSE_PAYMENT_MODE_LABELS,
+  EXPENSE_STATUS_LABELS,
+} from "../expenseOptions";
 import { ExpenseAttachmentUploader } from "./ExpenseAttachmentUploader";
+
+const buildPaymentDetailItems = (expense: Expense) => {
+  const items: Array<{ label: string; value: string }> = [
+    { label: "Payment Method", value: EXPENSE_PAYMENT_MODE_LABELS[expense.paymentMode] },
+    { label: "Paid Amount", value: expense.totalAmount },
+  ];
+
+  if (expense.paymentMode === "cash") {
+    if (expense.referenceNumber) {
+      items.push({ label: "Reference", value: expense.referenceNumber });
+    }
+
+    return items;
+  }
+
+  if (expense.bankAccount) {
+    items.push({
+      label: "Bank Account",
+      value: `${expense.bankAccount.bankName} • ${expense.bankAccount.accountNumber}`,
+    });
+  }
+
+  if (expense.referenceNumber) {
+    items.push({ label: "Reference", value: expense.referenceNumber });
+  }
+
+  if (expense.paymentMode === "cheque") {
+    if (expense.chequeNumber) {
+      items.push({ label: "Cheque Number", value: expense.chequeNumber });
+    }
+
+    if (expense.chequeDate) {
+      items.push({ label: "Cheque Date", value: expense.chequeDate.slice(0, 10) });
+    }
+
+    if (expense.chequeStatus) {
+      items.push({ label: "Cheque Status", value: EXPENSE_CHEQUE_STATUS_LABELS[expense.chequeStatus] });
+    }
+  }
+
+  return items;
+};
 
 export const ExpenseDetailDrawer = ({
   open,
@@ -29,97 +75,166 @@ export const ExpenseDetailDrawer = ({
   onEdit: (expense: Expense) => void;
   onPost: (expense: Expense) => void;
   onCancel: (expense: Expense) => void;
-}) => (
-  <SideSheet
-    open={open}
-    onClose={onClose}
-    title={expense ? expense.expenseNumber : "Expense Details"}
-    className="max-w-4xl"
-  footer={
-      expense ? (
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-          {canUpdate && expense.status === "draft" ? (
-            <Button type="button" variant="secondary" onClick={() => onEdit(expense)}>
-              <Pencil className="mr-2 size-4" />
-              Edit Draft
+}) => {
+  const paymentDetailItems = expense ? buildPaymentDetailItems(expense) : [];
+  const paymentDetailColumns =
+    paymentDetailItems.length >= 4 ? "xl:grid-cols-4" : paymentDetailItems.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-2";
+
+  return (
+    <SideSheet
+      open={open}
+      onClose={onClose}
+      title={expense ? expense.expenseNumber : "Expense Details"}
+      className="max-w-4xl"
+      footer={
+        expense ? (
+          <>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Close
             </Button>
-          ) : null}
-          {canPost && expense.status === "draft" ? (
-            <Button type="button" onClick={() => onPost(expense)}>
-              <CheckCircle2 className="mr-2 size-4" />
-              Post
-            </Button>
-          ) : null}
-          {canPost && expense.status === "posted" ? (
-            <Button type="button" variant="danger" onClick={() => onCancel(expense)}>
-              <XCircle className="mr-2 size-4" />
-              Cancel
-            </Button>
-          ) : null}
-        </>
-      ) : undefined
-    }
-  >
-    {loading || !expense ? (
-      <LoadingState label="Loading expense..." />
-    ) : (
-      <div className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card><CardContent><p className="text-[11px] uppercase tracking-wide text-slate-500">Date</p><p className="mt-1 text-sm font-semibold text-slate-900">{expense.expenseDate.slice(0, 10)}</p></CardContent></Card>
-          <Card><CardContent><p className="text-[11px] uppercase tracking-wide text-slate-500">Status</p><div className="mt-1"><StatusBadge status={expense.status} label={EXPENSE_STATUS_LABELS[expense.status]} /></div></CardContent></Card>
-          <Card><CardContent><p className="text-[11px] uppercase tracking-wide text-slate-500">Category</p><p className="mt-1 text-sm font-semibold text-slate-900">{expense.category.name}</p></CardContent></Card>
-          <Card><CardContent><p className="text-[11px] uppercase tracking-wide text-slate-500">Payment Mode</p><p className="mt-1 text-sm font-semibold text-slate-900">{EXPENSE_PAYMENT_MODE_LABELS[expense.paymentMode]}</p></CardContent></Card>
+            {canUpdate && expense.status === "draft" ? (
+              <Button type="button" variant="secondary" onClick={() => onEdit(expense)}>
+                <Pencil className="mr-2 size-4" />
+                Edit Draft
+              </Button>
+            ) : null}
+            {canPost && expense.status === "draft" ? (
+              <Button type="button" onClick={() => onPost(expense)}>
+                <CheckCircle2 className="mr-2 size-4" />
+                Post
+              </Button>
+            ) : null}
+            {canPost && expense.status === "posted" ? (
+              <Button type="button" variant="danger" onClick={() => onCancel(expense)}>
+                <XCircle className="mr-2 size-4" />
+                Cancel
+              </Button>
+            ) : null}
+          </>
+        ) : undefined
+      }
+    >
+      {loading || !expense ? (
+        <LoadingState label="Loading expense..." />
+      ) : (
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Card>
+              <CardContent>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Date</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{expense.expenseDate.slice(0, 10)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Status</p>
+                <div className="mt-1">
+                  <StatusBadge status={expense.status} label={EXPENSE_STATUS_LABELS[expense.status]} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Category</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{expense.category.name}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Payment Mode</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{EXPENSE_PAYMENT_MODE_LABELS[expense.paymentMode]}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader title="Expense Details" />
+            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Payee</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{expense.payeeName ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Expense Account</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">
+                  {expense.account ? `${expense.account.accountCode} • ${expense.account.accountName}` : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Reference</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{expense.referenceNumber ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Vendor GST</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{expense.vendorGstNumber ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Vendor PAN</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{expense.vendorPanNumber ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">HSN / SAC</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{expense.hsnSacCode ?? "-"}</p>
+              </div>
+              <div className="md:col-span-2 xl:col-span-3">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Description</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{expense.description}</p>
+              </div>
+              {expense.notes ? (
+                <div className="md:col-span-2 xl:col-span-3">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Notes</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">{expense.notes}</p>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="Payment Details" />
+            <CardContent className={`grid gap-4 md:grid-cols-2 ${paymentDetailColumns}`}>
+              {paymentDetailItems.map((item) => (
+                <div key={item.label}>
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500">{item.label}</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">{item.value}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="GST Breakdown" />
+            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Taxable Amount</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{expense.taxableAmount}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">CGST</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{expense.cgstAmount}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">SGST</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{expense.sgstAmount}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">IGST</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{expense.igstAmount}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Total</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{expense.totalAmount}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="Attachments" />
+            <CardContent>
+              <ExpenseAttachmentUploader attachments={expense.attachments} uploadingFiles={[]} readOnly />
+            </CardContent>
+          </Card>
         </div>
-
-        <Card>
-          <CardHeader title="Expense Details" />
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Payee</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.payeeName ?? "-"}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Expense Account</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.account ? `${expense.account.accountCode} • ${expense.account.accountName}` : "-"}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Reference</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.referenceNumber ?? "-"}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Vendor GST</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.vendorGstNumber ?? "-"}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Vendor PAN</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.vendorPanNumber ?? "-"}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">HSN / SAC</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.hsnSacCode ?? "-"}</p></div>
-            <div className="md:col-span-2 xl:col-span-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Description</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.description}</p></div>
-            {expense.notes ? <div className="md:col-span-2 xl:col-span-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Notes</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.notes}</p></div> : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader title="Payment Details" />
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Bank Account</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.bankAccount ? `${expense.bankAccount.bankName} • ${expense.bankAccount.accountNumber}` : "-"}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Cheque Number</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.chequeNumber ?? "-"}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Cheque Date</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.chequeDate?.slice(0, 10) ?? "-"}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Cheque Status</p><p className="mt-1 text-sm font-medium text-slate-900">{expense.chequeStatus ?? "-"}</p></div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader title="GST Breakdown" />
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Taxable Amount</p><p className="mt-1 text-sm font-semibold text-slate-900">{expense.taxableAmount}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">CGST</p><p className="mt-1 text-sm font-semibold text-slate-900">{expense.cgstAmount}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">SGST</p><p className="mt-1 text-sm font-semibold text-slate-900">{expense.sgstAmount}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">IGST</p><p className="mt-1 text-sm font-semibold text-slate-900">{expense.igstAmount}</p></div>
-            <div><p className="text-[11px] uppercase tracking-wide text-slate-500">Total</p><p className="mt-1 text-sm font-semibold text-slate-900">{expense.totalAmount}</p></div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader title="Attachments" />
-          <CardContent>
-            <ExpenseAttachmentUploader
-              attachments={expense.attachments}
-              uploadingFiles={[]}
-              readOnly
-            />
-          </CardContent>
-        </Card>
-      </div>
-    )}
-  </SideSheet>
-);
+      )}
+    </SideSheet>
+  );
+};

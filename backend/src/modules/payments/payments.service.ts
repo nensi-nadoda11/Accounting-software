@@ -1966,47 +1966,60 @@ class PaymentsService {
     };
   }
 
+  public async listReminderParties(
+    actor: Pick<PaymentActor, "companyId">,
+    partyType: PaymentPartyType
+  ) {
+    const items = await paymentsRepository.listReminderParties({
+      companyId: actor.companyId,
+      partyType
+    });
+
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        code: item.code
+      }))
+    };
+  }
+
   public async sendReminder(actor: PaymentActor, input: SendReminderInput, context: PaymentRequestContext) {
     const party = await this.getPartyOrThrow(actor.companyId, input.partyType, input.partyId);
     const receiptParty = this.toReceiptParty(input.partyType, party);
     const defaultMessage = `Reminder for ${input.referenceNumber ?? "due item"} amount ${normalizeMoney(input.amountDue)} due on ${input.dueDate.toISOString().slice(0, 10)}.`;
+    const reminderMessage = input.message ?? defaultMessage;
+    const whatsappUrl =
+      input.channel === "whatsapp" ? buildWhatsappShareUrl(receiptParty.mobile ?? "", reminderMessage) : null;
 
-    let status: "pending" | "sent" | "failed" = input.channel === "in_app" ? "sent" : "pending";
-    let errorMessage: string | null = null;
+    let status: "sent" | "failed" = "failed";
+    let errorMessage: string | null = "Reminder could not be sent";
 
     if (input.channel === "email") {
       const targetEmail = receiptParty.email;
       if (!targetEmail) {
-        status = "failed";
         errorMessage = "No email available for the selected party";
       } else {
         try {
           await emailService.sendGenericEmail({
             to: targetEmail,
             subject: `Payment reminder ${input.referenceNumber ?? ""}`.trim(),
-            html: `<p>${input.message ?? defaultMessage}</p>`,
-            text: input.message ?? defaultMessage
+            html: `<p>${reminderMessage}</p>`,
+            text: reminderMessage
           });
           status = "sent";
+          errorMessage = null;
         } catch (error) {
-          status = "failed";
           errorMessage = error instanceof Error ? error.message : "Email send failed";
         }
       }
     }
 
     if (input.channel === "whatsapp") {
-      const whatsappUrl = buildWhatsappShareUrl(
-        receiptParty.mobile ?? "",
-        input.message ?? defaultMessage
-      );
-
       if (!receiptParty.mobile || !whatsappUrl) {
-        status = "failed";
         errorMessage = "No WhatsApp mobile is available for the selected party";
       } else {
-        status = "sent";
-        errorMessage = null;
+        errorMessage = "WhatsApp delivery could not be confirmed automatically";
       }
     }
 
@@ -2021,7 +2034,7 @@ class PaymentsService {
       amountDue: normalizeMoney(input.amountDue),
       channel: input.channel,
       status,
-      message: input.message ?? defaultMessage,
+      message: reminderMessage,
       sentAt: status === "sent" ? new Date() : null,
       errorMessage,
       createdBy: actor.id
@@ -2054,9 +2067,9 @@ class PaymentsService {
         errorMessage: reminder.errorMessage,
         sentAt: reminder.sentAt
       },
-      ...(input.channel === "whatsapp" && reminder.status === "sent" && receiptParty.mobile
+      ...(input.channel === "whatsapp" && whatsappUrl
         ? {
-            whatsappUrl: buildWhatsappShareUrl(receiptParty.mobile, input.message ?? defaultMessage)
+            whatsappUrl
           }
         : {})
     };

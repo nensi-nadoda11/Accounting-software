@@ -18,6 +18,7 @@ import {
   paymentIdParamSchema,
   partyDueItemsParamSchema,
   reminderIdParamSchema,
+  reminderPartyTypeParamSchema,
   replaceAllocationsSchema,
   sendReceiptSchema,
   sendReminderSchema,
@@ -62,6 +63,13 @@ router.get(
   requirePermission(["payment.view"]),
   validateRequest({ query: listRemindersQuerySchema }),
   asyncHandler(paymentsController.listReminders)
+);
+
+router.get(
+  "/reminder-parties/:type",
+  requirePermission(["payment.view", "payment.reminder.manage"]),
+  validateRequest({ params: reminderPartyTypeParamSchema }),
+  asyncHandler(paymentsController.listReminderParties)
 );
 
 router.post(

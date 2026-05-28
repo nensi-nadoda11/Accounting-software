@@ -251,6 +251,15 @@ export class PaymentsController {
     response.json(successResponse("Payment reminders fetched successfully", data));
   };
 
+  public listReminderParties = async (request: Request, response: Response): Promise<void> => {
+    const data = await paymentsService.listReminderParties(
+      { companyId: request.currentUser!.companyId! },
+      String(request.params.type) as "customer" | "supplier"
+    );
+
+    response.json(successResponse("Reminder parties fetched successfully", data));
+  };
+
   public sendReminder = async (request: Request, response: Response): Promise<void> => {
     const data = await paymentsService.sendReminder(
       {

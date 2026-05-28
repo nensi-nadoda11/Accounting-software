@@ -1,30 +1,21 @@
-import { BellRing, CheckCircle2 } from "lucide-react";
-
 import { AmountText } from "../../../components/ui/AmountText";
 import { Card } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Pagination } from "../../../components/ui/Pagination";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
 import { Table, TableWrapper } from "../../../components/ui/Table";
-import { TableActionIconButton } from "../../../components/ui/TableActionIconButton";
 import { formatDate, formatDateTime } from "../../customers/customerUtils";
-import type { PaymentReminder, PaymentRemindersResponse } from "../../../types/payment";
+import type { PaymentRemindersResponse } from "../../../types/payment";
 import { PAYMENT_REMINDER_CHANNEL_LABELS } from "../paymentOptions";
 
 export const RemindersTable = ({
   data,
   loading,
-  canManage,
   onPageChange,
-  onSend,
-  onUpdateStatus,
 }: {
   data: PaymentRemindersResponse | null;
   loading?: boolean;
-  canManage: boolean;
   onPageChange: (page: number) => void;
-  onSend: (reminder: PaymentReminder) => void;
-  onUpdateStatus: (reminder: PaymentReminder) => void;
 }) => {
   if (!loading && !data?.items.length) {
     return <EmptyState title="No reminders found" />;
@@ -37,7 +28,7 @@ export const RemindersTable = ({
           <Table>
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
               <tr>
-                {["Party", "Reference", "Due Date", "Amount", "Channel", "Status", "Sent At", "Actions"].map((head) => (
+                {["Party", "Reference", "Due Date", "Amount", "Channel", "Status", "Sent At"].map((head) => (
                   <th key={head} className="px-4 py-3 font-semibold">
                     {head}
                   </th>
@@ -48,7 +39,7 @@ export const RemindersTable = ({
               {loading && !data
                 ? Array.from({ length: 8 }).map((_, rowIndex) => (
                     <tr key={rowIndex} className="animate-pulse">
-                      {Array.from({ length: 8 }).map((__, cellIndex) => (
+                      {Array.from({ length: 7 }).map((__, cellIndex) => (
                         <td key={cellIndex} className="px-4 py-4">
                           <div className="h-4 rounded bg-slate-100" />
                         </td>
@@ -64,14 +55,6 @@ export const RemindersTable = ({
                       <td className="px-4 py-4 whitespace-nowrap">{PAYMENT_REMINDER_CHANNEL_LABELS[reminder.channel]}</td>
                       <td className="px-4 py-4 whitespace-nowrap"><StatusBadge status={reminder.status} /></td>
                       <td className="px-4 py-4 whitespace-nowrap">{formatDateTime(reminder.sentAt)}</td>
-                      <td className="px-4 py-4">
-                        {canManage ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <TableActionIconButton label="Send reminder" icon={<BellRing className="size-4" />} onClick={() => onSend(reminder)} />
-                            <TableActionIconButton label="Update status" icon={<CheckCircle2 className="size-4" />} onClick={() => onUpdateStatus(reminder)} />
-                          </div>
-                        ) : null}
-                      </td>
                     </tr>
                   ))}
             </tbody>

@@ -64,6 +64,11 @@ type DueListFilters = {
   overdueOnly?: boolean | undefined;
 };
 
+type ReminderPartyFilters = {
+  companyId: string;
+  partyType: "customer" | "supplier";
+};
+
 export class PaymentsRepository {
   private getExecutor(executor?: DbExecutor) {
     return executor ?? db;
@@ -411,6 +416,44 @@ export class PaymentsRepository {
       rows,
       total: totalRow?.value ?? 0
     };
+  }
+
+  public async listReminderParties(filters: ReminderPartyFilters) {
+    if (filters.partyType === "customer") {
+      return db
+        .select({
+          id: customers.id,
+          name: customers.name,
+          code: customers.customerCode
+        })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.companyId, filters.companyId),
+            eq(customers.status, "active"),
+            eq(customers.isBlacklisted, false),
+            isNull(customers.deletedAt)
+          )
+        )
+        .orderBy(asc(customers.name));
+    }
+
+    return db
+      .select({
+        id: suppliers.id,
+        name: suppliers.name,
+        code: suppliers.supplierCode
+      })
+      .from(suppliers)
+      .where(
+        and(
+          eq(suppliers.companyId, filters.companyId),
+          eq(suppliers.status, "active"),
+          eq(suppliers.isBlacklisted, false),
+          isNull(suppliers.deletedAt)
+        )
+      )
+      .orderBy(asc(suppliers.name));
   }
 
   public async createReminder(data: typeof paymentReminders.$inferInsert, executor?: DbExecutor) {

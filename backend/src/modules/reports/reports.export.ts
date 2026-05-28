@@ -463,6 +463,13 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
   });
   const totalWeight = weights.reduce((sum, value) => sum + value, 0);
   const columnWidths = weights.map((weight) => (contentWidth * weight) / totalWeight);
+  const columnAlignments = tableColumns.map((column) => {
+    if (column.key === "__sr") {
+      return "center" as const;
+    }
+
+    return column.type === "number" ? ("right" as const) : ("left" as const);
+  });
 
   const headerHeight = 24;
   const tableHeaderLines = tableColumns.map((column, index) => {
@@ -498,6 +505,50 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
     }
     commands.push(`${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re ${fillColor && strokeColor ? "B" : fillColor ? "f" : "S"}`);
     return commands.join("\n");
+  };
+
+  const drawLine = (x1: number, y1: number, x2: number, y2: number, strokeColor: typeof PDF_TEXT) => [
+    color(strokeColor, "stroke"),
+    `${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`
+  ].join("\n");
+
+  const estimateTextWidth = (text: string, fontSize = tableFontSize) => text.length * fontSize * 0.47;
+
+  const getAlignedTextX = (
+    x: number,
+    width: number,
+    text: string,
+    alignment: "left" | "center" | "right"
+  ) => {
+    const renderedWidth = estimateTextWidth(text);
+
+    if (alignment === "right") {
+      return x + width - cellPaddingX - renderedWidth;
+    }
+
+    if (alignment === "center") {
+      return x + Math.max(cellPaddingX, (width - renderedWidth) / 2);
+    }
+
+    return x + cellPaddingX;
+  };
+
+  const drawColumnSeparators = (
+    x: number,
+    topY: number,
+    bottomY: number,
+    widths: number[],
+    strokeColor: typeof PDF_TEXT
+  ) => {
+    const commands: string[] = [];
+    let currentX = x;
+
+    for (let index = 0; index < widths.length - 1; index += 1) {
+      currentX += widths[index]!;
+      commands.push(drawLine(currentX, topY, currentX, bottomY, strokeColor));
+    }
+
+    return commands;
   };
 
   const renderPageBase = (pageNumber: number, totalPages: number) => {
@@ -576,7 +627,7 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
   tableHeaderLines.forEach((lines, columnIndex) => {
     lines.forEach((line, lineIndex) => {
       currentCommands.push(
-        drawText(columnX + cellPaddingX, tableY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
+        drawText(getAlignedTextX(columnX, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!), tableY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
           size: tableFontSize,
           font: "F2",
           color: { r: 1, g: 1, b: 1 }
@@ -585,6 +636,7 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
     });
     columnX += columnWidths[columnIndex]!;
   });
+  currentCommands.push(...drawColumnSeparators(marginX, tableY, tableY - tableHeaderRowHeight, columnWidths, { r: 1, g: 1, b: 1 }));
   currentY = tableY - tableHeaderRowHeight;
 
   // Draw each row of the primary table
@@ -599,7 +651,7 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
       tableHeaderLines.forEach((lines, columnIndex) => {
         lines.forEach((line, lineIndex) => {
           currentCommands.push(
-            drawText(columnX + cellPaddingX, tableY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
+            drawText(getAlignedTextX(columnX, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!), tableY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
               size: tableFontSize,
               font: "F2",
               color: { r: 1, g: 1, b: 1 }
@@ -608,20 +660,25 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
         });
         columnX += columnWidths[columnIndex]!;
       });
+      currentCommands.push(...drawColumnSeparators(marginX, tableY, tableY - tableHeaderRowHeight, columnWidths, { r: 1, g: 1, b: 1 }));
       currentY = tableY - tableHeaderRowHeight;
     }
 
     const fill = rowIndex % 2 === 0 ? { r: 1, g: 1, b: 1 } : { r: 0.985, g: 0.99, b: 0.995 };
     currentCommands.push(drawRect(marginX, currentY - row.height, contentWidth, row.height, fill, PDF_BORDER));
+    currentCommands.push(...drawColumnSeparators(marginX, currentY, currentY - row.height, columnWidths, PDF_BORDER));
 
     let x = marginX;
     row.cellLines.forEach((cell, columnIndex) => {
-      const isNumber = tableColumns[columnIndex]!.type === "number";
-      const textX = isNumber ? x + columnWidths[columnIndex]! - cellPaddingX : x + cellPaddingX;
       cell.forEach((line, lineIndex) => {
-        const renderedWidth = line.length * tableFontSize * 0.47;
-        const lineX = isNumber ? textX - renderedWidth : textX;
-        currentCommands.push(drawText(lineX, currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, { size: tableFontSize }));
+        currentCommands.push(
+          drawText(
+            getAlignedTextX(x, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!),
+            currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4,
+            line,
+            { size: tableFontSize }
+          )
+        );
       });
       x += columnWidths[columnIndex]!;
     });
@@ -653,6 +710,13 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
     });
     const secTotalWeight = secWeights.reduce((sum, v) => sum + v, 0);
     const secColumnWidths = secWeights.map((w) => (contentWidth * w) / secTotalWeight);
+    const secColumnAlignments = secTableColumns.map((column) => {
+      if (column.key === "__sr") {
+        return "center" as const;
+      }
+
+      return column.type === "number" ? ("right" as const) : ("left" as const);
+    });
     
     const secHeaderLines = secTableColumns.map((col, idx) => {
       const maxChars = Math.max(4, Math.floor((secColumnWidths[idx]! - cellPaddingX * 2) / (tableFontSize * 0.52)));
@@ -686,7 +750,7 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
     secHeaderLines.forEach((lines, columnIndex) => {
       lines.forEach((line, lineIndex) => {
         currentCommands.push(
-          drawText(columnX + cellPaddingX, currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
+          drawText(getAlignedTextX(columnX, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!), currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
             size: tableFontSize,
             font: "F2",
             color: { r: 1, g: 1, b: 1 }
@@ -695,6 +759,7 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
       });
       columnX += secColumnWidths[columnIndex]!;
     });
+    currentCommands.push(...drawColumnSeparators(marginX, currentY, currentY - secTableHeaderRowHeight, secColumnWidths, { r: 1, g: 1, b: 1 }));
     currentY -= secTableHeaderRowHeight;
 
     secBodyRows.forEach((row, rowIndex) => {
@@ -709,7 +774,7 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
         secHeaderLines.forEach((lines, columnIndex) => {
           lines.forEach((line, lineIndex) => {
             currentCommands.push(
-              drawText(columnX + cellPaddingX, currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
+              drawText(getAlignedTextX(columnX, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!), currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
                 size: tableFontSize,
                 font: "F2",
                 color: { r: 1, g: 1, b: 1 }
@@ -718,20 +783,25 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
           });
           columnX += secColumnWidths[columnIndex]!;
         });
+        currentCommands.push(...drawColumnSeparators(marginX, currentY, currentY - secTableHeaderRowHeight, secColumnWidths, { r: 1, g: 1, b: 1 }));
         currentY -= secTableHeaderRowHeight;
       }
 
       const fill = rowIndex % 2 === 0 ? { r: 1, g: 1, b: 1 } : { r: 0.985, g: 0.99, b: 0.995 };
       currentCommands.push(drawRect(marginX, currentY - row.height, contentWidth, row.height, fill, PDF_BORDER));
+      currentCommands.push(...drawColumnSeparators(marginX, currentY, currentY - row.height, secColumnWidths, PDF_BORDER));
 
       let x = marginX;
       row.cellLines.forEach((cell, columnIndex) => {
-        const isNumber = secTableColumns[columnIndex]!.type === "number";
-        const textX = isNumber ? x + secColumnWidths[columnIndex]! - cellPaddingX : x + cellPaddingX;
         cell.forEach((line, lineIndex) => {
-          const renderedWidth = line.length * tableFontSize * 0.47;
-          const lineX = isNumber ? textX - renderedWidth : textX;
-          currentCommands.push(drawText(lineX, currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, { size: tableFontSize }));
+          currentCommands.push(
+            drawText(
+              getAlignedTextX(x, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!),
+              currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4,
+              line,
+              { size: tableFontSize }
+            )
+          );
         });
         x += secColumnWidths[columnIndex]!;
       });

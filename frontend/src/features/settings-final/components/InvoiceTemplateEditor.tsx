@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormSetError } from "react-hook-form";
 import type { z } from "zod";
 
 import { Button } from "../../../components/ui/Button";
@@ -43,7 +43,7 @@ export const InvoiceTemplateEditor = ({
   loading?: boolean;
   companyName?: string;
   onClose: () => void;
-  onSubmit: (value: InvoiceTemplateValues) => Promise<void>;
+  onSubmit: (value: InvoiceTemplateValues, setError: UseFormSetError<InvoiceTemplateValues>) => Promise<void>;
 }) => {
   const form = useForm<InvoiceTemplateValues>({
     resolver: zodResolver(invoiceTemplateSchema),
@@ -72,7 +72,7 @@ export const InvoiceTemplateEditor = ({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button loading={loading} onClick={form.handleSubmit(async (nextValue) => onSubmit(nextValue))}>
+          <Button loading={loading} onClick={form.handleSubmit(async (nextValue) => onSubmit(nextValue, form.setError))}>
             Save Template
           </Button>
         </>
@@ -83,7 +83,12 @@ export const InvoiceTemplateEditor = ({
           <div className="grid gap-4 md:grid-cols-2">
             <Input label="Template Name" {...form.register("templateName")} error={form.formState.errors.templateName?.message} />
             <Input label="Template Key" {...form.register("templateKey")} error={form.formState.errors.templateKey?.message} />
-            <Select label="Invoice Type" value={preview.invoiceType} onChange={(event) => form.setValue("invoiceType", event.target.value as InvoiceTemplateValues["invoiceType"])}>
+            <Select
+              label="Invoice Type"
+              value={preview.invoiceType}
+              error={form.formState.errors.invoiceType?.message}
+              onChange={(event) => form.setValue("invoiceType", event.target.value as InvoiceTemplateValues["invoiceType"], { shouldDirty: true, shouldValidate: true })}
+            >
               <option value="sales">Sales</option>
               <option value="purchase">Purchase</option>
               <option value="pos">POS</option>
@@ -98,6 +103,9 @@ export const InvoiceTemplateEditor = ({
             <ToggleSwitch label="Show Bank Details" checked={preview.layoutConfig.showBankDetails} onCheckedChange={(checked) => form.setValue("layoutConfig.showBankDetails", checked)} />
             <ToggleSwitch label="Show QR Code" checked={preview.layoutConfig.showQrCode} onCheckedChange={(checked) => form.setValue("layoutConfig.showQrCode", checked)} />
           </div>
+          {form.formState.errors.isDefault?.message ? (
+            <p className="text-xs text-rose-600">{form.formState.errors.isDefault.message}</p>
+          ) : null}
           <Textarea label="Terms / Footer" rows={4} {...form.register("layoutConfig.termsFooter")} error={form.formState.errors.layoutConfig?.termsFooter?.message} />
           <Textarea label="Footer Note" rows={4} {...form.register("layoutConfig.footerNote")} error={form.formState.errors.layoutConfig?.footerNote?.message} />
         </div>

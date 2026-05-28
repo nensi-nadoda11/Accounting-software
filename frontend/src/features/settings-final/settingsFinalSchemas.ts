@@ -17,16 +17,27 @@ export const settingsTabKeys = [
 export type SettingsTabKey = (typeof settingsTabKeys)[number];
 
 export const invoiceTemplateSchema = z.object({
-  templateKey: z.string().trim().min(2).max(80).optional().or(z.literal("")),
-  templateName: z.string().trim().min(2, "Template name is required").max(80),
+  templateKey: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9._:-]+$/i, "Template key can only contain letters, numbers, dot, underscore, colon and hyphen")
+    .min(2, "Template key must be at least 2 characters")
+    .max(80, "Template key must be 80 characters or less")
+    .optional()
+    .or(z.literal("")),
+  templateName: z
+    .string()
+    .trim()
+    .min(2, "Template name is required")
+    .max(80, "Template name must be 80 characters or less"),
   invoiceType: z.enum(["sales", "purchase", "pos", "return"]),
   layoutConfig: z.object({
     showLogo: z.boolean(),
     showSignature: z.boolean(),
     showBankDetails: z.boolean(),
     showQrCode: z.boolean(),
-    termsFooter: z.string().trim().max(500),
-    footerNote: z.string().trim().max(500),
+    termsFooter: z.string().trim().max(500, "Terms / Footer must be 500 characters or less"),
+    footerNote: z.string().trim().max(500, "Footer Note must be 500 characters or less"),
   }),
   isDefault: z.boolean(),
   isActive: z.boolean(),

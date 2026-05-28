@@ -28,6 +28,7 @@ import { PaymentModeModal } from "./components/PaymentModeModal";
 import { PaymentModesTable } from "./components/PaymentModesTable";
 import { PermissionMatrix } from "./components/PermissionMatrix";
 import { SettingsFinalTabs } from "./components/SettingsFinalTabs";
+import { applySettingsFieldErrors } from "./settingsFinalUtils";
 import { TaxSettingsForm } from "./components/TaxSettingsForm";
 import { ThemeSettingsForm } from "./components/ThemeSettingsForm";
 import {
@@ -204,7 +205,10 @@ export const SettingsFinalPage = () => {
     }
   }, [activeTab, invoiceLoading, invoiceTemplates, paymentLoading, paymentModes, permissionLoading, permissionMatrix, taxLoading, taxSettings, themeLoading, uiPreferences]);
 
-  const handleInvoiceSubmit = async (value: InvoiceTemplateValues) => {
+  const handleInvoiceSubmit = async (
+    value: InvoiceTemplateValues,
+    setError: Parameters<typeof applySettingsFieldErrors<InvoiceTemplateValues>>[1],
+  ) => {
     try {
       setInvoiceSaving(true);
       if (selectedInvoiceTemplate) {
@@ -221,7 +225,21 @@ export const SettingsFinalPage = () => {
       setSelectedInvoiceTemplate(null);
       await loadInvoiceTemplates();
     } catch (error) {
-      toast.error(getErrorMessage(error, "Unable to save invoice template"));
+      const handled = applySettingsFieldErrors(error, setError, [
+        {
+          includes: "template key already exists",
+          field: "templateKey",
+        },
+        {
+          includes: "default invoice template is allowed",
+          field: "isDefault",
+          message: "This invoice type already has a default template.",
+        },
+      ]);
+
+      if (!handled) {
+        toast.error(getErrorMessage(error, "Unable to save invoice template"));
+      }
     } finally {
       setInvoiceSaving(false);
     }

@@ -42,6 +42,7 @@ export const SETTINGS_TABS = [
       "profile.manage",
     ],
   },
+  { label: "Profile", href: "/app/settings/profile" },
   { label: "Company Profile", href: "/app/settings/company/profile", permissions: ["settings.manage"] },
   { label: "Tax & GST", href: "/app/settings/company/tax", permissions: ["settings.manage"] },
   { label: "Financial Year", href: "/app/settings/company/financial-years", permissions: ["settings.manage"] },
@@ -52,7 +53,6 @@ export const SETTINGS_TABS = [
   { label: "Preferences", href: "/app/settings/company/preferences", permissions: ["settings.manage"] },
   { label: "Users", href: "/app/settings/users", permissions: ["user.view", "user.manage"] },
   { label: "Invites", href: "/app/settings/invites", permissions: ["user.view", "user.manage"] },
-  { label: "Profile", href: "/app/settings/profile" },
   { label: "Security", href: "/app/settings/security" },
 ] as const satisfies readonly SectionNavItem[];
 

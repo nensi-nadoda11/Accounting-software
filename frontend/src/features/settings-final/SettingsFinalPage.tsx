@@ -19,7 +19,6 @@ import type {
   InvoiceTemplate,
   PaymentMode,
   PermissionMatrix as PermissionMatrixData,
-  ProfileSettings,
   TaxSettings,
   UiPreference,
 } from "../../types/settings";
@@ -28,15 +27,12 @@ import { InvoiceTemplatePreview } from "./components/InvoiceTemplatePreview";
 import { PaymentModeModal } from "./components/PaymentModeModal";
 import { PaymentModesTable } from "./components/PaymentModesTable";
 import { PermissionMatrix } from "./components/PermissionMatrix";
-import { ProfileSettingsForm } from "./components/ProfileSettingsForm";
 import { SettingsFinalTabs } from "./components/SettingsFinalTabs";
 import { TaxSettingsForm } from "./components/TaxSettingsForm";
 import { ThemeSettingsForm } from "./components/ThemeSettingsForm";
 import {
   invoiceTemplateSchema,
-  passwordChangeSchema,
   paymentModeSchema,
-  profileSettingsSchema,
   type SettingsTabKey,
   taxSettingsSchema,
   uiPreferencesSchema,
@@ -46,8 +42,6 @@ type InvoiceTemplateValues = z.infer<typeof invoiceTemplateSchema>;
 type PaymentModeValues = z.infer<typeof paymentModeSchema>;
 type TaxSettingsValues = z.infer<typeof taxSettingsSchema>;
 type ThemeValues = z.infer<typeof uiPreferencesSchema>;
-type ProfileValues = z.infer<typeof profileSettingsSchema>;
-type PasswordValues = z.infer<typeof passwordChangeSchema>;
 
 const ROUTE_PERMISSIONS: PermissionKey[] = [
   "settings.view",
@@ -69,7 +63,6 @@ const tabDefinitions: Array<{
   { key: "tax-settings", label: "Tax Settings", canAccess: (hasPermission) => hasPermission("tax.settings.manage") },
   { key: "payment-modes", label: "Payment Modes", canAccess: (hasPermission) => hasPermission("payment.settings.manage") },
   { key: "theme", label: "Theme", canAccess: (hasPermission) => hasPermission(["profile.manage", "settings.manage"]) },
-  { key: "profile", label: "Profile", canAccess: (hasPermission) => hasPermission("profile.manage") },
 ];
 
 export const SettingsFinalPage = () => {
@@ -106,13 +99,6 @@ export const SettingsFinalPage = () => {
   const [themeLoading, setThemeLoading] = useState(false);
   const [themeError, setThemeError] = useState<string | null>(null);
   const [themeSaving, setThemeSaving] = useState(false);
-
-  const [profileSettings, setProfileSettings] = useState<ProfileSettings | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [passwordSaving, setPasswordSaving] = useState(false);
-  const [logoutAllLoading, setLogoutAllLoading] = useState(false);
 
   const [confirmState, setConfirmState] = useState<
     | { type: "deleteInvoice"; item: InvoiceTemplate }
@@ -200,19 +186,6 @@ export const SettingsFinalPage = () => {
     }
   };
 
-  const loadProfile = async () => {
-    try {
-      setProfileLoading(true);
-      setProfileError(null);
-      const response = await settingsApi.getProfileSettings();
-      setProfileSettings(response.data);
-    } catch (error) {
-      setProfileError(getErrorMessage(error, "Failed to load profile settings"));
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (activeTab === "permissions" && !permissionMatrix && !permissionLoading) {
       void loadPermissions();
@@ -229,10 +202,7 @@ export const SettingsFinalPage = () => {
     if (activeTab === "theme" && !uiPreferences && !themeLoading) {
       void loadTheme();
     }
-    if (activeTab === "profile" && !profileSettings && !profileLoading) {
-      void loadProfile();
-    }
-  }, [activeTab, invoiceLoading, invoiceTemplates, paymentLoading, paymentModes, permissionLoading, permissionMatrix, profileLoading, profileSettings, taxLoading, taxSettings, themeLoading, uiPreferences]);
+  }, [activeTab, invoiceLoading, invoiceTemplates, paymentLoading, paymentModes, permissionLoading, permissionMatrix, taxLoading, taxSettings, themeLoading, uiPreferences]);
 
   const handleInvoiceSubmit = async (value: InvoiceTemplateValues) => {
     try {
@@ -509,71 +479,6 @@ export const SettingsFinalPage = () => {
             />
           ) : (
             <EmptyState title="No theme settings available" />
-          )
-        ) : (
-          <PermissionDeniedState />
-        )
-      ) : null}
-
-      {activeTab === "profile" ? (
-        auth.hasPermission("profile.manage") ? (
-          profileLoading && !profileSettings ? (
-            <LoadingState label="Loading profile settings..." />
-          ) : profileError && !profileSettings ? (
-            <ErrorState title={profileError} action={<Button variant="secondary" onClick={() => void loadProfile()}>Retry</Button>} />
-          ) : profileSettings ? (
-            <ProfileSettingsForm
-              value={profileSettings}
-              saving={profileSaving}
-              passwordSaving={passwordSaving}
-              logoutAllLoading={logoutAllLoading}
-              onSubmit={async (value: ProfileValues) => {
-                try {
-                  setProfileSaving(true);
-                  const response = await settingsApi.updateProfileSettings({
-                    fullName: value.fullName,
-                    mobileNumber: value.mobileNumber || null,
-                  });
-                  setProfileSettings(response.data);
-                  if (auth.user) {
-                    auth.updateUser({
-                      ...auth.user,
-                      fullName: response.data.user.fullName,
-                      mobileNumber: response.data.user.mobileNumber,
-                    });
-                  }
-                  toast.success("Profile updated");
-                } catch (error) {
-                  toast.error(getErrorMessage(error, "Unable to update profile"));
-                } finally {
-                  setProfileSaving(false);
-                }
-              }}
-              onChangePassword={async (value: PasswordValues) => {
-                try {
-                  setPasswordSaving(true);
-                  await settingsApi.changePassword(value);
-                  toast.success("Password updated");
-                } catch (error) {
-                  toast.error(getErrorMessage(error, "Unable to change password"));
-                } finally {
-                  setPasswordSaving(false);
-                }
-              }}
-              onLogoutAll={async () => {
-                try {
-                  setLogoutAllLoading(true);
-                  await settingsApi.logoutAll();
-                  await auth.logout();
-                } catch (error) {
-                  toast.error(getErrorMessage(error, "Unable to logout all devices"));
-                } finally {
-                  setLogoutAllLoading(false);
-                }
-              }}
-            />
-          ) : (
-            <EmptyState title="No profile settings available" />
           )
         ) : (
           <PermissionDeniedState />

@@ -12,7 +12,6 @@ export const settingsTabKeys = [
   "tax-settings",
   "payment-modes",
   "theme",
-  "profile",
 ] as const;
 
 export type SettingsTabKey = (typeof settingsTabKeys)[number];

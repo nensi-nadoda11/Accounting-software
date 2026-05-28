@@ -20,6 +20,8 @@ import type {
 } from "../types/purchase";
 import type { DownloadFileResult } from "../types/product";
 
+const PURCHASE_MUTATION_TIMEOUT_MS = 60_000;
+
 const getFileNameFromDisposition = (contentDisposition: string | undefined, fallback: string) => {
   if (!contentDisposition) {
     return fallback;
@@ -69,19 +71,23 @@ export const purchasesApi = {
     ).data,
 
   create: async (payload: PurchaseFormInput) =>
-    (await client.post<ApiResponse<PurchaseDetailResponse>>("/purchases", payload)).data,
+    (await client.post<ApiResponse<PurchaseDetailResponse>>("/purchases", payload, { timeout: PURCHASE_MUTATION_TIMEOUT_MS })).data,
 
   get: async (purchaseId: string) =>
     (await client.get<ApiResponse<PurchaseDetailResponse>>(`/purchases/${purchaseId}`)).data,
 
   update: async (purchaseId: string, payload: Omit<PurchaseFormInput, "purchaseStatus" | "paidAmount" | "paymentMode" | "paymentReference" | "bankAccountId">) =>
-    (await client.patch<ApiResponse<PurchaseDetailResponse>>(`/purchases/${purchaseId}`, payload)).data,
+    (
+      await client.patch<ApiResponse<PurchaseDetailResponse>>(`/purchases/${purchaseId}`, payload, {
+        timeout: PURCHASE_MUTATION_TIMEOUT_MS,
+      })
+    ).data,
 
   remove: async (purchaseId: string) =>
     (await client.delete<ApiResponse<Record<string, never>>>(`/purchases/${purchaseId}`)).data,
 
   post: async (purchaseId: string) =>
-    (await client.post<ApiResponse<PurchaseDetailResponse>>(`/purchases/${purchaseId}/post`)).data,
+    (await client.post<ApiResponse<PurchaseDetailResponse>>(`/purchases/${purchaseId}/post`, undefined, { timeout: PURCHASE_MUTATION_TIMEOUT_MS })).data,
 
   cancel: async (purchaseId: string) =>
     (await client.post<ApiResponse<PurchaseDetailResponse>>(`/purchases/${purchaseId}/cancel`)).data,

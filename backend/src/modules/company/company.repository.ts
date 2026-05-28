@@ -53,8 +53,8 @@ class CompanyRepository {
     return value === null ? null : Number(value);
   }
 
-  public async findCompanyById(companyId: string) {
-    const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1);
+  public async findCompanyById(companyId: string, executor?: DbExecutor) {
+    const [company] = await this.getExecutor(executor).select().from(companies).where(eq(companies.id, companyId)).limit(1);
     return company ?? null;
   }
 
@@ -72,8 +72,9 @@ class CompanyRepository {
     return company ?? null;
   }
 
-  public async findTaxSettingsByCompanyId(companyId: string) {
-    const [settings] = await db
+  public async findTaxSettingsByCompanyId(companyId: string, executor?: DbExecutor) {
+    const [settings] = await this
+      .getExecutor(executor)
       .select()
       .from(companyTaxSettings)
       .where(eq(companyTaxSettings.companyId, companyId))

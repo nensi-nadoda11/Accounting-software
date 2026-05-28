@@ -67,6 +67,7 @@ type ProductRecord = typeof products.$inferSelect;
 
 type ProductContextRow = Awaited<ReturnType<typeof inventoryRepository.findProductInventoryContext>>;
 type BatchContextRow = Awaited<ReturnType<typeof inventoryRepository.findBatchById>>;
+type InventoryTransactionExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 type BatchResolutionInput = {
   companyId: string;
@@ -346,8 +347,8 @@ class InventoryService {
     return `WH-${String((Number.isFinite(lastSequence) ? lastSequence : 0) + 1).padStart(6, "0")}`;
   }
 
-  private async getProductOrThrow(companyId: string, productId: string) {
-    const row = await inventoryRepository.findProductInventoryContext(companyId, productId);
+  private async getProductOrThrow(companyId: string, productId: string, executor?: InventoryTransactionExecutor) {
+    const row = await inventoryRepository.findProductInventoryContext(companyId, productId, executor);
     if (!row) {
       throw new AppError("Product not found", 404);
     }
@@ -355,8 +356,13 @@ class InventoryService {
     return row;
   }
 
-  private async getWarehouseOrThrow(companyId: string, warehouseId: string, includeDeleted = false) {
-    const warehouse = await inventoryRepository.findWarehouseById(companyId, warehouseId, includeDeleted);
+  private async getWarehouseOrThrow(
+    companyId: string,
+    warehouseId: string,
+    includeDeleted = false,
+    executor?: InventoryTransactionExecutor
+  ) {
+    const warehouse = await inventoryRepository.findWarehouseById(companyId, warehouseId, includeDeleted, executor);
     if (!warehouse) {
       throw new AppError("Warehouse not found", 404);
     }
@@ -364,8 +370,13 @@ class InventoryService {
     return warehouse;
   }
 
-  private async getBatchOrThrow(companyId: string, batchId: string, includeDeleted = false) {
-    const row = await inventoryRepository.findBatchById(companyId, batchId, includeDeleted);
+  private async getBatchOrThrow(
+    companyId: string,
+    batchId: string,
+    includeDeleted = false,
+    executor?: InventoryTransactionExecutor
+  ) {
+    const row = await inventoryRepository.findBatchById(companyId, batchId, includeDeleted, executor);
     if (!row) {
       throw new AppError("Batch not found", 404);
     }
@@ -433,7 +444,7 @@ class InventoryService {
     }
 
     if (input.batchId) {
-      const batchRow = await this.getBatchOrThrow(input.companyId, input.batchId);
+      const batchRow = await this.getBatchOrThrow(input.companyId, input.batchId, false, executor);
       if (batchRow.batch.productId !== input.product.id || batchRow.batch.warehouseId !== input.warehouse.id) {
         throw new AppError("Batch does not belong to the selected product and warehouse", 400);
       }
@@ -1659,9 +1670,15 @@ class InventoryService {
     executor: Parameters<Parameters<typeof db.transaction>[0]>[0]
   ) {
     const touched: Array<{ productId: string; warehouseId: string | null; batchId: string | null }> = [];
+    const productCache = new Map<string, NonNullable<ProductContextRow>>();
+    const warehouseCache = new Map<string, WarehouseRecord>();
 
     for (const item of input.items) {
-      const productRow = await this.getProductOrThrow(actor.companyId, item.productId);
+      let productRow = productCache.get(item.productId);
+      if (!productRow) {
+        productRow = await this.getProductOrThrow(actor.companyId, item.productId, executor);
+        productCache.set(item.productId, productRow);
+      }
 
       if (productRow.product.productType !== "goods" || !productRow.product.stockTrackingEnabled) {
         continue;
@@ -1672,7 +1689,11 @@ class InventoryService {
         throw new AppError("Warehouse is required for goods inventory updates", 400);
       }
 
-      const warehouse = await this.getWarehouseOrThrow(actor.companyId, item.warehouseId);
+      let warehouse = warehouseCache.get(item.warehouseId);
+      if (!warehouse) {
+        warehouse = await this.getWarehouseOrThrow(actor.companyId, item.warehouseId, false, executor);
+        warehouseCache.set(item.warehouseId, warehouse);
+      }
       this.assertActiveWarehouse(warehouse);
       this.assertDecimalQuantityAllowed(item.quantity, Boolean(productRow.unitDecimalAllowed));
 

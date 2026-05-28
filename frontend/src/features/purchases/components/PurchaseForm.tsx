@@ -13,11 +13,12 @@ import { applyFriendlyFieldErrors } from "../../customers/customerUtils";
 import { getErrorMessage } from "../../../lib/errors";
 import { useAuth } from "../../../providers/useAuth";
 import { useToast } from "../../../providers/useToast";
+import { inventoryApi } from "../../../services/inventoryApi";
 import { paymentsApi } from "../../../services/paymentsApi";
 import { productsApi } from "../../../services/productsApi";
 import { suppliersApi } from "../../../services/suppliersApi";
 import type { CompanyBankAccount, CompanyInvoiceSettings, CompanyProfile } from "../../../types/company";
-import type { Warehouse } from "../../../types/inventory";
+import type { ProductBatch, Warehouse } from "../../../types/inventory";
 import type { Product, ProductListItem, ProductLookupItem } from "../../../types/product";
 import type { Supplier, SupplierFormInput, SupplierListItem } from "../../../types/supplier";
 import type { PurchaseFormInput, PurchaseInvoice, PurchasePaymentMode } from "../../../types/purchase";
@@ -33,15 +34,31 @@ import {
   hydrateItemFromProduct,
   isBankPaymentMode,
   resolveInterState,
+  toDateInputValue,
 } from "../purchaseUtils";
 import { AsyncLookupSelect, type LookupOption } from "./AsyncLookupSelect";
-import { PurchaseItemsTable } from "./PurchaseItemsTable";
+import { PurchaseItemsTable, type PurchaseBatchOption } from "./PurchaseItemsTable";
 import { PurchaseTotalsPanel } from "./PurchaseTotalsPanel";
 import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
 type SupplierLookupValue = LookupOption | null;
 const SUPPLIER_DIRECTORY_LIMIT = 100;
 const PRODUCT_DIRECTORY_LIMIT = 100;
+const MANUAL_BATCH_MODE = "manual" as const;
+const EXISTING_BATCH_MODE = "existing" as const;
+
+const shiftIndexedRecordAfterRemoval = <T,>(record: Record<number, T>, removedIndex: number) =>
+  Object.entries(record).reduce<Record<number, T>>((accumulator, [key, value]) => {
+    const numericKey = Number(key);
+
+    if (numericKey < removedIndex) {
+      accumulator[numericKey] = value;
+    } else if (numericKey > removedIndex) {
+      accumulator[numericKey - 1] = value;
+    }
+
+    return accumulator;
+  }, {});
 
 const buildSupplierLookupOption = (supplier: Pick<SupplierListItem, "id" | "name" | "supplierCode" | "mobile">): LookupOption => ({
   id: supplier.id,
@@ -135,6 +152,9 @@ export const PurchaseForm = ({
   const [productLookupLoading, setProductLookupLoading] = useState(false);
   const [supplierDetail, setSupplierDetail] = useState<Supplier | null>(null);
   const [productDetails, setProductDetails] = useState<Record<string, Product>>({});
+  const [batchOptions, setBatchOptions] = useState<Record<number, PurchaseBatchOption[]>>({});
+  const [batchModeByIndex, setBatchModeByIndex] = useState<Record<number, "existing" | "manual">>({});
+  const [loadingBatchIndex, setLoadingBatchIndex] = useState<number | null>(null);
   const [availableAdvanceAmount, setAvailableAdvanceAmount] = useState(0);
   const [useAdvanceAmount, setUseAdvanceAmount] = useState(false);
   const [advanceAdjustmentAmount, setAdvanceAdjustmentAmount] = useState(0);
@@ -253,6 +273,8 @@ export const PurchaseForm = ({
     if (!initialInvoice) {
       setSupplierLookupValue(null);
       setSupplierDetail(null);
+      setBatchOptions({});
+      setBatchModeByIndex({});
       setAvailableAdvanceAmount(0);
       setUseAdvanceAmount(false);
       setAdvanceAdjustmentAmount(0);
@@ -268,6 +290,8 @@ export const PurchaseForm = ({
       ...buildPurchaseFormDefaults(initialInvoice, invoiceSettings),
       grandTotalPreview: Number(initialInvoice.grandTotal),
     });
+    setBatchOptions({});
+    setBatchModeByIndex({});
     setAvailableAdvanceAmount(0);
     setUseAdvanceAmount(false);
     setAdvanceAdjustmentAmount(0);
@@ -286,12 +310,27 @@ export const PurchaseForm = ({
         ]);
 
         setSupplierDetail(supplierResponse.data.supplier);
-        setProductDetails(
-          productResponses.reduce<Record<string, Product>>((accumulator, response) => {
-            accumulator[response.data.product.id] = response.data.product;
-            return accumulator;
-          }, {}),
-        );
+        const nextProductDetails = productResponses.reduce<Record<string, Product>>((accumulator, response) => {
+          accumulator[response.data.product.id] = response.data.product;
+          return accumulator;
+        }, {});
+        setProductDetails(nextProductDetails);
+        (initialInvoice.items ?? []).forEach((item, index) => {
+          const product = nextProductDetails[item.productId];
+          if (!product) {
+            return;
+          }
+
+          form.setValue(`items.${index}.productType`, product.productType, { shouldDirty: false, shouldValidate: true });
+          form.setValue(`items.${index}.batchTrackingEnabled`, product.batchTrackingEnabled, { shouldDirty: false, shouldValidate: true });
+          form.setValue(`items.${index}.expiryTrackingEnabled`, product.expiryTrackingEnabled, { shouldDirty: false, shouldValidate: true });
+          form.setValue(`items.${index}.decimalAllowed`, undefined, { shouldDirty: false, shouldValidate: true });
+
+          const warehouseId = item.warehouse?.id ?? initialInvoice.warehouse?.id ?? null;
+          if (product.batchTrackingEnabled && warehouseId) {
+            void loadBatches(index, product.id, warehouseId);
+          }
+        });
       } catch {
         // The form still works with existing invoice snapshots if these lookups fail.
       }
@@ -474,6 +513,178 @@ export const PurchaseForm = ({
 
   void loadProducts;
 
+  const clearBatchState = useCallback((index: number, options?: { clearValues?: boolean }) => {
+    const shouldClearValues = options?.clearValues ?? true;
+
+    setBatchOptions((current) => ({ ...current, [index]: [] }));
+    setBatchModeByIndex((current) => ({ ...current, [index]: MANUAL_BATCH_MODE }));
+
+    if (!shouldClearValues) {
+      return;
+    }
+
+    form.setValue(`items.${index}.batchId`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.batchNumber`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.manufacturingDate`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.expiryDate`, null, { shouldDirty: true, shouldValidate: true });
+  }, [form]);
+
+  const applyBatchOptionToItem = useCallback((index: number, batch: PurchaseBatchOption) => {
+    setBatchModeByIndex((current) => ({ ...current, [index]: EXISTING_BATCH_MODE }));
+    form.setValue(`items.${index}.batchId`, batch.id, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.batchNumber`, batch.batchNumber, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.manufacturingDate`, batch.manufacturingDate, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.expiryDate`, batch.expiryDate, { shouldDirty: true, shouldValidate: true });
+  }, [form]);
+
+  const mapBatchToOption = useCallback((batch: ProductBatch): PurchaseBatchOption => ({
+    id: batch.id,
+    label: batch.expiryDate
+      ? `${batch.batchNumber} · ${batch.availableQuantity} · ${toDateInputValue(batch.expiryDate)}`
+      : `${batch.batchNumber} · ${batch.availableQuantity}`,
+    batchNumber: batch.batchNumber,
+    manufacturingDate: toDateInputValue(batch.manufacturingDate),
+    expiryDate: toDateInputValue(batch.expiryDate),
+    availableQuantity: batch.availableQuantity,
+  }), []);
+
+  const loadBatches = useCallback(async (index: number, productId?: string, warehouseId?: string | null) => {
+    const resolvedProductId = (productId ?? (form.getValues(`items.${index}.productId`) as string | undefined)) ?? "";
+    const resolvedWarehouseId =
+      (warehouseId ?? (form.getValues(`items.${index}.warehouseId`) as string | null | undefined) ?? (form.getValues("warehouseId") as string | undefined)) ?? "";
+    const batchTrackingEnabled = Boolean(form.getValues(`items.${index}.batchTrackingEnabled`));
+
+    if (!resolvedProductId || !resolvedWarehouseId || !batchTrackingEnabled) {
+      clearBatchState(index, { clearValues: !batchTrackingEnabled });
+      return;
+    }
+
+    try {
+      setLoadingBatchIndex(index);
+      const response = await inventoryApi.listBatches({
+        page: 1,
+        limit: 50,
+        productId: resolvedProductId,
+        warehouseId: resolvedWarehouseId,
+      });
+      const nextOptions = response.data.items.map(mapBatchToOption);
+      const currentBatchId = (form.getValues(`items.${index}.batchId`) as string | null | undefined) ?? null;
+      const currentBatchNumber = (form.getValues(`items.${index}.batchNumber`) as string | null | undefined) ?? null;
+      const preferredManualMode = batchModeByIndex[index] === MANUAL_BATCH_MODE && Boolean(currentBatchNumber) && !currentBatchId;
+
+      setBatchOptions((current) => ({ ...current, [index]: nextOptions }));
+
+      const matchedBatchById = currentBatchId ? nextOptions.find((option) => option.id === currentBatchId) ?? null : null;
+      if (matchedBatchById) {
+        applyBatchOptionToItem(index, matchedBatchById);
+        return;
+      }
+
+      if (preferredManualMode) {
+        setBatchModeByIndex((current) => ({ ...current, [index]: MANUAL_BATCH_MODE }));
+        return;
+      }
+
+      if (nextOptions.length === 0) {
+        setBatchModeByIndex((current) => ({ ...current, [index]: MANUAL_BATCH_MODE }));
+        return;
+      }
+
+      if (nextOptions.length === 1) {
+        applyBatchOptionToItem(index, nextOptions[0]!);
+        return;
+      }
+
+      const matchedBatchByNumber = currentBatchNumber
+        ? nextOptions.find((option) => option.batchNumber === currentBatchNumber) ?? null
+        : null;
+      if (matchedBatchByNumber) {
+        applyBatchOptionToItem(index, matchedBatchByNumber);
+        return;
+      }
+
+      setBatchModeByIndex((current) => ({ ...current, [index]: EXISTING_BATCH_MODE }));
+      form.setValue(`items.${index}.batchId`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.batchNumber`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.manufacturingDate`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.expiryDate`, null, { shouldDirty: true, shouldValidate: true });
+    } catch {
+      clearBatchState(index, { clearValues: false });
+    } finally {
+      setLoadingBatchIndex((current) => (current === index ? null : current));
+    }
+  }, [applyBatchOptionToItem, batchModeByIndex, clearBatchState, form, mapBatchToOption]);
+
+  const handleBatchModeChange = useCallback((index: number, mode: "existing" | "manual") => {
+    setBatchModeByIndex((current) => ({ ...current, [index]: mode }));
+
+    if (mode === MANUAL_BATCH_MODE) {
+      form.setValue(`items.${index}.batchId`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.batchNumber`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.manufacturingDate`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.expiryDate`, null, { shouldDirty: true, shouldValidate: true });
+      return;
+    }
+
+    const options = batchOptions[index] ?? [];
+    if (options.length === 1) {
+      applyBatchOptionToItem(index, options[0]!);
+      return;
+    }
+
+    form.setValue(`items.${index}.batchId`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.batchNumber`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.manufacturingDate`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.expiryDate`, null, { shouldDirty: true, shouldValidate: true });
+  }, [applyBatchOptionToItem, batchOptions, form]);
+
+  const handleBatchSelect = useCallback((index: number, batchId: string | null) => {
+    const selectedBatch = (batchOptions[index] ?? []).find((entry) => entry.id === batchId);
+
+    if (!selectedBatch) {
+      form.setValue(`items.${index}.batchId`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.batchNumber`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.manufacturingDate`, null, { shouldDirty: true, shouldValidate: true });
+      form.setValue(`items.${index}.expiryDate`, null, { shouldDirty: true, shouldValidate: true });
+      return;
+    }
+
+    applyBatchOptionToItem(index, selectedBatch);
+  }, [applyBatchOptionToItem, batchOptions, form]);
+
+  const handleItemWarehouseChange = useCallback((index: number, warehouseId: string | null) => {
+    form.setValue(`items.${index}.warehouseId`, warehouseId, { shouldDirty: true, shouldValidate: true });
+
+    const productId = (form.getValues(`items.${index}.productId`) as string | undefined) ?? "";
+    const productType = form.getValues(`items.${index}.productType`) as string | undefined;
+    const batchTrackingEnabled = Boolean(form.getValues(`items.${index}.batchTrackingEnabled`));
+
+    if (productType !== "goods") {
+      clearBatchState(index);
+      return;
+    }
+
+    form.setValue(`items.${index}.batchId`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.batchNumber`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.manufacturingDate`, null, { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.expiryDate`, null, { shouldDirty: true, shouldValidate: true });
+
+    if (batchTrackingEnabled && productId && warehouseId) {
+      void loadBatches(index, productId, warehouseId);
+      return;
+    }
+
+    clearBatchState(index, { clearValues: false });
+  }, [clearBatchState, form, loadBatches]);
+
+  const handleProductClear = useCallback((index: number) => {
+    form.setValue(`items.${index}.productId`, "", { shouldDirty: true, shouldValidate: true });
+    form.setValue(`items.${index}.batchTrackingEnabled`, false, { shouldDirty: false, shouldValidate: true });
+    form.setValue(`items.${index}.expiryTrackingEnabled`, false, { shouldDirty: false, shouldValidate: true });
+    form.setValue(`items.${index}.productType`, undefined, { shouldDirty: false, shouldValidate: true });
+    clearBatchState(index);
+  }, [clearBatchState, form]);
+
   const handleSupplierSelect = async (option: LookupOption) => {
     stopSupplierLookup();
     setSupplierLookupValue(option);
@@ -533,18 +744,30 @@ export const PurchaseForm = ({
       form.setValue(`items.${index}.batchTrackingEnabled`, product.batchTrackingEnabled, { shouldDirty: false, shouldValidate: true });
       form.setValue(`items.${index}.expiryTrackingEnabled`, product.expiryTrackingEnabled, { shouldDirty: false, shouldValidate: true });
       form.setValue(`items.${index}.decimalAllowed`, undefined, { shouldDirty: false, shouldValidate: true });
+
+      if (product.productType === "goods" && product.batchTrackingEnabled && nextItem.warehouseId) {
+        await loadBatches(index, product.id, nextItem.warehouseId);
+      } else {
+        clearBatchState(index, { clearValues: false });
+      }
     } catch {
       // Validation and submit feedback will still protect the flow.
     }
   };
 
   const applyDefaultWarehouseToItems = useCallback((warehouseId: string | null) => {
-    values.items.forEach((item, index) => {
+    form.getValues("items").forEach((item, index) => {
       if (item.productType === "goods") {
-        form.setValue(`items.${index}.warehouseId`, warehouseId, { shouldDirty: true, shouldValidate: true });
+        handleItemWarehouseChange(index, warehouseId);
       }
     });
-  }, [form, values.items]);
+  }, [form, handleItemWarehouseChange]);
+
+  const handleRemoveItem = useCallback((index: number) => {
+    setBatchOptions((current) => shiftIndexedRecordAfterRemoval(current, index));
+    setBatchModeByIndex((current) => shiftIndexedRecordAfterRemoval(current, index));
+    remove(index);
+  }, [remove]);
 
   const currentPaymentMode = (form.watch("paymentMode") as PurchasePaymentMode | null | undefined) ?? null;
   const hasDirectPayment = Number(values.paidAmount ?? 0) > 0;
@@ -655,6 +878,8 @@ export const PurchaseForm = ({
               setUseAdvanceAmount(false);
               setAdvanceAdjustmentAmount(0);
               setAdvanceError(null);
+              setBatchOptions({});
+              setBatchModeByIndex({});
               form.reset({
                 ...buildPurchaseFormDefaults(initialInvoice, invoiceSettings),
                 grandTotalPreview: Number(initialInvoice?.grandTotal ?? 0),
@@ -776,11 +1001,19 @@ export const PurchaseForm = ({
         productLookupLoading={productLookupLoading}
         productLookupNoResultsLabel={productLookupMessage ?? "No matching active products found"}
         productDetails={productDetails}
+        batchOptions={batchOptions}
+        batchModeByIndex={batchModeByIndex}
+        loadingBatchIndex={loadingBatchIndex}
         preview={preview}
         append={append}
-        remove={remove}
+        remove={handleRemoveItem}
         onProductSearch={(value) => void loadProductsWithFallback(value)}
         onProductSelect={(index, option) => void handleProductSelect(index, option)}
+        onProductClear={handleProductClear}
+        onWarehouseChange={handleItemWarehouseChange}
+        onBatchLoad={(index) => void loadBatches(index)}
+        onBatchSelect={handleBatchSelect}
+        onBatchModeChange={handleBatchModeChange}
         getLookupValue={(index) => {
           const item = values.items[index];
           if (!item?.productId) {

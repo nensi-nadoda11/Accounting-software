@@ -44,6 +44,7 @@ import {
 type ProductContextRow = Awaited<ReturnType<typeof inventoryRepository.findProductInventoryContext>>;
 type InvoiceRecord = Awaited<ReturnType<typeof purchasesRepository.findPurchaseById>>;
 type InvoiceItemRow = Awaited<ReturnType<typeof purchasesRepository.listPurchaseInvoiceItems>>[number];
+type PurchaseTransactionExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 type ResolvedPurchaseItem = {
   product: NonNullable<ProductContextRow>;
@@ -504,8 +505,8 @@ class PurchasesService {
     };
   }
 
-  private async getSupplierOrThrow(companyId: string, supplierId: string) {
-    const supplier = await suppliersRepository.findById(companyId, supplierId);
+  private async getSupplierOrThrow(companyId: string, supplierId: string, executor?: PurchaseTransactionExecutor) {
+    const supplier = await suppliersRepository.findById(companyId, supplierId, false, executor);
     if (!supplier) {
       throw new AppError("Supplier not found", 404);
     }
@@ -521,8 +522,8 @@ class PurchasesService {
     return supplier;
   }
 
-  private async getBankAccountOrThrow(companyId: string, bankAccountId: string) {
-    const bankAccount = await companyRepository.findBankAccountById(companyId, bankAccountId);
+  private async getBankAccountOrThrow(companyId: string, bankAccountId: string, executor?: PurchaseTransactionExecutor) {
+    const bankAccount = await companyRepository.findBankAccountById(companyId, bankAccountId, executor);
     if (!bankAccount || !bankAccount.isActive) {
       throw new AppError("Active bank account not found", 404);
     }
@@ -530,8 +531,8 @@ class PurchasesService {
     return bankAccount;
   }
 
-  private async getWarehouseOrThrow(companyId: string, warehouseId: string) {
-    const warehouse = await inventoryRepository.findWarehouseById(companyId, warehouseId);
+  private async getWarehouseOrThrow(companyId: string, warehouseId: string, executor?: PurchaseTransactionExecutor) {
+    const warehouse = await inventoryRepository.findWarehouseById(companyId, warehouseId, false, executor);
     if (!warehouse) {
       throw new AppError("Warehouse not found", 404);
     }
@@ -543,7 +544,7 @@ class PurchasesService {
     return warehouse;
   }
 
-  private async getPurchaseOrThrow(companyId: string, purchaseId: string, executor?: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+  private async getPurchaseOrThrow(companyId: string, purchaseId: string, executor?: PurchaseTransactionExecutor) {
     const purchase = await purchasesRepository.findPurchaseById(companyId, purchaseId, executor);
     if (!purchase) {
       throw new AppError("Purchase invoice not found", 404);
@@ -557,47 +558,54 @@ class PurchasesService {
     return this.normalizePrefix(settings?.purchaseInvoicePrefix, "PUR");
   }
 
-  private async getNextPurchaseNumber(companyId: string, executor: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+  private async getNextPurchaseNumber(companyId: string, executor: PurchaseTransactionExecutor) {
     await purchasesRepository.acquireScopedLock("purchase-number", companyId, executor);
     const latest = await purchasesRepository.findLatestPurchaseNumber(companyId, executor);
     const prefix = await this.getPurchasePrefix(companyId);
     return this.buildNextSequenceNumber(latest, prefix);
   }
 
-  private async getNextReturnNumber(companyId: string, executor: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+  private async getNextReturnNumber(companyId: string, executor: PurchaseTransactionExecutor) {
     await purchasesRepository.acquireScopedLock("purchase-return-number", companyId, executor);
     const latest = await purchasesRepository.findLatestReturnNumber(companyId, executor);
     return this.buildNextSequenceNumber(latest, "PR-");
   }
 
-  private async getCompanyTaxContext(companyId: string) {
-    const [company, taxSettings] = await Promise.all([
-      companyRepository.findCompanyById(companyId),
-      companyRepository.findTaxSettingsByCompanyId(companyId)
-    ]);
+  private async getCompanyOrThrow(companyId: string, executor?: PurchaseTransactionExecutor) {
+    const company = await companyRepository.findCompanyById(companyId, executor);
 
     if (!company) {
       throw new AppError("Company not found", 404);
     }
 
-    return {
-      company,
-      taxSettings
-    };
+    return company;
   }
 
   private async resolvePurchaseItems(
     companyId: string,
     supplierState: string | null,
     invoiceWarehouseId: string | null,
-    items: CreatePurchaseInput["items"] | NonNullable<UpdatePurchaseInput["items"]>
+    items: CreatePurchaseInput["items"] | NonNullable<UpdatePurchaseInput["items"]>,
+    executor?: PurchaseTransactionExecutor
   ) {
-    const { company } = await this.getCompanyTaxContext(companyId);
+    const company = await this.getCompanyOrThrow(companyId, executor);
     const companyState = this.normalizeState(company.state);
     const resolvedItems: ResolvedPurchaseItem[] = [];
+    const productCache = new Map<string, NonNullable<ProductContextRow>>();
+    const warehouseCache = new Map<string, Awaited<ReturnType<typeof inventoryRepository.findWarehouseById>>>();
+    const batchByIdCache = new Map<string, Awaited<ReturnType<typeof inventoryRepository.findBatchById>>>();
+    const batchByNumberCache = new Map<string, Awaited<ReturnType<typeof inventoryRepository.findBatchByNumber>>>();
 
     for (const item of items) {
-      const productRow = await inventoryRepository.findProductInventoryContext(companyId, item.productId);
+      let productRow = productCache.get(item.productId);
+      if (!productRow) {
+        const fetchedProductRow = await inventoryRepository.findProductInventoryContext(companyId, item.productId, executor);
+        if (fetchedProductRow) {
+          productCache.set(item.productId, fetchedProductRow);
+        }
+        productRow = fetchedProductRow ?? undefined;
+      }
+
       if (!productRow) {
         throw new AppError("Product not found", 404);
       }
@@ -620,7 +628,9 @@ class PurchasesService {
           throw new AppError(`Warehouse is required for goods product ${productRow.product.name}`, 400);
         }
 
-        await this.getWarehouseOrThrow(companyId, warehouseId);
+        if (!warehouseCache.has(warehouseId)) {
+          warehouseCache.set(warehouseId, await this.getWarehouseOrThrow(companyId, warehouseId, executor));
+        }
       }
 
       if (productRow.product.productType === "service" && warehouseId) {
@@ -639,6 +649,47 @@ class PurchasesService {
         throw new AppError(`Expiry date must be after manufacturing date for ${productRow.product.name}`, 400);
       }
 
+      let batchId = item.batchId ?? null;
+      let batchNumber = item.batchNumber ?? null;
+
+      if (productRow.product.batchTrackingEnabled && warehouseId) {
+        if (batchId) {
+          let batchRow = batchByIdCache.get(batchId);
+          if (batchRow === undefined) {
+            batchRow = await inventoryRepository.findBatchById(companyId, batchId, false, executor);
+            batchByIdCache.set(batchId, batchRow);
+          }
+
+          if (!batchRow) {
+            throw new AppError(`Batch not found for ${productRow.product.name}`, 404);
+          }
+
+          if (batchRow.batch.productId !== productRow.product.id || batchRow.batch.warehouseId !== warehouseId) {
+            throw new AppError(`Batch does not belong to the selected product and warehouse for ${productRow.product.name}`, 400);
+          }
+
+          batchNumber = batchNumber ?? batchRow.batch.batchNumber;
+        } else if (batchNumber) {
+          const batchLookupKey = `${productRow.product.id}:${warehouseId}:${batchNumber}`;
+          let existingBatch = batchByNumberCache.get(batchLookupKey);
+          if (existingBatch === undefined) {
+            existingBatch = await inventoryRepository.findBatchByNumber(
+              companyId,
+              productRow.product.id,
+              warehouseId,
+              batchNumber,
+              undefined,
+              executor
+            );
+            batchByNumberCache.set(batchLookupKey, existingBatch);
+          }
+
+          if (existingBatch) {
+            batchId = existingBatch.id;
+          }
+        }
+      }
+
       const gstRate =
         productRow.product.taxType === "taxable"
           ? normalizeMoney(item.gstRate ?? productRow.product.gstRate)
@@ -651,8 +702,8 @@ class PurchasesService {
       resolvedItems.push({
         product: productRow,
         warehouseId,
-        batchId: item.batchId ?? null,
-        batchNumber: item.batchNumber ?? null,
+        batchId,
+        batchNumber,
         quantity,
         freeQuantity,
         totalStockQuantity,
@@ -764,17 +815,17 @@ class PurchasesService {
       termsConditions?: string | null | undefined;
       attachmentUrl?: string | null | undefined;
     },
-    executor: Parameters<Parameters<typeof db.transaction>[0]>[0],
+    executor: PurchaseTransactionExecutor,
     existingPurchaseId?: string
   ) {
-    const supplier = await this.getSupplierOrThrow(actor.companyId, input.supplierId);
+    const supplier = await this.getSupplierOrThrow(actor.companyId, input.supplierId, executor);
     const invoiceWarehouseId = input.warehouseId ?? null;
     if (invoiceWarehouseId) {
-      await this.getWarehouseOrThrow(actor.companyId, invoiceWarehouseId);
+      await this.getWarehouseOrThrow(actor.companyId, invoiceWarehouseId, executor);
     }
 
     if (input.bankAccountId) {
-      await this.getBankAccountOrThrow(actor.companyId, input.bankAccountId);
+      await this.getBankAccountOrThrow(actor.companyId, input.bankAccountId, executor);
     }
 
     if (input.supplierInvoiceNumber) {
@@ -795,7 +846,8 @@ class PurchasesService {
       actor.companyId,
       this.normalizeState(supplier.gstState ?? supplier.billingState ?? supplier.shippingState),
       invoiceWarehouseId,
-      input.items
+      input.items,
+      executor
     );
 
     const totals = calculateInvoiceTotals({

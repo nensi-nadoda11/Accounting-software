@@ -12,6 +12,7 @@ const API_BASE_URL = getApiBaseUrl({
 });
 const REQUEST_TIMEOUT_MS = 15000;
 const TRANSIENT_RETRY_DELAY_MS = 500;
+const MAX_TRANSIENT_REQUEST_ATTEMPTS = 3;
 const MAX_REFRESH_ATTEMPTS = 2;
 
 const client = axios.create({
@@ -59,6 +60,8 @@ const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
+
+const getTransientRetryDelay = (attempt: number) => TRANSIENT_RETRY_DELAY_MS * attempt;
 
 const applySessionUpdate = (session: LoginResponse) => {
   tokenStore.set(session.accessToken);
@@ -142,21 +145,22 @@ client.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as (InternalAxiosRequestConfig & {
       _retry?: boolean;
-      _transientRetry?: boolean;
+      _transientRetryCount?: number;
     }) | undefined;
     const status = error.response?.status;
     const requestUrl = originalRequest?.url ?? "";
     const method = originalRequest?.method?.toLowerCase();
+    const transientRetryCount = originalRequest?._transientRetryCount ?? 0;
 
     if (status !== 401 || !originalRequest || originalRequest._retry || requestUrl.includes("/auth/login") || isAuthRefreshRequest(requestUrl)) {
       if (
         originalRequest &&
-        !originalRequest._transientRetry &&
+        transientRetryCount < MAX_TRANSIENT_REQUEST_ATTEMPTS &&
         (method === "get" || method === "head") &&
         isTransientAxiosError(error)
       ) {
-        originalRequest._transientRetry = true;
-        await sleep(TRANSIENT_RETRY_DELAY_MS);
+        originalRequest._transientRetryCount = transientRetryCount + 1;
+        await sleep(getTransientRetryDelay(originalRequest._transientRetryCount));
         return client(originalRequest);
       }
 

@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import type { FieldArrayWithId, UseFieldArrayAppend, UseFieldArrayRemove, UseFormReturn } from "react-hook-form";
+import type { FieldArrayWithId, UseFieldArrayAppend, UseFormReturn } from "react-hook-form";
 
 import { Button } from "../../../components/ui/Button";
 import { AmountText } from "../../../components/ui/AmountText";
@@ -15,6 +15,15 @@ import type { PurchaseFormInput } from "../../../types/purchase";
 import { AsyncLookupSelect, type LookupOption } from "./AsyncLookupSelect";
 import { WarehouseLookupSelect } from "./WarehouseLookupSelect";
 
+export type PurchaseBatchOption = {
+  id: string;
+  label: string;
+  batchNumber: string;
+  manufacturingDate: string | null;
+  expiryDate: string | null;
+  availableQuantity: string;
+};
+
 export const PurchaseItemsTable = ({
   form,
   fields,
@@ -23,10 +32,18 @@ export const PurchaseItemsTable = ({
   productLookupLoading,
   productLookupNoResultsLabel,
   productDetails,
+  batchOptions,
+  batchModeByIndex,
+  loadingBatchIndex,
   preview,
   getLookupValue,
   onProductSearch,
   onProductSelect,
+  onProductClear,
+  onWarehouseChange,
+  onBatchLoad,
+  onBatchSelect,
+  onBatchModeChange,
   append,
   remove,
 }: {
@@ -37,12 +54,20 @@ export const PurchaseItemsTable = ({
   productLookupLoading?: boolean;
   productLookupNoResultsLabel?: string;
   productDetails: Record<string, Product>;
+  batchOptions: Record<number, PurchaseBatchOption[]>;
+  batchModeByIndex: Record<number, "existing" | "manual">;
+  loadingBatchIndex: number | null;
   preview: PurchasePreviewTotals;
   getLookupValue: (index: number) => LookupOption | null;
   onProductSearch: (value: string) => void;
   onProductSelect: (index: number, option: LookupOption) => void;
+  onProductClear: (index: number) => void;
+  onWarehouseChange: (index: number, warehouseId: string | null) => void;
+  onBatchLoad: (index: number) => void;
+  onBatchSelect: (index: number, batchId: string | null) => void;
+  onBatchModeChange: (index: number, mode: "existing" | "manual") => void;
   append: UseFieldArrayAppend<PurchaseFormValues, "items">;
-  remove: UseFieldArrayRemove;
+  remove: (index: number) => void;
 }) => {
   const headerWarehouseId = form.watch("warehouseId");
 
@@ -86,6 +111,11 @@ export const PurchaseItemsTable = ({
           const product = productId ? productDetails[productId] : undefined;
           const linePreview = preview.lines[index];
           const showItemWarehouse = product?.productType === "goods" && !headerWarehouseId;
+          const rowBatchOptions = batchOptions[index] ?? [];
+          const batchMode = batchModeByIndex[index] ?? (rowBatchOptions.length > 0 ? "existing" : "manual");
+          const selectedBatchId = (form.watch(`items.${index}.batchId`) as string | null | undefined) ?? "";
+          const isExistingBatchSelected = batchMode === "existing" && Boolean(selectedBatchId);
+          const showBatchControls = product?.productType === "goods" && product?.batchTrackingEnabled;
 
           return (
             <div key={field.id} className="rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
@@ -101,9 +131,7 @@ export const PurchaseItemsTable = ({
                     noResultsLabel={productLookupNoResultsLabel ?? "No matching active products found"}
                     onSearch={onProductSearch}
                     onSelect={(option) => onProductSelect(index, option)}
-                    onClear={() => {
-                      form.setValue(`items.${index}.productId`, "", { shouldDirty: true, shouldValidate: true });
-                    }}
+                    onClear={() => onProductClear(index)}
                   />
                 </div>
                 <Input
@@ -187,32 +215,76 @@ export const PurchaseItemsTable = ({
                       value={(form.watch(`items.${index}.warehouseId`) as string | null | undefined) ?? ""}
                       warehouses={warehouses}
                       error={form.formState.errors.items?.[index]?.warehouseId?.message}
-                      onChange={(value) => form.setValue(`items.${index}.warehouseId`, value, { shouldDirty: true, shouldValidate: true })}
+                      onChange={(value) => onWarehouseChange(index, value)}
                     />
                   </div>
                 ) : null}
               </div>
 
               <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_120px] xl:items-end">
-                <Input
-                  label="Batch No"
-                  {...form.register(`items.${index}.batchNumber`)}
-                  error={form.formState.errors.items?.[index]?.batchNumber?.message}
-                  disabled={product?.productType !== "goods"}
-                />
+                <div className="space-y-2">
+                  {showBatchControls && rowBatchOptions.length > 0 && batchMode === "existing" ? (
+                    <>
+                      <Select
+                        label="Batch"
+                        value={selectedBatchId}
+                        onFocus={() => onBatchLoad(index)}
+                        onChange={(event) => onBatchSelect(index, event.target.value || null)}
+                        error={form.formState.errors.items?.[index]?.batchNumber?.message}
+                      >
+                        <option value="">{loadingBatchIndex === index ? "Loading batches..." : "Select Batch"}</option>
+                        {rowBatchOptions.map((batch) => (
+                          <option key={batch.id} value={batch.id}>
+                            {batch.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-emerald-700 transition hover:text-emerald-800"
+                        onClick={() => onBatchModeChange(index, "manual")}
+                      >
+                        Use new batch number
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        label={showBatchControls && rowBatchOptions.length > 0 ? "New Batch No" : "Batch No"}
+                        {...form.register(`items.${index}.batchNumber`)}
+                        error={form.formState.errors.items?.[index]?.batchNumber?.message}
+                        disabled={product?.productType !== "goods"}
+                        onFocus={() => {
+                          if (showBatchControls) {
+                            onBatchLoad(index);
+                          }
+                        }}
+                      />
+                      {showBatchControls && rowBatchOptions.length > 0 ? (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-emerald-700 transition hover:text-emerald-800"
+                          onClick={() => onBatchModeChange(index, "existing")}
+                        >
+                          Select existing batch
+                        </button>
+                      ) : null}
+                    </>
+                  )}
+                </div>
                 <Input
                   label="MFG Date"
                   type="date"
                   {...form.register(`items.${index}.manufacturingDate`)}
                   error={form.formState.errors.items?.[index]?.manufacturingDate?.message}
-                  disabled={product?.productType !== "goods"}
+                  disabled={product?.productType !== "goods" || isExistingBatchSelected}
                 />
                 <Input
                   label="Expiry Date"
                   type="date"
                   {...form.register(`items.${index}.expiryDate`)}
                   error={form.formState.errors.items?.[index]?.expiryDate?.message}
-                  disabled={product?.productType !== "goods"}
+                  disabled={product?.productType !== "goods" || isExistingBatchSelected}
                 />
                 <button
                   type="button"

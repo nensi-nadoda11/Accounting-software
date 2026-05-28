@@ -527,6 +527,7 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
             setSubmittingForm(true);
             let invoiceId = "";
             let invoiceNumber = "";
+            let successMessage = "";
             if (purchaseId) {
               await purchasesApi.update(purchaseId, createPurchaseUpdatePayload({ ...values, purchaseStatus: mode }));
               if (mode === "posted") {
@@ -534,25 +535,31 @@ export const PurchasePage = ({ tab }: { tab: PurchasePageTab }) => {
                 invoiceId = posted.data.invoice.id;
                 invoiceNumber = posted.data.invoice.purchaseNumber;
               }
-              toast.success("Purchase draft updated");
+              successMessage = mode === "posted" ? "Purchase draft updated and posted" : "Purchase draft updated";
             } else {
               const created = await purchasesApi.create({ ...values, purchaseStatus: mode });
               invoiceId = created.data.invoice.id;
               invoiceNumber = created.data.invoice.purchaseNumber;
-              toast.success(mode === "posted" ? "Purchase saved and posted" : "Purchase draft saved");
+              successMessage = mode === "posted" ? "Purchase saved and posted" : "Purchase draft saved";
             }
 
+            toast.success(successMessage);
+
             if (mode === "posted" && advanceAdjustmentAmount > 0 && values.supplierId && invoiceId) {
-              await allocateAdvancePayments({
-                partyType: "supplier",
-                paymentType: "supplier_pay",
-                partyId: values.supplierId,
-                referenceType: "purchase_invoice",
-                referenceId: invoiceId,
-                referenceNumber: invoiceNumber,
-                allocationDate: values.invoiceDate,
-                amount: advanceAdjustmentAmount,
-              });
+              try {
+                await allocateAdvancePayments({
+                  partyType: "supplier",
+                  paymentType: "supplier_pay",
+                  partyId: values.supplierId,
+                  referenceType: "purchase_invoice",
+                  referenceId: invoiceId,
+                  referenceNumber: invoiceNumber,
+                  allocationDate: values.invoiceDate,
+                  amount: advanceAdjustmentAmount,
+                });
+              } catch (allocationError) {
+                toast.error(getErrorMessage(allocationError, "Purchase saved, but advance allocation could not be completed"));
+              }
             }
 
             navigate("/app/purchases/invoices");

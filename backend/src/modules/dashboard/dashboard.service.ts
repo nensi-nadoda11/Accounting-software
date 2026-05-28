@@ -1,4 +1,5 @@
 import { auditLogService } from "../audit-logs/audit-log.service";
+import { logger } from "../../config/logger";
 import { AppError } from "../../utils/app-error";
 import { dashboardRepository } from "./dashboard.repository";
 import type {
@@ -155,23 +156,32 @@ export class DashboardService {
     auditor: []
   };
 
-  private async logView(
+  private logView(
     actor: DashboardActor,
     action: string,
     context: DashboardRequestContext,
     metadata?: Record<string, unknown>
   ) {
-    await auditLogService.log({
-      companyId: actor.companyId,
-      userId: actor.id,
-      action,
-      module: "dashboard",
-      entityType: "dashboard",
-      entityId: actor.companyId,
-      metadata: metadata ?? null,
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent
-    });
+    void auditLogService
+      .log({
+        companyId: actor.companyId,
+        userId: actor.id,
+        action,
+        module: "dashboard",
+        entityType: "dashboard",
+        entityId: actor.companyId,
+        metadata: metadata ?? null,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent
+      })
+      .catch((error) => {
+        logger.warn("Dashboard audit log write skipped", {
+          action,
+          companyId: actor.companyId,
+          userId: actor.id,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      });
   }
 
   private ensureAccess(actor: DashboardActor) {
@@ -195,7 +205,7 @@ export class DashboardService {
     const payrollCost = Number(data.payrollTotals?.payrollCost ?? 0);
     const netProfit = currentSales - currentPurchases - currentExpense - payrollCost;
 
-    await this.logView(actor, "dashboard_summary_viewed", context, { range: query.range });
+    this.logView(actor, "dashboard_summary_viewed", context, { range: query.range });
 
     return {
       todaySales: clampMoney(data.salesTotals?.comparisonSales),
@@ -241,7 +251,7 @@ export class DashboardService {
       };
     });
 
-    await this.logView(actor, "dashboard_chart_viewed", context, { chartKey, range: query.range });
+    this.logView(actor, "dashboard_chart_viewed", context, { chartKey, range: query.range });
 
     return {
       chart: chartKey,
@@ -260,7 +270,7 @@ export class DashboardService {
     const { range } = getRangeBounds(query);
     const rows = await dashboardRepository.getTopProducts(actor.companyId, range, query.limit);
 
-    await this.logView(actor, "dashboard_top_products_viewed", context, { range: query.range, limit: query.limit });
+    this.logView(actor, "dashboard_top_products_viewed", context, { range: query.range, limit: query.limit });
 
     return {
       items: rows.map((row) => ({
@@ -282,7 +292,7 @@ export class DashboardService {
 
     const data = await dashboardRepository.listRecentActivities(actor.companyId, query.page, query.limit);
 
-    await this.logView(actor, "dashboard_recent_activities_viewed", context, { page: query.page, limit: query.limit });
+    this.logView(actor, "dashboard_recent_activities_viewed", context, { page: query.page, limit: query.limit });
 
     return {
       items: data.rows.map((row) => ({
@@ -310,7 +320,7 @@ export class DashboardService {
 
     const data = await dashboardRepository.getAlertData(actor.companyId);
 
-    await this.logView(actor, "dashboard_alerts_viewed", context);
+    this.logView(actor, "dashboard_alerts_viewed", context);
 
     const items: DashboardAlert[] = [
       ...data.inventoryRows.map((row) => ({
@@ -380,7 +390,7 @@ export class DashboardService {
 
     const data = await dashboardRepository.getPendingTaskData(actor.companyId);
 
-    await this.logView(actor, "dashboard_pending_tasks_viewed", context);
+    this.logView(actor, "dashboard_pending_tasks_viewed", context);
 
     const items: DashboardTask[] = [
         {
@@ -438,7 +448,7 @@ export class DashboardService {
     const month = getMonthBounds(new Date());
     const data = await dashboardRepository.getSnapshotData(actor.companyId, month);
 
-    await this.logView(actor, "dashboard_role_viewed", context, { role: actor.role });
+    this.logView(actor, "dashboard_role_viewed", context, { role: actor.role });
 
     const inventorySnapshot: DashboardInventorySnapshot = {
       totalProducts: clampCount(data.inventory?.totalProducts),

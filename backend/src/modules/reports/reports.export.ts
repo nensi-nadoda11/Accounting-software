@@ -399,15 +399,7 @@ const wrapText = (value: string, maxChars: number) => {
       lines.push(current);
     }
 
-    if (word.length <= maxChars) {
-      current = word;
-      continue;
-    }
-
-    for (let index = 0; index < word.length; index += maxChars) {
-      lines.push(word.slice(index, index + maxChars));
-    }
-    current = "";
+    current = word;
   }
 
   if (current) {
@@ -415,6 +407,15 @@ const wrapText = (value: string, maxChars: number) => {
   }
 
   return lines;
+};
+
+const getLongestWordLength = (value: string) => {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) {
+    return value.length;
+  }
+
+  return Math.max(...words.map((word) => word.length));
 };
 
 const buildPdfContent = (dataset: ReportExportDataset) => {
@@ -459,29 +460,30 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
     }
 
     const longest = Math.max(column.label.length, ...column.values.map((value) => String(value).length));
-    return Math.min(Math.max(longest / 10, 1.2), 2.4);
+    const longestWord = Math.max(
+      getLongestWordLength(column.label),
+      ...column.values.map((value) => getLongestWordLength(String(value)))
+    );
+    const contentWeight = Math.min(Math.max(longest / 14, 1.2), 2.5);
+    const wordWeight = Math.min(Math.max(longestWord / 7, 1.2), 3);
+    return Math.max(contentWeight, wordWeight);
   });
   const totalWeight = weights.reduce((sum, value) => sum + value, 0);
   const columnWidths = weights.map((weight) => (contentWidth * weight) / totalWeight);
-  const columnAlignments = tableColumns.map((column) => {
-    if (column.key === "__sr") {
-      return "center" as const;
-    }
+  const columnAlignments = tableColumns.map(() => "center" as const);
 
-    return column.type === "number" ? ("right" as const) : ("left" as const);
-  });
+  const getColumnMaxChars = (width: number) =>
+    Math.max(4, Math.floor((width - cellPaddingX * 2) / (tableFontSize * 0.52)));
 
   const headerHeight = 24;
   const tableHeaderLines = tableColumns.map((column, index) => {
-    const maxChars = Math.max(4, Math.floor((columnWidths[index]! - cellPaddingX * 2) / (tableFontSize * 0.52)));
-    return wrapText(column.label, maxChars);
+    return wrapText(column.label, getColumnMaxChars(columnWidths[index]!));
   });
   const tableHeaderRowHeight = Math.max(...tableHeaderLines.map((lines) => lines.length)) * lineHeight + cellPaddingY * 2;
 
   const bodyRows = rows.map((row) => {
     const cellLines = [String(row.srNo), ...row.values].map((value, index) => {
-      const maxChars = Math.max(4, Math.floor((columnWidths[index]! - cellPaddingX * 2) / (tableFontSize * 0.52)));
-      return wrapText(String(value), maxChars);
+      return wrapText(String(value), getColumnMaxChars(columnWidths[index]!));
     });
     const height = Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + cellPaddingY * 2;
     return { cellLines, height };
@@ -514,13 +516,24 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
 
   const estimateTextWidth = (text: string, fontSize = tableFontSize) => text.length * fontSize * 0.47;
 
+  const getFittedFontSize = (text: string, width: number, preferredFontSize = tableFontSize) => {
+    if (!text) {
+      return preferredFontSize;
+    }
+
+    const availableWidth = Math.max(width - cellPaddingX * 2, preferredFontSize);
+    const fittedFontSize = availableWidth / Math.max(text.length * 0.47, 1);
+    return Math.max(6, Math.min(preferredFontSize, fittedFontSize));
+  };
+
   const getAlignedTextX = (
     x: number,
     width: number,
     text: string,
-    alignment: "left" | "center" | "right"
+    alignment: "left" | "center" | "right",
+    fontSize = tableFontSize
   ) => {
-    const renderedWidth = estimateTextWidth(text);
+    const renderedWidth = estimateTextWidth(text, fontSize);
 
     if (alignment === "right") {
       return x + width - cellPaddingX - renderedWidth;
@@ -626,9 +639,10 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
   let columnX = marginX;
   tableHeaderLines.forEach((lines, columnIndex) => {
     lines.forEach((line, lineIndex) => {
+      const fittedFontSize = getFittedFontSize(line, columnWidths[columnIndex]!, tableFontSize);
       currentCommands.push(
-        drawText(getAlignedTextX(columnX, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!), tableY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
-          size: tableFontSize,
+        drawText(getAlignedTextX(columnX, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!, fittedFontSize), tableY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
+          size: fittedFontSize,
           font: "F2",
           color: { r: 1, g: 1, b: 1 }
         })
@@ -650,9 +664,10 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
       let columnX = marginX;
       tableHeaderLines.forEach((lines, columnIndex) => {
         lines.forEach((line, lineIndex) => {
+          const fittedFontSize = getFittedFontSize(line, columnWidths[columnIndex]!, tableFontSize);
           currentCommands.push(
-            drawText(getAlignedTextX(columnX, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!), tableY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
-              size: tableFontSize,
+            drawText(getAlignedTextX(columnX, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!, fittedFontSize), tableY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
+              size: fittedFontSize,
               font: "F2",
               color: { r: 1, g: 1, b: 1 }
             })
@@ -671,12 +686,13 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
     let x = marginX;
     row.cellLines.forEach((cell, columnIndex) => {
       cell.forEach((line, lineIndex) => {
+        const fittedFontSize = getFittedFontSize(line, columnWidths[columnIndex]!, tableFontSize);
         currentCommands.push(
           drawText(
-            getAlignedTextX(x, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!),
+            getAlignedTextX(x, columnWidths[columnIndex]!, line, columnAlignments[columnIndex]!, fittedFontSize),
             currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4,
             line,
-            { size: tableFontSize }
+            { size: fittedFontSize }
           )
         );
       });
@@ -706,28 +722,26 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
       if (col.key === "__sr") return 0.7;
       if (col.type === "number") return 1;
       const longest = Math.max(col.label.length, ...col.values.map((v) => String(v).length));
-      return Math.min(Math.max(longest / 10, 1.2), 2.4);
+      const longestWord = Math.max(
+        getLongestWordLength(col.label),
+        ...col.values.map((value) => getLongestWordLength(String(value)))
+      );
+      const contentWeight = Math.min(Math.max(longest / 14, 1.2), 2.5);
+      const wordWeight = Math.min(Math.max(longestWord / 7, 1.2), 3);
+      return Math.max(contentWeight, wordWeight);
     });
     const secTotalWeight = secWeights.reduce((sum, v) => sum + v, 0);
     const secColumnWidths = secWeights.map((w) => (contentWidth * w) / secTotalWeight);
-    const secColumnAlignments = secTableColumns.map((column) => {
-      if (column.key === "__sr") {
-        return "center" as const;
-      }
-
-      return column.type === "number" ? ("right" as const) : ("left" as const);
-    });
+    const secColumnAlignments = secTableColumns.map(() => "center" as const);
     
     const secHeaderLines = secTableColumns.map((col, idx) => {
-      const maxChars = Math.max(4, Math.floor((secColumnWidths[idx]! - cellPaddingX * 2) / (tableFontSize * 0.52)));
-      return wrapText(col.label, maxChars);
+      return wrapText(col.label, getColumnMaxChars(secColumnWidths[idx]!));
     });
     const secTableHeaderRowHeight = Math.max(...secHeaderLines.map((l) => l.length)) * lineHeight + cellPaddingY * 2;
     
     const secBodyRows = secRows.map((row) => {
       const cellLines = [String(row.srNo), ...row.values].map((val, idx) => {
-        const maxChars = Math.max(4, Math.floor((secColumnWidths[idx]! - cellPaddingX * 2) / (tableFontSize * 0.52)));
-        return wrapText(String(val), maxChars);
+        return wrapText(String(val), getColumnMaxChars(secColumnWidths[idx]!));
       });
       const height = Math.max(...cellLines.map((l) => l.length)) * lineHeight + cellPaddingY * 2;
       return { cellLines, height };
@@ -749,9 +763,10 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
     let columnX = marginX;
     secHeaderLines.forEach((lines, columnIndex) => {
       lines.forEach((line, lineIndex) => {
+        const fittedFontSize = getFittedFontSize(line, secColumnWidths[columnIndex]!, tableFontSize);
         currentCommands.push(
-          drawText(getAlignedTextX(columnX, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!), currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
-            size: tableFontSize,
+          drawText(getAlignedTextX(columnX, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!, fittedFontSize), currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
+            size: fittedFontSize,
             font: "F2",
             color: { r: 1, g: 1, b: 1 }
           })
@@ -773,9 +788,10 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
         let columnX = marginX;
         secHeaderLines.forEach((lines, columnIndex) => {
           lines.forEach((line, lineIndex) => {
+            const fittedFontSize = getFittedFontSize(line, secColumnWidths[columnIndex]!, tableFontSize);
             currentCommands.push(
-              drawText(getAlignedTextX(columnX, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!), currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
-                size: tableFontSize,
+              drawText(getAlignedTextX(columnX, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!, fittedFontSize), currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4, line, {
+                size: fittedFontSize,
                 font: "F2",
                 color: { r: 1, g: 1, b: 1 }
               })
@@ -794,12 +810,13 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
       let x = marginX;
       row.cellLines.forEach((cell, columnIndex) => {
         cell.forEach((line, lineIndex) => {
+          const fittedFontSize = getFittedFontSize(line, secColumnWidths[columnIndex]!, tableFontSize);
           currentCommands.push(
             drawText(
-              getAlignedTextX(x, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!),
+              getAlignedTextX(x, secColumnWidths[columnIndex]!, line, secColumnAlignments[columnIndex]!, fittedFontSize),
               currentY - cellPaddingY - lineHeight * (lineIndex + 1) + 4,
               line,
-              { size: tableFontSize }
+              { size: fittedFontSize }
             )
           );
         });

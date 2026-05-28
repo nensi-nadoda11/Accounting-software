@@ -2,7 +2,6 @@ import { CalendarRange } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "../../components/ui/Button";
-import { ErrorState } from "../../components/ui/ErrorState";
 import { LoadingState } from "../../components/ui/LoadingState";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { cn } from "../../lib/utils";
@@ -18,8 +17,7 @@ import type {
   DashboardRecentActivitiesResponse,
   DashboardRoleDashboard,
   DashboardSummary,
-  DashboardTasksResponse,
-  DashboardTopProductsResponse
+  DashboardTasksResponse
 } from "../../types/dashboard";
 import { DashboardAccountingSnapshot } from "./components/DashboardAccountingSnapshot";
 import { DashboardAlertsPanel } from "./components/DashboardAlertsPanel";
@@ -31,7 +29,6 @@ import { DashboardPendingTasks } from "./components/DashboardPendingTasks";
 import { DashboardQuickActions } from "./components/DashboardQuickActions";
 import { DashboardRecentActivities } from "./components/DashboardRecentActivities";
 import { DashboardSummaryCards, type DashboardSummaryCardsVariant } from "./components/DashboardSummaryCards";
-import { DashboardTopProducts } from "./components/DashboardTopProducts";
 
 type Loadable<T> = {
   data: T | null;
@@ -52,7 +49,6 @@ type DashboardWidget =
   | "alerts"
   | "recent-activities"
   | "pending-tasks"
-  | "top-products"
   | "inventory"
   | "gst"
   | "payroll"
@@ -86,7 +82,7 @@ const chartConfig: Array<{ key: DashboardChartKey; title: string; color: string 
 ];
 
 const widgetFallbackByRole: Record<Role, DashboardWidget[]> = {
-  admin: ["summary", "charts", "quick-actions", "alerts", "recent-activities", "pending-tasks", "top-products", "inventory", "gst", "payroll", "accounting"],
+  admin: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory", "gst", "payroll", "accounting"],
   accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "gst", "payroll", "accounting"],
   staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory"],
   auditor: ["summary", "charts", "alerts", "recent-activities", "gst", "payroll", "accounting"]
@@ -106,6 +102,32 @@ const summaryVariantByRole: Record<Role, DashboardSummaryCardsVariant> = {
   auditor: "auditor"
 };
 
+const DASHBOARD_RETRY_ATTEMPTS = 3;
+const DASHBOARD_RETRY_DELAY_MS = 700;
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
+const retryDashboardRequest = async <T,>(request: () => Promise<T>) => {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= DASHBOARD_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await request();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < DASHBOARD_RETRY_ATTEMPTS) {
+        await sleep(DASHBOARD_RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+
+  throw lastError;
+};
+
 export const DashboardPage = () => {
   const auth = useAuth();
   const [filters, setFilters] = useState<DashboardFilters>(initialFilters);
@@ -114,7 +136,6 @@ export const DashboardPage = () => {
   const [roleDashboard, setRoleDashboard] = useState<Loadable<DashboardRoleDashboard>>(createLoadable());
   const [alerts, setAlerts] = useState<Loadable<DashboardAlertsResponse>>(createLoadable());
   const [tasks, setTasks] = useState<Loadable<DashboardTasksResponse>>(createLoadable());
-  const [topProducts, setTopProducts] = useState<Loadable<DashboardTopProductsResponse>>(createLoadable());
   const [recentActivities, setRecentActivities] = useState<Loadable<DashboardRecentActivitiesResponse>>(createLoadable());
   const [activitiesPage, setActivitiesPage] = useState(1);
   const [charts, setCharts] = useState<Record<DashboardChartKey, Loadable<DashboardChartResponse>>>({
@@ -138,8 +159,7 @@ export const DashboardPage = () => {
   const showQuickActions = activeWidgets.has("quick-actions");
   const showAlerts = activeWidgets.has("alerts");
   const showPendingTasks = activeWidgets.has("pending-tasks");
-  const showTopProducts = activeWidgets.has("top-products");
-  const showRecentActivities = activeWidgets.has("recent-activities");
+  const showRecentActivities = activeRole !== "admin" && activeWidgets.has("recent-activities");
   const showInventorySnapshot = activeWidgets.has("inventory");
   const showGstSnapshot = activeWidgets.has("gst");
   const showPayrollSnapshot = activeWidgets.has("payroll");
@@ -154,7 +174,7 @@ export const DashboardPage = () => {
     setSummary((current) => ({ ...current, loading: true, error: null }));
 
     try {
-      const response = await dashboardApi.getSummary(activeFilters);
+      const response = await retryDashboardRequest(() => dashboardApi.getSummary(activeFilters));
       setSummary({ data: response.data, loading: false, error: null });
     } catch {
       const message = "Dashboard summary could not be loaded.";
@@ -167,19 +187,25 @@ export const DashboardPage = () => {
     setAlerts((current) => ({ ...current, loading: true, error: null }));
     setTasks((current) => ({ ...current, loading: true, error: null }));
 
-    const [roleResponse, alertsResponse, tasksResponse] = await Promise.allSettled([
-      dashboardApi.getRoleDashboard(),
-      dashboardApi.getAlerts(),
-      dashboardApi.getPendingTasks()
+    const message = "Dashboard widgets could not be loaded.";
+    let roleLoaded = false;
+
+    try {
+      const roleResponse = await retryDashboardRequest(() => dashboardApi.getRoleDashboard());
+      setRoleDashboard({ data: roleResponse.data, loading: false, error: null });
+      roleLoaded = true;
+    } catch {
+      setRoleDashboard((current) => ({ ...current, loading: false, error: current.data ? current.error : message }));
+    }
+
+    const [alertsResponse, tasksResponse] = await Promise.allSettled([
+      retryDashboardRequest(() => dashboardApi.getAlerts()),
+      retryDashboardRequest(() => dashboardApi.getPendingTasks())
     ]);
 
-    const message = "Dashboard widgets could not be loaded.";
-
-    setRoleDashboard((current) =>
-      roleResponse.status === "fulfilled"
-        ? { data: roleResponse.value.data, loading: false, error: null }
-        : { ...current, loading: false, error: current.data ? current.error : message }
-    );
+    if (!roleLoaded) {
+      setRoleDashboard((current) => ({ ...current, loading: false }));
+    }
 
     setAlerts((current) =>
       alertsResponse.status === "fulfilled"
@@ -194,23 +220,11 @@ export const DashboardPage = () => {
     );
   }, []);
 
-  const loadTopProducts = useCallback(async (activeFilters: DashboardFilters) => {
-    setTopProducts((current) => ({ ...current, loading: true, error: null }));
-
-    try {
-      const response = await dashboardApi.getTopProducts(activeFilters, 5);
-      setTopProducts({ data: response.data, loading: false, error: null });
-    } catch {
-      const message = "Top products could not be loaded.";
-      setTopProducts((current) => ({ ...current, loading: false, error: current.data ? current.error : message }));
-    }
-  }, []);
-
   const loadRecentActivities = useCallback(async (page: number) => {
     setRecentActivities((current) => ({ ...current, loading: true, error: null }));
 
     try {
-      const response = await dashboardApi.getRecentActivities(page, 8);
+      const response = await retryDashboardRequest(() => dashboardApi.getRecentActivities(page, 8));
       setRecentActivities({ data: response.data, loading: false, error: null });
     } catch {
       const message = "Recent activities could not be loaded.";
@@ -218,14 +232,14 @@ export const DashboardPage = () => {
     }
   }, []);
 
-  const loadChart = useCallback(async (chartKey: DashboardChartKey) => {
+  const loadChart = useCallback(async (chartKey: DashboardChartKey, activeFilters: DashboardFilters = filters) => {
     setCharts((current) => ({
       ...current,
       [chartKey]: { ...current[chartKey], loading: true, error: null }
     }));
 
     try {
-      const response = await dashboardApi.getChart(chartKey, filters);
+      const response = await retryDashboardRequest(() => dashboardApi.getChart(chartKey, activeFilters));
       setCharts((current) => ({
         ...current,
         [chartKey]: { data: response.data, loading: false, error: null }
@@ -238,9 +252,11 @@ export const DashboardPage = () => {
     }
   }, [filters]);
 
-  const loadCharts = useCallback(async () => {
-    await Promise.all(visibleCharts.map((chart) => loadChart(chart.key)));
-  }, [loadChart, visibleCharts]);
+  const loadCharts = useCallback(async (activeFilters: DashboardFilters = filters) => {
+    for (const chart of visibleCharts) {
+      await loadChart(chart.key, activeFilters);
+    }
+  }, [filters, loadChart, visibleCharts]);
 
   useEffect(() => {
     void loadStaticCore();
@@ -261,21 +277,68 @@ export const DashboardPage = () => {
   }, [filters, loadCharts, visibleCharts.length]);
 
   useEffect(() => {
-    if (showTopProducts) {
-      void loadTopProducts(filters);
-    }
-  }, [filters, loadTopProducts, showTopProducts]);
-
-  useEffect(() => {
     if (showRecentActivities) {
       void loadRecentActivities(activitiesPage);
     }
   }, [activitiesPage, loadRecentActivities, showRecentActivities]);
 
+  useEffect(() => {
+    const hasCoreRecoveryPending =
+      (!summary.data && !!summary.error) ||
+      (!roleDashboard.data && !!roleDashboard.error) ||
+      (!alerts.data && !!alerts.error) ||
+      (!tasks.data && !!tasks.error);
+    const hasChartRecoveryPending = visibleCharts.some((chart) => !charts[chart.key].data && !!charts[chart.key].error);
+    const hasActivitiesRecoveryPending = showRecentActivities && !recentActivities.data && !!recentActivities.error;
+
+    if (!hasCoreRecoveryPending && !hasChartRecoveryPending && !hasActivitiesRecoveryPending) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (!summary.data && summary.error) {
+        void loadSummary(filters);
+      }
+
+      if ((!roleDashboard.data && roleDashboard.error) || (!alerts.data && alerts.error) || (!tasks.data && tasks.error)) {
+        void loadStaticCore();
+      }
+
+      if (hasChartRecoveryPending) {
+        void loadCharts(filters);
+      }
+
+      if (showRecentActivities && !recentActivities.data && recentActivities.error) {
+        void loadRecentActivities(activitiesPage);
+      }
+    }, 2200);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    activitiesPage,
+    alerts.data,
+    alerts.error,
+    charts,
+    filters,
+    loadCharts,
+    loadRecentActivities,
+    loadStaticCore,
+    loadSummary,
+    recentActivities.data,
+    recentActivities.error,
+    roleDashboard.data,
+    roleDashboard.error,
+    showRecentActivities,
+    summary.data,
+    summary.error,
+    tasks.data,
+    tasks.error,
+    visibleCharts
+  ]);
+
   const isRefreshing =
     summary.loading ||
-    visibleCharts.some((chart) => charts[chart.key].loading) ||
-    (showTopProducts && topProducts.loading);
+    visibleCharts.some((chart) => charts[chart.key].loading);
 
   const handleRangeSelect = (range: DashboardRange) => {
     setFiltersError(null);
@@ -310,36 +373,6 @@ export const DashboardPage = () => {
     setFiltersError(null);
     setFilters({ ...draftFilters });
   };
-
-  if (summary.loading && !summary.data && roleDashboard.loading && !roleDashboard.data) {
-    return <LoadingState label="Loading dashboard..." />;
-  }
-
-  if (summary.error && !summary.data && roleDashboard.error && !roleDashboard.data) {
-    return (
-      <ErrorState
-        title="Dashboard could not be loaded."
-        action={
-          <Button
-            variant="secondary"
-            onClick={() => {
-              void loadStaticCore();
-              void loadSummary(filters);
-              void loadCharts();
-              if (showTopProducts) {
-                void loadTopProducts(filters);
-              }
-              if (showRecentActivities) {
-                void loadRecentActivities(activitiesPage);
-              }
-            }}
-          >
-            Retry
-          </Button>
-        }
-      />
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -398,7 +431,7 @@ export const DashboardPage = () => {
       <DashboardSummaryCards
         summary={summary.data}
         range={filters.range}
-        loading={summary.loading && !summary.data}
+        loading={summary.loading || !summary.data}
         variant={summaryVariant}
       />
 
@@ -410,8 +443,8 @@ export const DashboardPage = () => {
               title={chart.title}
               color={chart.color}
               items={charts[chart.key].data?.items ?? []}
-              loading={charts[chart.key].loading}
-              error={charts[chart.key].error}
+              loading={charts[chart.key].loading || !charts[chart.key].data}
+              error={charts[chart.key].data ? charts[chart.key].error : null}
               onRefresh={() => void loadChart(chart.key)}
             />
           ))}
@@ -424,12 +457,28 @@ export const DashboardPage = () => {
             {showQuickActions && visibleActions.length > 0 ? (
               <DashboardQuickActions actions={visibleActions} className="h-[20rem]" compact />
             ) : null}
-            {showPendingTasks ? <DashboardPendingTasks items={tasks.data?.items ?? []} className="h-[20rem]" /> : null}
-            {showAlerts ? <DashboardAlertsPanel alerts={alerts.data?.items ?? []} className="h-[20rem]" /> : null}
+            {showPendingTasks ? (
+              tasks.data ? (
+                <DashboardPendingTasks items={tasks.data.items} className="h-[20rem]" />
+              ) : (
+                <LoadingState label="Loading pending tasks..." className="h-[20rem]" />
+              )
+            ) : null}
+            {showAlerts ? (
+              alerts.data ? (
+                <DashboardAlertsPanel alerts={alerts.data.items} className="h-[20rem]" />
+              ) : (
+                <LoadingState label="Loading alerts..." className="h-[20rem]" />
+              )
+            ) : null}
           </div>
-          {roleDashboard.data && showInventorySnapshot ? (
+          {showInventorySnapshot ? (
             <div className="grid gap-4">
-              <DashboardInventorySnapshot snapshot={roleDashboard.data.inventorySnapshot} />
+              {roleDashboard.data ? (
+                <DashboardInventorySnapshot snapshot={roleDashboard.data.inventorySnapshot} />
+              ) : (
+                <LoadingState label="Loading inventory snapshot..." />
+              )}
             </div>
           ) : null}
         </>
@@ -439,16 +488,44 @@ export const DashboardPage = () => {
         <>
           <div className="grid items-stretch gap-4 xl:grid-cols-[1.05fr_1fr_1fr]">
             {showQuickActions && visibleActions.length > 0 ? <DashboardQuickActions actions={visibleActions} /> : null}
-            {showAlerts ? <DashboardAlertsPanel alerts={alerts.data?.items ?? []} className="h-[24rem]" /> : null}
-            {showPendingTasks ? <DashboardPendingTasks items={tasks.data?.items ?? []} className="h-[24rem]" /> : null}
+            {showAlerts ? (
+              alerts.data ? (
+                <DashboardAlertsPanel alerts={alerts.data.items} className="h-[24rem]" />
+              ) : (
+                <LoadingState label="Loading alerts..." className="h-[24rem]" />
+              )
+            ) : null}
+            {showPendingTasks ? (
+              tasks.data ? (
+                <DashboardPendingTasks items={tasks.data.items} className="h-[24rem]" />
+              ) : (
+                <LoadingState label="Loading pending tasks..." className="h-[24rem]" />
+              )
+            ) : null}
           </div>
-          {roleDashboard.data ? (
-            <div className="grid gap-4 xl:grid-cols-3">
-              {showAccountingSnapshot ? <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} /> : null}
-              {showGstSnapshot ? <DashboardGstSnapshot snapshot={roleDashboard.data.gstSnapshot} /> : null}
-              {showPayrollSnapshot ? <DashboardPayrollSnapshot snapshot={roleDashboard.data.payrollSnapshot} /> : null}
-            </div>
-          ) : null}
+          <div className="grid gap-4 xl:grid-cols-3">
+            {showAccountingSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} />
+              ) : (
+                <LoadingState label="Loading accounting snapshot..." />
+              )
+            ) : null}
+            {showGstSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardGstSnapshot snapshot={roleDashboard.data.gstSnapshot} />
+              ) : (
+                <LoadingState label="Loading GST snapshot..." />
+              )
+            ) : null}
+            {showPayrollSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardPayrollSnapshot snapshot={roleDashboard.data.payrollSnapshot} />
+              ) : (
+                <LoadingState label="Loading payroll snapshot..." />
+              )
+            ) : null}
+          </div>
         </>
       ) : null}
 
@@ -458,55 +535,94 @@ export const DashboardPage = () => {
             {showRecentActivities ? (
               <DashboardRecentActivities
                 data={recentActivities.data}
-                loading={recentActivities.loading && !recentActivities.data}
-                error={recentActivities.error}
+                loading={recentActivities.loading || !recentActivities.data}
+                error={recentActivities.data ? recentActivities.error : null}
                 onRetry={() => void loadRecentActivities(activitiesPage)}
                 onPageChange={setActivitiesPage}
               />
             ) : null}
-            {showAlerts ? <DashboardAlertsPanel alerts={alerts.data?.items ?? []} /> : null}
+            {showAlerts ? (
+              alerts.data ? (
+                <DashboardAlertsPanel alerts={alerts.data.items} />
+              ) : (
+                <LoadingState label="Loading alerts..." />
+              )
+            ) : null}
           </div>
-          {roleDashboard.data ? (
-            <div className="grid gap-4 xl:grid-cols-3">
-              {showAccountingSnapshot ? <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} /> : null}
-              {showGstSnapshot ? <DashboardGstSnapshot snapshot={roleDashboard.data.gstSnapshot} /> : null}
-              {showPayrollSnapshot ? <DashboardPayrollSnapshot snapshot={roleDashboard.data.payrollSnapshot} /> : null}
-            </div>
-          ) : null}
+          <div className="grid gap-4 xl:grid-cols-3">
+            {showAccountingSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} />
+              ) : (
+                <LoadingState label="Loading accounting snapshot..." />
+              )
+            ) : null}
+            {showGstSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardGstSnapshot snapshot={roleDashboard.data.gstSnapshot} />
+              ) : (
+                <LoadingState label="Loading GST snapshot..." />
+              )
+            ) : null}
+            {showPayrollSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardPayrollSnapshot snapshot={roleDashboard.data.payrollSnapshot} />
+              ) : (
+                <LoadingState label="Loading payroll snapshot..." />
+              )
+            ) : null}
+          </div>
         </>
       ) : null}
 
-      {activeRole === "admin" && roleDashboard.data ? (
+      {activeRole === "admin" ? (
         <>
           <div className="grid items-stretch gap-4 xl:grid-cols-[1.1fr_1fr_1fr]">
-            {showQuickActions && visibleActions.length > 0 ? <DashboardQuickActions actions={visibleActions} /> : null}
-            {showAlerts ? <DashboardAlertsPanel alerts={alerts.data?.items ?? []} /> : null}
-            {showPendingTasks ? <DashboardPendingTasks items={tasks.data?.items ?? []} /> : null}
-          </div>
-          <div className="grid gap-4 xl:grid-cols-2">
-            {showTopProducts ? (
-              <DashboardTopProducts
-                items={topProducts.data?.items ?? []}
-                loading={topProducts.loading && !topProducts.data}
-                error={topProducts.error}
-                onRetry={() => void loadTopProducts(filters)}
-              />
+            {showQuickActions && visibleActions.length > 0 ? <DashboardQuickActions actions={visibleActions} className="h-[40rem]" /> : null}
+            {showAlerts ? (
+              alerts.data ? (
+                <DashboardAlertsPanel alerts={alerts.data.items} className="h-[40rem]" />
+              ) : (
+                <LoadingState label="Loading alerts..." className="h-[40rem]" />
+              )
             ) : null}
-            {showRecentActivities ? (
-              <DashboardRecentActivities
-                data={recentActivities.data}
-                loading={recentActivities.loading && !recentActivities.data}
-                error={recentActivities.error}
-                onRetry={() => void loadRecentActivities(activitiesPage)}
-                onPageChange={setActivitiesPage}
-              />
+            {showPendingTasks ? (
+              tasks.data ? (
+                <DashboardPendingTasks items={tasks.data.items} className="h-[40rem]" />
+              ) : (
+                <LoadingState label="Loading pending tasks..." className="h-[40rem]" />
+              )
             ) : null}
           </div>
           <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-            {showInventorySnapshot ? <DashboardInventorySnapshot snapshot={roleDashboard.data.inventorySnapshot} /> : null}
-            {showGstSnapshot ? <DashboardGstSnapshot snapshot={roleDashboard.data.gstSnapshot} /> : null}
-            {showPayrollSnapshot ? <DashboardPayrollSnapshot snapshot={roleDashboard.data.payrollSnapshot} /> : null}
-            {showAccountingSnapshot ? <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} /> : null}
+            {showInventorySnapshot ? (
+              roleDashboard.data ? (
+                <DashboardInventorySnapshot snapshot={roleDashboard.data.inventorySnapshot} />
+              ) : (
+                <LoadingState label="Loading inventory snapshot..." />
+              )
+            ) : null}
+            {showGstSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardGstSnapshot snapshot={roleDashboard.data.gstSnapshot} />
+              ) : (
+                <LoadingState label="Loading GST snapshot..." />
+              )
+            ) : null}
+            {showPayrollSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardPayrollSnapshot snapshot={roleDashboard.data.payrollSnapshot} />
+              ) : (
+                <LoadingState label="Loading payroll snapshot..." />
+              )
+            ) : null}
+            {showAccountingSnapshot ? (
+              roleDashboard.data ? (
+                <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} />
+              ) : (
+                <LoadingState label="Loading accounting snapshot..." />
+              )
+            ) : null}
           </div>
         </>
       ) : null}

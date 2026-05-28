@@ -212,6 +212,16 @@ export interface PaymentRemindersResponse {
   };
 }
 
+export interface ReminderPartyOption {
+  id: string;
+  name: string | null;
+  code: string | null;
+}
+
+export interface ReminderPartyOptionsResponse {
+  items: ReminderPartyOption[];
+}
+
 export interface PaymentFormAllocationInput {
   allocationType: PaymentAllocationType;
   referenceId: string | null;

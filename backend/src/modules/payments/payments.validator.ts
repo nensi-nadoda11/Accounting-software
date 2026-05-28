@@ -267,7 +267,7 @@ export const sendReminderSchema = z
     referenceNumber: optionalNullableString(150),
     dueDate: z.coerce.date(),
     amountDue: decimalNumber({ min: Number.EPSILON }),
-    channel: z.enum(PAYMENT_REMINDER_CHANNELS),
+    channel: z.enum(PAYMENT_REMINDER_CHANNELS.filter((channel) => channel !== "in_app") as ["email", "whatsapp"]),
     message: optionalNullableString(2000)
   })
   .strict();
@@ -294,6 +294,10 @@ export const listRemindersQuerySchema = z
 
 export const reminderIdParamSchema = z.object({
   id: z.uuid()
+});
+
+export const reminderPartyTypeParamSchema = z.object({
+  type: z.enum(PAYMENT_PARTY_TYPES)
 });
 
 export const updateReminderStatusSchema = z

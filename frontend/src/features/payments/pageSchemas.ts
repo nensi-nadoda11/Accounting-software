@@ -25,7 +25,7 @@ export const SEND_REMINDER_SCHEMA = z.object({
   referenceNumber: nullableText(150),
   dueDate: z.string().min(1, "Due date is required"),
   amountDue: z.coerce.number().gt(0, "Amount must be greater than 0"),
-  channel: z.enum(["in_app", "email", "whatsapp"]),
+  channel: z.enum(["email", "whatsapp"]),
   message: nullableText(2000),
 });
 

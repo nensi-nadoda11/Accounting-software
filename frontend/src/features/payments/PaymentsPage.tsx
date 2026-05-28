@@ -15,9 +15,7 @@ import { getErrorMessage } from "../../lib/errors";
 import { useAuth } from "../../providers/useAuth";
 import { useToast } from "../../providers/useToast";
 import { bankApi } from "../../services/bankApi";
-import { customersApi } from "../../services/customersApi";
 import { paymentsApi } from "../../services/paymentsApi";
-import { suppliersApi } from "../../services/suppliersApi";
 import type { CompanyBankAccount } from "../../types/company";
 import type {
   DueItem,
@@ -50,15 +48,12 @@ import { AllocationTable } from "./components/AllocationTable";
 import {
   CANCEL_PAYMENT_SCHEMA,
   SEND_REMINDER_SCHEMA,
-  UPDATE_REMINDER_STATUS_SCHEMA,
   type CancelPaymentFormInputValues,
   type CancelPaymentFormValues,
-  type ReminderStatusFormInputValues,
-  type ReminderStatusFormValues,
   type SendReminderFormInputValues,
   type SendReminderFormValues,
 } from "./pageSchemas";
-import { CHEQUE_STATUS_LABELS, PAYMENT_TABS, REMINDER_STATUS_OPTIONS } from "./paymentOptions";
+import { CHEQUE_STATUS_LABELS, PAYMENT_TABS } from "./paymentOptions";
 import type { PaymentManagementTab } from "./paymentTypes";
 import { matchesNinetyPlusBucket } from "./paymentUtils";
 
@@ -244,18 +239,8 @@ export const PaymentsPage = () => {
       referenceNumber: null,
       dueDate: new Date().toISOString().slice(0, 10),
       amountDue: 0,
-      channel: "in_app",
+      channel: "email",
       message: null,
-    },
-  });
-
-  const [reminderStatusTarget, setReminderStatusTarget] = useState<PaymentReminder | null>(null);
-  const [reminderStatusSubmitting, setReminderStatusSubmitting] = useState(false);
-  const reminderStatusForm = useForm<ReminderStatusFormInputValues, undefined, ReminderStatusFormValues>({
-    resolver: zodResolver(UPDATE_REMINDER_STATUS_SCHEMA),
-    defaultValues: {
-      status: "pending",
-      errorMessage: null,
     },
   });
 
@@ -269,19 +254,19 @@ export const PaymentsPage = () => {
     const loadReferenceData = async () => {
       const [bankResult, customerResult, supplierResult] = await Promise.allSettled([
         bankApi.list({ page: 1, limit: ALL_FETCH_LIMIT, isActive: true }),
-        customersApi.list({ page: 1, limit: ALL_FETCH_LIMIT, status: "active" }),
-        suppliersApi.list({ page: 1, limit: ALL_FETCH_LIMIT, status: "active", isBlacklisted: false }),
+        paymentsApi.listReminderParties("customer"),
+        paymentsApi.listReminderParties("supplier"),
       ]);
 
       setBankAccounts(bankResult.status === "fulfilled" ? bankResult.value.data.items.filter((item) => item.isActive) : []);
       setCustomerOptions(
         customerResult.status === "fulfilled"
-          ? customerResult.value.data.items.map((item) => ({ id: item.id, label: item.name }))
+          ? customerResult.value.data.items.map((item) => ({ id: item.id, label: item.name ?? item.code ?? "-" }))
           : [],
       );
       setSupplierOptions(
         supplierResult.status === "fulfilled"
-          ? supplierResult.value.data.items.map((item) => ({ id: item.id, label: item.name }))
+          ? supplierResult.value.data.items.map((item) => ({ id: item.id, label: item.name ?? item.code ?? "-" }))
           : [],
       );
     };
@@ -474,18 +459,10 @@ export const PaymentsPage = () => {
       referenceNumber: payload?.referenceNumber ?? null,
       dueDate: payload?.dueDate ?? new Date().toISOString().slice(0, 10),
       amountDue: payload?.amountDue ?? 0,
-      channel: payload?.channel ?? "in_app",
+      channel: payload?.channel === "whatsapp" ? "whatsapp" : "email",
       message: payload?.message ?? null,
     });
     setReminderFormOpen(true);
-  };
-
-  const openReminderStatusForm = (reminder: PaymentReminder) => {
-    reminderStatusForm.reset({
-      status: reminder.status,
-      errorMessage: reminder.errorMessage,
-    });
-    setReminderStatusTarget(reminder);
   };
 
   const openAdvanceAllocation = async (payment: Payment) => {
@@ -823,22 +800,7 @@ export const PaymentsPage = () => {
             <RemindersTable
               data={remindersData}
               loading={remindersLoading}
-              canManage={canReminderManage}
               onPageChange={setReminderPage}
-              onSend={(reminder) =>
-                openReminderForm({
-                  partyType: reminder.partyType,
-                  partyId: reminder.partyId,
-                  referenceType: reminder.referenceType,
-                  referenceId: reminder.referenceId,
-                  referenceNumber: reminder.referenceNumber,
-                  dueDate: reminder.dueDate.slice(0, 10),
-                  amountDue: Number(reminder.amountDue),
-                  channel: reminder.channel,
-                  message: reminder.message,
-                })
-              }
-              onUpdateStatus={openReminderStatusForm}
             />
           </div>
         ) : null}
@@ -1034,65 +996,12 @@ export const PaymentsPage = () => {
           <Input type="date" label="Due Date" {...reminderForm.register("dueDate")} error={reminderForm.formState.errors.dueDate?.message} />
           <Input type="number" min="0" step="0.01" label="Amount" {...reminderForm.register("amountDue")} error={reminderForm.formState.errors.amountDue?.message} />
           <Select label="Channel" {...reminderForm.register("channel")} error={reminderForm.formState.errors.channel?.message}>
-            <option value="in_app">In-App</option>
             <option value="email">Email</option>
             <option value="whatsapp">WhatsApp</option>
           </Select>
           <div className="md:col-span-2">
             <Textarea label="Message" rows={4} {...reminderForm.register("message")} error={reminderForm.formState.errors.message?.message} />
           </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={Boolean(reminderStatusTarget)}
-        onClose={() => setReminderStatusTarget(null)}
-        title="Update Reminder Status"
-        footer={
-          <>
-            <Button type="button" variant="secondary" onClick={() => setReminderStatusTarget(null)}>
-              Close
-            </Button>
-            <Button
-              type="button"
-              loading={reminderStatusSubmitting}
-              onClick={reminderStatusForm.handleSubmit(async (values) => {
-                if (!reminderStatusTarget) {
-                  return;
-                }
-
-                try {
-                  setReminderStatusSubmitting(true);
-                  await paymentsApi.updateReminderStatus(reminderStatusTarget.id, values);
-                  toast.success("Reminder status updated");
-                  setReminderStatusTarget(null);
-                  refreshData();
-                } catch (error) {
-                  toast.error(getErrorMessage(error, "Failed to update reminder"));
-                } finally {
-                  setReminderStatusSubmitting(false);
-                }
-              })}
-            >
-              Update
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Select label="Status" {...reminderStatusForm.register("status")} error={reminderStatusForm.formState.errors.status?.message}>
-            {REMINDER_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-          <Textarea
-            label="Error Message"
-            rows={3}
-            {...reminderStatusForm.register("errorMessage")}
-            error={reminderStatusForm.formState.errors.errorMessage?.message}
-          />
         </div>
       </Modal>
 

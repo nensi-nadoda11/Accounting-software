@@ -18,6 +18,7 @@ import type {
   PaymentReminderQuery,
   PaymentRemindersResponse,
   PaymentExportFormat,
+  ReminderPartyOptionsResponse,
   SendReceiptInput,
   SendReminderInput,
   UpdateChequeStatusInput,
@@ -184,6 +185,9 @@ export const paymentsApi = {
         },
       })
     ).data,
+
+  listReminderParties: async (partyType: PartyType) =>
+    (await client.get<ApiResponse<ReminderPartyOptionsResponse>>(`/payments/reminder-parties/${partyType}`)).data,
 
   sendReminder: async (payload: SendReminderInput) =>
     (await client.post<ApiResponse<{ reminder: { id: string; status: string; channel: string; errorMessage: string | null; sentAt: string | null }; whatsappUrl?: string }>>("/payments/reminders/send", payload)).data,

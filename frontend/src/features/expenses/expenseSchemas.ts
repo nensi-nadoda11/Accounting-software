@@ -9,7 +9,6 @@ import type { ExpenseFormInput, RecurringExpenseFormInput } from "../../types/ex
 const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/;
 const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const hsnSacRegex = /^[0-9]{4,8}$/;
-const safeColorRegex = /^#[0-9A-Fa-f]{6}$/;
 
 const trimToNull = (value: unknown) => {
   if (value === undefined || value === null) {
@@ -141,8 +140,6 @@ export const expenseCategorySchema = z
     name: z.string().trim().min(2, "Name is required").max(100, "Must be 100 characters or fewer"),
     parentId: z.preprocess(trimToNull, z.uuid().nullable()),
     defaultAccountId: z.preprocess(trimToNull, z.uuid().nullable()),
-    color: z.preprocess(trimToNull, z.string().regex(safeColorRegex, "Color must be a hex value").nullable()),
-    icon: nullableString(100),
     description: nullableString(500),
     status: z.enum(["active", "inactive"]),
     currentId: z.preprocess(trimToNull, z.uuid().nullable()).optional(),
@@ -156,8 +153,6 @@ export const expenseCategorySchema = z
     name: value.name.trim(),
     parentId: value.parentId,
     defaultAccountId: value.defaultAccountId,
-    color: value.color,
-    icon: value.icon,
     description: value.description,
     status: value.status,
   }));

@@ -38,8 +38,6 @@ export const ExpenseCategoryDrawer = ({
       name: "",
       parentId: null,
       defaultAccountId: null,
-      color: "#10b981",
-      icon: null,
       description: null,
       status: "active",
       currentId: null,
@@ -51,8 +49,6 @@ export const ExpenseCategoryDrawer = ({
       name: category?.name ?? "",
       parentId: category?.parentId ?? null,
       defaultAccountId: category?.defaultAccountId ?? null,
-      color: category?.color ?? "#10b981",
-      icon: category?.icon ?? null,
       description: category?.description ?? null,
       status: category?.status === "inactive" ? "inactive" : "active",
       currentId: category?.id ?? null,
@@ -106,9 +102,7 @@ export const ExpenseCategoryDrawer = ({
             ))}
           </Select>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Input label="Color" {...form.register("color")} error={form.formState.errors.color?.message} />
-          <Input label="Icon" {...form.register("icon")} error={form.formState.errors.icon?.message} />
+        <div className="grid gap-4 md:grid-cols-2">
           <Select label="Status" {...form.register("status")} error={form.formState.errors.status?.message}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>

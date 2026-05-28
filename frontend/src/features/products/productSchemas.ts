@@ -49,7 +49,7 @@ export const productFormSchema = z
         .nullable(),
     ),
     categoryId: z.uuid("Select category"),
-    unitId: z.uuid("Select unit"),
+    unitId: z.preprocess(trimToNull, z.uuid("Select unit").nullable()),
     brand: nullableText(120),
     description: nullableText(1000),
     hsnSacCode: z.preprocess(
@@ -162,6 +162,16 @@ export const productFormSchema = z
           });
         }
       }
+
+      return;
+    }
+
+    if (!value.unitId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["unitId"],
+        message: "Select unit",
+      });
     }
   })
   .transform(

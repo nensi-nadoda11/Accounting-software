@@ -58,7 +58,7 @@ export type InventoryProductSettings = {
   reorderLevel: string;
   maximumStockLevel: string;
   unit: {
-    id: string;
+    id: string | null;
     name: string | null;
     symbol: string | null;
     decimalAllowed: boolean;
@@ -260,7 +260,7 @@ export const buildProductSettings = (product: Product, unitMap: Map<string, Prod
     id: product.unit.id,
     name: product.unit.name,
     symbol: product.unit.symbol,
-    decimalAllowed: unitMap.get(product.unit.id)?.decimalAllowed ?? true,
+    decimalAllowed: product.unit.id ? (unitMap.get(product.unit.id)?.decimalAllowed ?? true) : true,
   },
 });
 

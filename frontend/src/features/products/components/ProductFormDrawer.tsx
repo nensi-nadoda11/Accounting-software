@@ -213,8 +213,13 @@ export const ProductFormDrawer = ({
                     </option>
                   ))}
               </Select>
-              <Select label="Unit" required {...form.register("unitId")} error={form.formState.errors.unitId?.message}>
-                <option value="">Select Unit</option>
+              <Select
+                label="Unit"
+                required={productType === "goods"}
+                {...form.register("unitId")}
+                error={form.formState.errors.unitId?.message}
+              >
+                <option value="">{productType === "service" ? "Select Unit (Optional)" : "Select Unit"}</option>
                 {units
                   .filter((item) => item.status !== "deleted")
                   .map((item) => (

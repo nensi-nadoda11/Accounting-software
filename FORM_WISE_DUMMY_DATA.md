@@ -7,6 +7,7 @@ Auto-generated, calculated, preview, system ID, status-history aur backend-gener
 ## Auth Forms
 
 ### Register Form
+
 Full Name: Jaimin Patel
 Email: admin@acmetrading.in
 Mobile Number: 9876543210
@@ -19,28 +20,34 @@ State: Gujarat
 Terms Accepted: Yes
 
 ### Login Form
+
 Email or Mobile: admin@acmetrading.in
 Password: Admin@1234
 Remember Me: Yes
 
 ### Verify OTP Form
+
 Email: admin@acmetrading.in
 OTP: 123456
 
 ### Forgot Password Form
+
 Email or Mobile: admin@acmetrading.in
 
 ### Reset Password Form
+
 Email: admin@acmetrading.in
 OTP: 123456
 New Password: Reset@1234
 Confirm Password: Reset@1234
 
 ### Accept Invite Form
+
 Password: Invite@1234
 Confirm Password: Invite@1234
 
 ### Change Password Form
+
 Current Password: Admin@1234
 New Password: Admin@5678
 Confirm Password: Admin@5678
@@ -48,6 +55,7 @@ Confirm Password: Admin@5678
 ## Company Forms
 
 ### Company Profile Form
+
 Company Name: Acme Trading Pvt Ltd
 Legal Name: Acme Trading Private Limited
 Business Type: Private Limited Company
@@ -69,6 +77,7 @@ Currency: INR
 Language: en
 
 ### Tax Settings Form
+
 GST Enabled: Yes
 GST Type: regular
 Composition Scheme: No
@@ -81,12 +90,14 @@ GST Filing Frequency: monthly
 TAN Number: ABCD12345E
 
 ### Financial Year Form
+
 Financial Year Name: FY 2025-26
 Start Date: 2025-04-01
 End Date: 2026-03-31
 Active: Yes
 
 ### Bank Account Form
+
 Bank Name: HDFC Bank
 Account Holder Name: Acme Trading Private Limited
 Account Number: 50200012345678
@@ -99,6 +110,7 @@ Default Account: Yes
 Active: Yes
 
 ### Invoice Settings Form
+
 Sales Invoice Prefix: SAL
 Purchase Invoice Prefix: PUR
 Credit Note Prefix: CRN
@@ -119,6 +131,7 @@ Tax Display Format: both
 Invoice Template: gst_a4
 
 ### Branch Form
+
 Branch Name: Head Office Ahmedabad
 Branch Code: AHM-HO
 GST Number: 24AABCU9603R1ZV
@@ -133,6 +146,7 @@ Manager Name: Nirav Shah
 Active: Yes
 
 ### Preferences Form
+
 Date Format: DD/MM/YYYY
 Currency Format: symbol_first
 Number Format: indian
@@ -147,6 +161,7 @@ Notification WhatsApp Enabled: No
 ## Settings And Users Forms
 
 ### Invite User Form
+
 Full Name: Riya Sharma
 Email: riya.sharma@acmetrading.in
 Mobile Number: 9876543201
@@ -154,13 +169,16 @@ Role: accountant
 Permissions: dashboard.view, customer.view, supplier.view, product.view, inventory.view, purchase.view, sales.view, payment.view, expense.view, accounting.view, gst.view, payroll.view, reports.view, settings.view
 
 ### Update Profile Form
+
 Full Name: Jaimin Patel
 Mobile Number: 9876543210
 
 ### Update Permissions Form
+
 Permissions: customer.view, customer.create, customer.update, supplier.view, supplier.create, product.view, product.create, inventory.view, inventory.manage, sales.view, sales.create, purchase.view, purchase.create, payment.view, expense.view
 
 ### Invoice Template Form
+
 Template Key: DEFAULT-GST-A4
 Template Name: Default GST A4 Template
 Invoice Type: sales
@@ -174,6 +192,7 @@ Default Template: Yes
 Active: Yes
 
 ### Payment Mode Form
+
 Mode Key: upi
 Mode Name: UPI
 Enabled: Yes
@@ -183,6 +202,7 @@ Requires Bank Account: Yes
 Cheque Workflow Enabled: No
 
 ### UI Preferences Form
+
 Accent Color: #0F766E
 Compact Mode: No
 Table Density: normal
@@ -193,6 +213,7 @@ Number Format: indian
 ## Customer Forms
 
 ### Customer Form
+
 Name: Raj Retail Mart
 Customer Type: business
 Business Name: Raj Retail Mart
@@ -227,6 +248,7 @@ Notes: Regular B2B customer
 ## Supplier Forms
 
 ### Supplier Form
+
 Name: Shree Raw Materials
 Supplier Type: manufacturer
 Business Name: Shree Raw Materials LLP
@@ -275,12 +297,14 @@ Notes: Primary tea/raw material supplier
 ## Product Forms
 
 ### Product Category Form
+
 Category Name: Tea Products
 Parent Category:
 Description: Packaged tea products
 Status: active
 
 ### Product Unit Form
+
 Unit Name: Kilogram
 Symbol: KG
 Decimal Allowed: Yes
@@ -289,6 +313,7 @@ Conversion Rate:
 Status: active
 
 ### Product Form Goods
+
 Product Type: goods
 Product Name: Masala Tea 1kg Pack
 SKU: TEA-1KG-MASALA
@@ -321,6 +346,7 @@ Negative Stock Allowed: No
 Status: active
 
 ### Product Form Service
+
 Product Type: service
 Product Name: Business Consulting Service
 SKU: CONSULT-SVC
@@ -329,6 +355,7 @@ Category: Professional Services
 Unit: Piece
 Brand: Acme Advisory
 Description: Monthly consulting retainer
+HSN/SAC Code: 998312
 HSN/SAC Code: 998312
 Tax Type: taxable
 GST Rate: 18
@@ -355,6 +382,7 @@ Status: active
 ## Inventory Forms
 
 ### Warehouse Form
+
 Warehouse Code: MAIN-AHM
 Name: Main Warehouse Ahmedabad
 Address Line 1: Godown No 3, Sarkhej
@@ -368,6 +396,7 @@ Default Warehouse: Yes
 Status: active
 
 ### Batch Form
+
 Product: Masala Tea 1kg Pack
 Warehouse: Main Warehouse Ahmedabad
 Batch Number: TEA-APR-2025-A1
@@ -377,6 +406,7 @@ Purchase Rate: 210
 Status: active
 
 ### Opening Stock Form
+
 Product: Masala Tea 1kg Pack
 Warehouse: Main Warehouse Ahmedabad
 Batch Number: TEA-APR-2025-A1
@@ -388,6 +418,7 @@ Movement Date: 2025-04-15
 Remarks: Initial stock setup
 
 ### Stock Adjustment Form
+
 Product: Masala Tea 1kg Pack
 Warehouse: Main Warehouse Ahmedabad
 Batch Number: TEA-APR-2025-A1
@@ -403,6 +434,7 @@ Remarks: Extra stock found during audit
 ## Purchase Forms
 
 ### Purchase Invoice Form
+
 Supplier: Shree Raw Materials
 Supplier Invoice Number: SRM-4587
 Invoice Date: 2025-05-05
@@ -449,6 +481,7 @@ Terms and Conditions: Material subject to quality check
 Attachment URL:
 
 ### Purchase Payment Form
+
 Payment Date: 2025-05-20
 Amount: 3000
 Payment Mode: upi
@@ -457,6 +490,7 @@ Reference Number: UPI-PUR-5201
 Notes: Part payment against supplier invoice
 
 ### Purchase Return Form
+
 Purchase Invoice: PUR-00051
 Return Date: 2025-05-25
 Warehouse: Main Warehouse Ahmedabad
@@ -473,6 +507,7 @@ Quantity: 4
 Remarks: Moisture damage
 
 ### Purchase Return Refund Form
+
 Refund Date: 2025-05-26
 Amount: 500
 Payment Mode: bank
@@ -483,6 +518,7 @@ Notes: Partial refund received
 ## Sales Forms
 
 ### Sales Invoice Form
+
 Invoice Type: gst_invoice
 Invoice Status: posted
 Invoice Date: 2025-05-08
@@ -530,6 +566,7 @@ Notes: B2B supply invoice
 Terms and Conditions: Payment due within 21 days
 
 ### POS Billing Form
+
 Invoice Type: pos
 Invoice Status: posted
 Invoice Date: 2025-05-09
@@ -557,6 +594,7 @@ Payment Mode: cash
 Notes: Retail POS bill
 
 ### Sales Payment Form
+
 Payment Date: 2025-05-18
 Amount: 7000
 Payment Mode: bank
@@ -565,6 +603,7 @@ Reference Number: NEFT-SAL-1801
 Notes: Part payment received
 
 ### Sales Return Form
+
 Sales Invoice: SAL-00101
 Return Date: 2025-05-22
 Warehouse: Main Warehouse Ahmedabad
@@ -582,6 +621,7 @@ Quantity: 2
 Remarks: 2 packs damaged
 
 ### Sales Return Refund Form
+
 Refund Date: 2025-05-23
 Amount: 400
 Payment Mode: upi
@@ -590,6 +630,7 @@ Reference Number: UPI-RET-2301
 Notes: Partial refund paid
 
 ### Send Invoice Form
+
 Email: orders@rajretail.in
 Subject: Your Invoice from Acme Trading
 Message: Please find attached your sales invoice.
@@ -597,6 +638,7 @@ Message: Please find attached your sales invoice.
 ## Payment Forms
 
 ### Receive Customer Payment Form
+
 Payment Type: customer_receive
 Party Type: customer
 Party: Raj Retail Mart
@@ -616,6 +658,7 @@ Allocated Amount: 7000
 Allocation Date: 2025-05-18
 
 ### Pay Supplier Form
+
 Payment Type: supplier_pay
 Party Type: supplier
 Party: Shree Raw Materials
@@ -635,6 +678,7 @@ Allocated Amount: 3000
 Allocation Date: 2025-05-20
 
 ### Advance Payment Form
+
 Payment Type: customer_receive
 Party Type: customer
 Party: Anita Shah
@@ -653,20 +697,24 @@ Allocated Amount: 2000
 Allocation Date: 2025-05-24
 
 ### Cancel Payment Form
+
 Reason: Duplicate payment entry
 
 ### Send Receipt Form
+
 Email: orders@rajretail.in
 Subject: Payment Receipt
 Message: Thanks for your payment. Attached is the receipt.
 
 ### Cheque Status Form
+
 Cheque Status: cleared
 Status Date: 2025-05-21
 Remarks: Cheque cleared successfully
 Reason:
 
 ### Send Reminder Form
+
 Party Type: customer
 Party: Raj Retail Mart
 Reference Type: sales_invoice
@@ -679,6 +727,7 @@ Message: Gentle reminder: your invoice payment is due on 29-05-2025.
 ## Expense Forms
 
 ### Expense Category Form
+
 Name: Office Rent
 Parent Category:
 Default Account: Rent Expense
@@ -688,6 +737,7 @@ Description: Monthly office rent expenses
 Status: active
 
 ### Expense Entry Form
+
 Expense Date: 2025-05-07
 Category: Office Rent
 Expense Account: Rent Expense
@@ -710,9 +760,11 @@ Notes: Paid on time
 Status: posted
 
 ### Cancel Expense Form
+
 Cancellation Reason: Wrong category selected
 
 ### Recurring Expense Form
+
 Template Name: Monthly Office Rent
 Category: Office Rent
 Expense Account: Rent Expense
@@ -736,6 +788,7 @@ Status: active
 ## Accounting Forms
 
 ### Account Form
+
 Account Code: CASH01
 Account Name: Cash in Hand
 Account Type: asset
@@ -747,6 +800,7 @@ Status: active
 Description: Cash account
 
 ### Opening Balance Form
+
 Account: Cash in Hand
 Financial Year: FY 2025-26
 Opening Date: 2025-04-01
@@ -755,6 +809,7 @@ Credit: 0
 Description: Opening cash balance
 
 ### Journal Entry Form
+
 Financial Year: FY 2025-26
 Journal Number: JV-0001
 Entry Date: 2025-05-10
@@ -776,10 +831,12 @@ Debit: 0
 Credit: 10000
 
 ### Journal Cancel Or Reverse Form
+
 Reason: Wrong amount posted
 Reversal Date: 2025-05-11
 
 ### Period Lock Form
+
 Financial Year: FY 2025-26
 Period Start: 2025-04-01
 Period End: 2025-04-30
@@ -789,6 +846,7 @@ Reason: April books finalized
 ## GST Forms
 
 ### GST Adjustment Form
+
 Adjustment Date: 2025-05-28
 Adjustment Type: itc_reversal
 Tax Component: cgst
@@ -798,9 +856,11 @@ Reference Number: GST-ADJ-001
 Notes: Will re-claim after reconciliation
 
 ### GST Adjustment Cancel Form
+
 Cancellation Reason: Created against wrong tax component
 
 ### GST ITC Status Form
+
 Eligibility Status: eligible
 Claim Status: partially_claimed
 Claimed Amount: 450
@@ -809,6 +869,7 @@ Notes: Balance will be claimed next month
 ## Payroll Forms
 
 ### Employee Form
+
 Full Name: Riya Sharma
 Mobile: 9876543241
 Email: riya.sharma@acmetrading.in
@@ -834,6 +895,7 @@ UPI ID: riya.sharma@okhdfcbank
 Status: active
 
 ### Salary Structure Form
+
 Basic Salary: 18000
 HRA: 9000
 Conveyance Allowance: 2000
@@ -849,6 +911,7 @@ Effective To:
 Active: Yes
 
 ### Attendance Form
+
 Employee: Riya Sharma
 Payroll Month: 2025-05
 Working Days: 26
@@ -861,6 +924,7 @@ Overtime Hours: 4
 Remarks: One half day for personal work
 
 ### Attendance Bulk Entry Form
+
 Payroll Month: 2025-05
 
 Employee 1: Riya Sharma
@@ -884,12 +948,14 @@ Overtime Hours: 6
 Remarks: Warehouse supervision
 
 ### Payroll Run Form
+
 Payroll Month: 2025-05
 Period Start: 2025-05-01
 Period End: 2025-05-31
 Notes: Monthly payroll run for May 2025
 
 ### Bonus Deduction Form
+
 Entry 1
 Type: bonus
 Name: Performance Bonus
@@ -905,6 +971,7 @@ Taxable: No
 Notes: Attendance related deduction
 
 ### Salary Payment Form
+
 Amount: 28140
 Payment Date: 2025-05-31
 Payment Mode: bank
@@ -913,6 +980,7 @@ Reference Number: SALARY-MAY-RIYA
 Notes: Salary credited for May
 
 ### Bulk Salary Payment Form
+
 Payment Date: 2025-05-31
 Payment Mode: bank
 Bank Account: HDFC Bank Current
@@ -920,6 +988,7 @@ Reference Number: SALARY-MAY-BULK
 Notes: Bulk payroll transfer
 
 ### Salary Slip Email Form
+
 Email: riya.sharma@acmetrading.in
 Subject: Salary Slip - May 2025
 Message: Please find attached your salary slip for May 2025.

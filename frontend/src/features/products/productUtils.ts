@@ -250,7 +250,7 @@ export const buildProductFormDefaults = (product?: Product | null): ProductFormI
   sku: product?.sku ?? null,
   barcode: product?.barcode ?? null,
   categoryId: product?.category.id ?? "",
-  unitId: product?.unit.id ?? "",
+  unitId: product?.unit.id ?? null,
   brand: product?.brand ?? null,
   description: product?.description ?? null,
   hsnSacCode: product?.hsnSacCode ?? null,

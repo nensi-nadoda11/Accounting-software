@@ -40,7 +40,7 @@ type ResolvedProductState = {
   sku: string | null;
   barcode: string | null;
   categoryId: string;
-  unitId: string;
+  unitId: string | null;
   brand: string | null;
   description: string | null;
   hsnSacCode: string | null;
@@ -73,7 +73,7 @@ type ProductStateInput = {
   sku?: string | null | undefined;
   barcode?: string | null | undefined;
   categoryId?: string | undefined;
-  unitId?: string | undefined;
+  unitId?: string | null | undefined;
   brand?: string | null | undefined;
   description?: string | null | undefined;
   hsnSacCode?: string | null | undefined;
@@ -294,7 +294,7 @@ class ProductsService {
       sku: null,
       barcode: null,
       categoryId: "",
-      unitId: "",
+      unitId: null,
       brand: null,
       description: null,
       hsnSacCode: null,
@@ -496,6 +496,10 @@ class ProductsService {
       throw new AppError("HSN/SAC code is required when company GST is enabled", 400);
     }
 
+    if (state.productType === "goods" && !state.unitId) {
+      throw new AppError("Unit is required for goods products", 400);
+    }
+
     if (state.hsnSacCode && !/^\d{4,8}$/.test(state.hsnSacCode)) {
       throw new AppError("HSN/SAC code must be 4 to 8 digits", 400);
     }
@@ -584,7 +588,11 @@ class ProductsService {
     return category;
   }
 
-  private async assertUnitUsable(companyId: string, unitId: string) {
+  private async assertUnitUsable(companyId: string, unitId: string | null) {
+    if (!unitId) {
+      return null;
+    }
+
     const unit = await productsRepository.findUnitById(companyId, unitId);
     if (!unit || unit.status !== "active") {
       throw new AppError("Selected unit was not found or is inactive", 400);

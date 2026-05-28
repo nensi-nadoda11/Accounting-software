@@ -115,9 +115,7 @@ export const products = pgTable(
     categoryId: uuid("category_id")
       .notNull()
       .references(() => productCategories.id, { onDelete: "restrict" }),
-    unitId: uuid("unit_id")
-      .notNull()
-      .references(() => productUnits.id, { onDelete: "restrict" }),
+    unitId: uuid("unit_id").references(() => productUnits.id, { onDelete: "restrict" }),
     brand: text("brand"),
     description: text("description"),
     hsnSacCode: text("hsn_sac_code"),

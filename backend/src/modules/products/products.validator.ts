@@ -127,7 +127,7 @@ const productBodyFields = {
   sku: optionalSku,
   barcode: optionalBarcode,
   categoryId: z.uuid(),
-  unitId: z.uuid(),
+  unitId: z.preprocess(trimToNull, z.uuid().nullable()),
   brand: optionalNullableString(120),
   description: optionalNullableString(1000),
   hsnSacCode: optionalHsnSacCode,
@@ -155,6 +155,8 @@ const productBodyFields = {
 } satisfies Record<string, z.ZodTypeAny>;
 
 const validateProductBody = (value: Record<string, unknown>, ctx: z.RefinementCtx) => {
+  const productType = value.productType as "goods" | "service" | undefined;
+  const unitId = value.unitId as string | null | undefined;
   const gstRate = value.gstRate as number | undefined;
   const salePrice = value.salePrice as number | undefined;
   const minimumSalePrice = value.minimumSalePrice as number | undefined;
@@ -224,6 +226,14 @@ const validateProductBody = (value: Record<string, unknown>, ctx: z.RefinementCt
       message: "Batch tracking must be enabled when expiry tracking is enabled"
     });
   }
+
+  if (productType === "goods" && !unitId) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["unitId"],
+      message: "Unit is required for goods products"
+    });
+  }
 };
 
 export const createProductSchema = z
@@ -238,7 +248,7 @@ export const updateProductSchema = z
     sku: productBodyFields.sku,
     barcode: productBodyFields.barcode,
     categoryId: z.uuid().optional(),
-    unitId: z.uuid().optional(),
+    unitId: z.preprocess(trimToNull, z.uuid().nullable().optional()),
     brand: productBodyFields.brand,
     description: productBodyFields.description,
     hsnSacCode: productBodyFields.hsnSacCode,

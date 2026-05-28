@@ -65,7 +65,7 @@ export interface ProductCategoryRef {
 }
 
 export interface ProductUnitRef {
-  id: string;
+  id: string | null;
   name: string | null;
   symbol: string | null;
 }
@@ -155,7 +155,7 @@ export interface ProductFormInput {
   sku: string | null;
   barcode: string | null;
   categoryId: string;
-  unitId: string;
+  unitId: string | null;
   brand: string | null;
   description: string | null;
   hsnSacCode: string | null;

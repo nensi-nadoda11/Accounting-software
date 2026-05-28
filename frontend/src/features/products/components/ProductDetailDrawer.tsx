@@ -61,6 +61,7 @@ export const ProductDetailDrawer = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [barcodeLoading, setBarcodeLoading] = useState(false);
+  const isGoodsProduct = product?.productType === "goods";
 
   useEffect(() => {
     if (!open || !productId) {
@@ -147,10 +148,12 @@ export const ProductDetailDrawer = ({
                   Price History
                 </Button>
               ) : null}
-              <Button type="button" variant="secondary" onClick={() => onOpenStockSummary(product)}>
-                <Package className="mr-2 size-4" />
-                Stock Summary
-              </Button>
+              {isGoodsProduct ? (
+                <Button type="button" variant="secondary" onClick={() => onOpenStockSummary(product)}>
+                  <Package className="mr-2 size-4" />
+                  Stock Summary
+                </Button>
+              ) : null}
               {canManagePrice ? (
                 <Button
                   type="button"
@@ -249,50 +252,6 @@ export const ProductDetailDrawer = ({
             </Card>
 
             <Card>
-              <CardHeader title="Inventory Settings" action={<Eye className="size-4 text-slate-400" />} />
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                {[
-                  { label: "Stock Tracking", value: product.stockTrackingEnabled ? "Enabled" : "Disabled" },
-                  { label: "Opening Stock", value: product.openingStockQuantity },
-                  { label: "Opening Value", value: formatInr(product.openingStockValue) },
-                  { label: "Min Stock", value: product.minimumStockLevel },
-                  { label: "Reorder Level", value: product.reorderLevel },
-                  { label: "Max Stock", value: product.maximumStockLevel },
-                  { label: "Batch Tracking", value: product.batchTrackingEnabled ? "Enabled" : "Disabled" },
-                  { label: "Expiry Tracking", value: product.expiryTrackingEnabled ? "Enabled" : "Disabled" },
-                  { label: "Serial Tracking", value: product.serialTrackingEnabled ? "Enabled" : "Disabled" },
-                  { label: "Negative Stock", value: product.negativeStockAllowed ? "Allowed" : "Blocked" },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">{item.value}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card>
-              <CardHeader title="Stock Summary" />
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                {stockSummary
-                  ? [
-                      { label: "Available Qty", value: stockSummary.availableQuantity },
-                      { label: "Reserved Qty", value: stockSummary.reservedQuantity },
-                      { label: "Incoming Qty", value: stockSummary.incomingQuantity },
-                      { label: "Inventory Module", value: stockSummary.inventoryModuleReady ? "Ready" : "Pending" },
-                    ].map((item) => (
-                      <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
-                        <p className="mt-1 text-sm font-medium text-slate-900">{item.value}</p>
-                      </div>
-                    ))
-                  : <EmptyState title="Stock summary unavailable" />}
-              </CardContent>
-            </Card>
-
-            <Card>
               <CardHeader title="Recent Price History" />
               <CardContent>
                 {!history?.items.length ? (
@@ -321,7 +280,54 @@ export const ProductDetailDrawer = ({
                 )}
               </CardContent>
             </Card>
+
           </div>
+
+          {isGoodsProduct ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <Card>
+                <CardHeader title="Inventory Settings" action={<Eye className="size-4 text-slate-400" />} />
+                <CardContent className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    { label: "Stock Tracking", value: product.stockTrackingEnabled ? "Enabled" : "Disabled" },
+                    { label: "Opening Stock", value: product.openingStockQuantity },
+                    { label: "Opening Value", value: formatInr(product.openingStockValue) },
+                    { label: "Min Stock", value: product.minimumStockLevel },
+                    { label: "Reorder Level", value: product.reorderLevel },
+                    { label: "Max Stock", value: product.maximumStockLevel },
+                    { label: "Batch Tracking", value: product.batchTrackingEnabled ? "Enabled" : "Disabled" },
+                    { label: "Expiry Tracking", value: product.expiryTrackingEnabled ? "Enabled" : "Disabled" },
+                    { label: "Serial Tracking", value: product.serialTrackingEnabled ? "Enabled" : "Disabled" },
+                    { label: "Negative Stock", value: product.negativeStockAllowed ? "Allowed" : "Blocked" },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
+                      <p className="mt-1 text-sm font-medium text-slate-900">{item.value}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader title="Stock Summary" />
+                <CardContent className="grid gap-3 sm:grid-cols-2">
+                  {stockSummary
+                    ? [
+                        { label: "Available Qty", value: stockSummary.availableQuantity },
+                        { label: "Reserved Qty", value: stockSummary.reservedQuantity },
+                        { label: "Incoming Qty", value: stockSummary.incomingQuantity },
+                        { label: "Inventory Module", value: stockSummary.inventoryModuleReady ? "Ready" : "Pending" },
+                      ].map((item) => (
+                        <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
+                          <p className="mt-1 text-sm font-medium text-slate-900">{item.value}</p>
+                        </div>
+                      ))
+                    : <EmptyState title="Stock summary unavailable" />}
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
             {canDelete ? (

@@ -3,6 +3,7 @@ import { auditLogRepository } from "./audit-log.repository";
 type JsonRecord = Record<string, unknown>;
 
 const SENSITIVE_KEY_PATTERN = /(password|token|secret|refresh|session|otp|hash|authorization|cookie|api[_-]?key)/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const sanitizeValue = (value: unknown): unknown => {
   if (Array.isArray(value)) {
@@ -25,6 +26,33 @@ const toNullableRecord = (value: unknown): JsonRecord | null => {
   }
 
   return sanitizeValue(value) as JsonRecord;
+};
+
+const normalizeEntityId = (value: string | null | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return UUID_PATTERN.test(normalized) ? normalized : null;
+};
+
+const buildMetadata = (value: unknown, rawEntityId: string | null | undefined) => {
+  const metadata = toNullableRecord(value) ?? {};
+
+  if (!rawEntityId) {
+    return metadata;
+  }
+
+  const normalizedEntityId = rawEntityId.trim();
+  if (!normalizedEntityId || UUID_PATTERN.test(normalizedEntityId) || metadata.entityReference) {
+    return metadata;
+  }
+
+  return {
+    ...metadata,
+    entityReference: normalizedEntityId
+  };
 };
 
 const inferModule = (moduleName: string | null | undefined, action: string, entityType: string | null | undefined) => {
@@ -64,6 +92,8 @@ export class AuditLogService {
     requestPath?: string | null;
     status?: "success" | "failed";
   }): Promise<void> {
+    const entityId = normalizeEntityId(data.entityId);
+
     await auditLogRepository.create({
       companyId: data.companyId ?? null,
       userId: data.userId ?? null,
@@ -72,10 +102,10 @@ export class AuditLogService {
       action: data.action,
       module: inferModule(data.module, data.action, data.entityType ?? null),
       entityType: data.entityType ?? null,
-      entityId: data.entityId ?? null,
+      entityId,
       oldValues: toNullableRecord(data.oldValues),
       newValues: toNullableRecord(data.newValues),
-      metadata: toNullableRecord(data.metadata) ?? {},
+      metadata: buildMetadata(data.metadata, data.entityId),
       ipAddress: data.ipAddress ?? null,
       userAgent: data.userAgent ?? null,
       requestMethod: data.requestMethod ?? null,

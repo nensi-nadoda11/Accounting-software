@@ -821,3 +821,183 @@ Final 6
 32. Dashboard
 33. User Invite
 34. Audit
+
+## 16. Expense Flow
+
+Fast demo order ke baad agar Expenses screen bhi dikhani ho to ye data use karo.
+
+### Expense Category
+
+Name: Office Maintenance
+Parent Category: blank
+Default Account: Office Expense
+Color: #F59E0B
+Icon: receipt
+Description: Office repair aur utility expenses
+Status: active
+
+### New Expense
+
+Expense Date: 2026-04-12
+Category: Office Maintenance
+Expense Account: Office Expense
+Payee Name: LaserTech Services
+Vendor GST Number: 24ABCLS4521M1Z8
+Vendor PAN Number: ABCLS4521M
+HSN/SAC Code: 998713
+Description: Office printer repair and cartridge replacement
+Amount: 1000
+GST Applicable: Yes
+GST Rate: 18
+Price Tax Type: exclusive
+Payment Mode: bank
+Bank Account: HDFC Bank
+Reference Number: EXP-APR-001
+Cheque Number: blank
+Cheque Date: blank
+Notes: Safe GST demo expense entry
+Status: posted
+
+### Expense Expected Result
+
+Taxable Amount: 1000
+CGST: 90
+SGST: 90
+IGST: 0
+GST Total: 180
+Total Amount: 1180
+
+### Cancel Expense
+
+Cancellation Reason: Duplicate expense entry created by mistake
+
+### Recurring Expense
+
+Template Name: Monthly Internet Bill
+Category: Office Maintenance
+Expense Account: Office Expense
+Payee Name: Airtel Business
+Description: Monthly broadband expense
+Amount: 2500
+GST Applicable: Yes
+GST Rate: 18
+Price Tax Type: exclusive
+Payment Mode: upi
+Bank Account: HDFC Bank
+Frequency: monthly
+Start Date: 2026-04-01
+End Date: 2027-03-31
+Next Run Date: 2026-05-01
+Auto Create Enabled: Yes
+Create As Status: draft
+Reminder Days Before: 2
+Status: active
+
+## 17. GST Flow
+
+### GST Summary Filters
+
+Financial Year: FY 2026-27
+Date From: 2026-04-01
+Date To: 2026-04-30
+
+### GST Summary Expected Result
+
+Purchase GST purchase invoice se aayega
+Sales GST POS billing aur sales invoice se aayega
+Sales Return GST sales return se reduce hoga
+Expense Input GST: 180
+Net GST payable output minus input ke hisaab se dikhega
+
+### Sales GST Filters
+
+Date From: 2026-04-01
+Date To: 2026-04-30
+State: Gujarat
+Invoice Type: all
+Party Type: all
+GST Rate: 5
+
+### Purchase GST Filters
+
+Date From: 2026-04-01
+Date To: 2026-04-30
+Supplier: Mahalaxmi Tea Suppliers
+State: Gujarat
+Eligibility Status: blank
+Claim Status: blank
+
+### ITC Status Update
+
+Source Type: expense
+Source Document: EXP-APR-001
+Eligibility Status: eligible
+Claim Status: claimed
+Claimed Amount: 180
+Notes: Office expense GST claimed in April
+
+### GST Adjustment
+
+Adjustment Date: 2026-04-30
+Adjustment Type: rounding
+Tax Component: cgst
+Amount: 1
+Reason: Monthly GST rounding adjustment
+Reference Number: GST-APR-ROUND-01
+Notes: Demo entry for adjustment tab
+
+### GST Adjustment Cancel
+
+Cancellation Reason: Wrong tax component selected
+
+### HSN / SAC Summary Filters
+
+Date From: 2026-04-01
+Date To: 2026-04-30
+Source: all
+
+Expected Codes:
+0902 for tea sales and purchase
+998713 for printer repair expense
+
+### GST Export
+
+Export Type: gstr-3b
+Format: pdf
+Date From: 2026-04-01
+Date To: 2026-04-30
+
+## 18. Tax Flow
+
+### Output Tax Filters
+
+Date From: 2026-04-01
+Date To: 2026-04-30
+State: Gujarat
+GST Rate: 5
+
+### Output Tax Expected Result
+
+POS billing aur sales invoice ka output tax show hoga
+Sales return ke baad net output GST thoda reduce hoga
+Current demo mostly intra-state hai isliye CGST + SGST split dikhega
+
+### Tax Summary Filters
+
+Date From: 2026-04-01
+Date To: 2026-04-30
+
+### Tax Summary Expected Rows
+
+GST Rate 5:
+Purchase side me tea purchase data dikhega
+Sales side me POS aur sales invoice data dikhega
+
+GST Rate 18:
+Expense side me EXP-APR-001 ka input GST effect dikhega
+
+### Tax Screen Talking Points
+
+5 percent row inventory product transactions cover karegi
+18 percent row expense GST ko cover karegi
+Agar future demo me interstate sale loge to IGST bhi yahin reflect hoga

@@ -2259,15 +2259,37 @@ class PurchasesService {
         { label: "Status", value: invoice.purchaseStatus },
         { label: "Payment Status", value: invoice.paymentStatus }
       ],
-      summary: [
-        { label: "Subtotal", value: invoice.subtotal },
-        { label: "GST Total", value: invoice.gstTotal },
-        { label: "Freight", value: invoice.freightCharges },
-        { label: "Other Charges", value: invoice.additionalCharges },
-        { label: "Round Off", value: invoice.roundOffAmount },
-        { label: "Grand Total", value: invoice.grandTotal },
-        { label: "Paid Amount", value: invoice.paidAmount },
-        { label: "Due Amount", value: invoice.dueAmount }
+      summaryTitle: "Bill Summary",
+      summaryLayout: "panel",
+      summaryPlacement: "after",
+      summarySections: [
+        {
+          title: "Tax Breakup",
+          items: [
+            { label: "Subtotal", value: invoice.subtotal },
+            { label: "Item Discount", value: invoice.itemDiscountTotal },
+            { label: "Invoice Discount", value: invoice.invoiceDiscountTotal },
+            { label: "Additional Charges", value: invoice.additionalCharges },
+            { label: "Freight", value: invoice.freightCharges },
+            { label: "Taxable", value: invoice.taxableAmount },
+            { label: "CGST", value: invoice.cgstTotal },
+            { label: "SGST", value: invoice.sgstTotal },
+            { label: "IGST", value: invoice.igstTotal },
+            { label: "Cess", value: invoice.cessTotal },
+            { label: "GST Total", value: invoice.gstTotal },
+            { label: "Round Off", value: invoice.roundOffAmount },
+            { label: "Grand Total", value: invoice.grandTotal }
+          ]
+        },
+        {
+          title: "Payment Summary",
+          items: [
+            { label: "Paid", value: invoice.paidAmount },
+            { label: "Due", value: invoice.dueAmount },
+            { label: "Mode", value: invoice.paymentMode ?? "-" },
+            { label: "Reference", value: invoice.paymentReference ?? "-" }
+          ]
+        }
       ],
       columns: [
         { key: "productName", label: "Product" },

@@ -97,6 +97,7 @@ type OutstandingSummary = {
   totalPurchaseReturns: string;
   totalPaymentsMade: string;
   totalRefundsReceived: string;
+  invoiceOutstanding: string;
   outstandingPayable: string;
   overduePayable: string;
   creditLimit: string;
@@ -446,6 +447,7 @@ class SuppliersService {
       totalRefundsReceived: string;
       debitAdjustments: string;
       creditAdjustments: string;
+      invoiceOutstanding: string;
       overduePayable: string;
       dueInvoicesCount: number;
     }
@@ -461,17 +463,11 @@ class SuppliersService {
     const totalPurchaseReturns = parseDecimalToCents(totals.totalPurchaseReturns);
     const totalPaymentsMade = parseDecimalToCents(totals.totalPaymentsMade);
     const totalRefundsReceived = parseDecimalToCents(totals.totalRefundsReceived);
-    const debitAdjustments = parseDecimalToCents(totals.debitAdjustments);
-    const creditAdjustments = parseDecimalToCents(totals.creditAdjustments);
+    const invoiceOutstanding = parseDecimalToCents(totals.invoiceOutstanding);
     const overduePayable = parseDecimalToCents(totals.overduePayable);
-    const outstandingPayable =
-      signedOpeningBalance +
-      totalPurchases -
-      totalPurchaseReturns -
-      totalPaymentsMade +
-      totalRefundsReceived +
-      creditAdjustments -
-      debitAdjustments;
+    const openingPayable = signedOpeningBalance > 0n ? signedOpeningBalance : 0n;
+    const outstandingFromInvoices = openingPayable + invoiceOutstanding;
+    const outstandingPayable = outstandingFromInvoices > overduePayable ? outstandingFromInvoices : overduePayable;
     const creditLimit = parseDecimalToCents(supplier.creditLimit);
     const usedPayable = outstandingPayable > 0n ? outstandingPayable : 0n;
     const remainingCreditLimit = creditLimit - usedPayable;
@@ -482,6 +478,7 @@ class SuppliersService {
       totalPurchaseReturns: formatCentsToDecimal(totalPurchaseReturns),
       totalPaymentsMade: formatCentsToDecimal(totalPaymentsMade),
       totalRefundsReceived: formatCentsToDecimal(totalRefundsReceived),
+      invoiceOutstanding: formatCentsToDecimal(invoiceOutstanding),
       outstandingPayable: formatCentsToDecimal(outstandingPayable),
       overduePayable: formatCentsToDecimal(overduePayable),
       creditLimit: formatCentsToDecimal(creditLimit),
@@ -602,35 +599,51 @@ class SuppliersService {
     }
 
     const result = await suppliersRepository.listSuppliers(params);
+    const totalsBySupplier = new Map(
+      await Promise.all(
+        result.rows.map(async (supplier) => [
+          supplier.id,
+          await suppliersRepository.getSupplierTransactionTotals(actor.companyId, supplier.id)
+        ] as const)
+      )
+    );
 
     return {
-      items: result.rows.map((supplier) => ({
-        id: supplier.id,
-        supplierCode: supplier.supplierCode,
-        name: supplier.name,
-        supplierType: supplier.supplierType,
-        businessName: supplier.businessName,
-        mobile: supplier.mobile,
-        email: supplier.email,
-        gstNumber: supplier.gstNumber,
-        taxType: supplier.taxType,
-        status: supplier.status,
-        isBlacklisted: supplier.isBlacklisted,
-        isPreferred: supplier.isPreferred,
-        creditDays: supplier.creditDays,
-        createdAt: supplier.createdAt,
-        updatedAt: supplier.updatedAt,
-        outstandingSummary: this.buildOutstandingSummary(supplier, {
-          totalPurchases: "0.00",
-          totalPurchaseReturns: "0.00",
-          totalPaymentsMade: "0.00",
-          totalRefundsReceived: "0.00",
-          debitAdjustments: "0.00",
-          creditAdjustments: "0.00",
-          overduePayable: "0.00",
-          dueInvoicesCount: 0
-        })
-      })),
+      items: result.rows.map((supplier) => {
+        const totals = totalsBySupplier.get(supplier.id);
+
+        return {
+          id: supplier.id,
+          supplierCode: supplier.supplierCode,
+          name: supplier.name,
+          supplierType: supplier.supplierType,
+          businessName: supplier.businessName,
+          mobile: supplier.mobile,
+          email: supplier.email,
+          gstNumber: supplier.gstNumber,
+          taxType: supplier.taxType,
+          status: supplier.status,
+          isBlacklisted: supplier.isBlacklisted,
+          isPreferred: supplier.isPreferred,
+          creditDays: supplier.creditDays,
+          createdAt: supplier.createdAt,
+          updatedAt: supplier.updatedAt,
+          outstandingSummary: this.buildOutstandingSummary(
+            supplier,
+            totals ?? {
+              totalPurchases: "0.00",
+              totalPurchaseReturns: "0.00",
+              totalPaymentsMade: "0.00",
+              totalRefundsReceived: "0.00",
+              debitAdjustments: "0.00",
+              creditAdjustments: "0.00",
+              invoiceOutstanding: "0.00",
+              overduePayable: "0.00",
+              dueInvoicesCount: 0
+            }
+          )
+        };
+      }),
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -753,6 +766,7 @@ class SuppliersService {
         totalPurchaseReturns: "0.00",
         totalPaymentsMade: "0.00",
         totalRefundsReceived: "0.00",
+        invoiceOutstanding: "0.00",
         debitAdjustments: "0.00",
         creditAdjustments: "0.00",
         overduePayable: "0.00",
@@ -1309,6 +1323,7 @@ class SuppliersService {
           totalPurchaseReturns: "0.00",
           totalPaymentsMade: "0.00",
           totalRefundsReceived: "0.00",
+          invoiceOutstanding: "0.00",
           debitAdjustments: "0.00",
           creditAdjustments: "0.00",
           overduePayable: "0.00",

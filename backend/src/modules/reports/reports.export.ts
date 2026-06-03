@@ -435,6 +435,11 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
 
   const metadata = dataset.metadata ?? [];
   const summary = dataset.summary ?? [];
+  const summarySections = dataset.summarySections ?? [];
+  const hasSummary = summary.length > 0 || summarySections.length > 0;
+  const summaryTitle = dataset.summaryTitle ?? "Summary";
+  const summaryLayout = dataset.summaryLayout ?? "cards";
+  const summaryPlacement = dataset.summaryPlacement ?? "before";
   const rows = dataset.rows.map((row, index) => ({
     srNo: index + 1,
     values: dataset.columns.map((column) => toDisplayValue(row[column.key], column))
@@ -564,6 +569,93 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
     return commands;
   };
 
+  const drawSummaryCards = (commands: string[], cursorY: number) => {
+    if (!hasSummary) {
+      return cursorY;
+    }
+
+    const cardsPerRow = Math.max(2, Math.min(4, Math.floor(contentWidth / 170)));
+    const cardGap = 10;
+    const cardWidth = (contentWidth - cardGap * (cardsPerRow - 1)) / cardsPerRow;
+    const summaryRows = Math.ceil(summary.length / cardsPerRow);
+    const cardHeight = 42;
+
+    for (let index = 0; index < summary.length; index += 1) {
+      const cardX = marginX + (index % cardsPerRow) * (cardWidth + cardGap);
+      const cardY = cursorY - Math.floor(index / cardsPerRow) * (cardHeight + 10) - cardHeight;
+      commands.push(drawRect(cardX, cardY, cardWidth, cardHeight, PDF_SUMMARY_FILL, PDF_BORDER));
+      commands.push(drawText(cardX + 10, cardY + 26, summary[index]!.label, { size: 8, color: PDF_MUTED }));
+      commands.push(drawText(cardX + 10, cardY + 10, String(summary[index]!.value), { size: 11, font: "F2" }));
+    }
+
+    return cursorY - summaryRows * (cardHeight + 10) - 6;
+  };
+
+  const drawSummaryPanel = (commands: string[], cursorY: number) => {
+    const sectionGap = 12;
+    const panelPaddingX = 12;
+    const panelPaddingTop = 12;
+    const panelPaddingBottom = 12;
+    const titleHeight = 16;
+    const sectionTitleHeight = 14;
+    const rowHeight = 18;
+    const labelWidthRatio = 0.58;
+
+    const sections = summarySections.length
+      ? summarySections
+      : summary.length
+        ? [
+            {
+              title: summaryTitle,
+              items: summary
+            }
+          ]
+        : [];
+
+    if (!sections.length) {
+      return cursorY;
+    }
+
+    const sectionWidths = sections.map((section) => {
+      const columnCount = Math.max(section.items.length, 1);
+      return {
+        section,
+        height: sectionTitleHeight + columnCount * rowHeight + 6
+      };
+    });
+
+    const panelContentTop = cursorY - panelPaddingTop - titleHeight;
+    const panelBodyHeight = Math.max(...sectionWidths.map((section) => section.height));
+    const panelHeight = panelPaddingTop + titleHeight + panelBodyHeight + panelPaddingBottom + 2;
+    const panelBottom = cursorY - panelHeight;
+
+    commands.push(drawRect(marginX, panelBottom, contentWidth, panelHeight, PDF_SUMMARY_FILL, PDF_BORDER));
+    commands.push(drawText(marginX + panelPaddingX, cursorY - 14, summaryTitle, { size: 11, font: "F2", color: PDF_TEXT }));
+    commands.push(drawLine(marginX + panelPaddingX, cursorY - 24, marginX + contentWidth - panelPaddingX, cursorY - 24, PDF_BORDER));
+
+    const availableWidth = contentWidth - panelPaddingX * 2;
+    const sectionWidth = sections.length > 1 ? (availableWidth - sectionGap * (sections.length - 1)) / sections.length : availableWidth;
+    const sectionTop = panelContentTop - 6;
+
+    sections.forEach((section, sectionIndex) => {
+      const sectionX = marginX + panelPaddingX + sectionIndex * (sectionWidth + sectionGap);
+      commands.push(drawText(sectionX, sectionTop - 2, section.title, { size: 9, font: "F2", color: PDF_MUTED }));
+      section.items.forEach((item, itemIndex) => {
+        const rowY = sectionTop - sectionTitleHeight - itemIndex * rowHeight;
+        commands.push(drawText(sectionX, rowY, item.label, { size: 8.5, color: PDF_TEXT }));
+        commands.push(
+          drawText(sectionX + sectionWidth * labelWidthRatio, rowY, String(item.value), {
+            size: 8.5,
+            font: "F2",
+            color: PDF_TEXT
+          })
+        );
+      });
+    });
+
+    return panelBottom - 10;
+  };
+
   const renderPageBase = (pageNumber: number, totalPages: number) => {
     const commands: string[] = [];
     let cursorY = pageHeight - marginTop;
@@ -590,22 +682,8 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
       cursorY -= metaHeight + 12;
     }
 
-    if (summary.length) {
-      const cardsPerRow = Math.max(2, Math.min(4, Math.floor(contentWidth / 170)));
-      const cardGap = 10;
-      const cardWidth = (contentWidth - cardGap * (cardsPerRow - 1)) / cardsPerRow;
-      const summaryRows = Math.ceil(summary.length / cardsPerRow);
-      const cardHeight = 42;
-
-      for (let index = 0; index < summary.length; index += 1) {
-        const cardX = marginX + (index % cardsPerRow) * (cardWidth + cardGap);
-        const cardY = cursorY - Math.floor(index / cardsPerRow) * (cardHeight + 10) - cardHeight;
-        commands.push(drawRect(cardX, cardY, cardWidth, cardHeight, PDF_SUMMARY_FILL, PDF_BORDER));
-        commands.push(drawText(cardX + 10, cardY + 26, summary[index]!.label, { size: 8, color: PDF_MUTED }));
-        commands.push(drawText(cardX + 10, cardY + 10, String(summary[index]!.value), { size: 11, font: "F2" }));
-      }
-
-      cursorY -= summaryRows * (cardHeight + 10) + 6;
+    if (hasSummary && summaryPlacement === "before" && summaryLayout === "cards") {
+      cursorY = drawSummaryCards(commands, cursorY);
     }
 
     const footerY = marginBottom - 6;
@@ -701,6 +779,39 @@ const buildPdfContent = (dataset: ReportExportDataset) => {
 
     currentY -= row.height;
   });
+
+  if (hasSummary && summaryPlacement === "after") {
+    if (summaryLayout === "panel") {
+      const panelSections = summarySections.length
+        ? summarySections
+        : [
+            {
+              title: summaryTitle,
+              items: summary
+            }
+          ];
+      const estimatedHeight =
+        12 +
+        16 +
+        12 +
+        Math.max(...panelSections.map((section) => 14 + Math.max(section.items.length, 1) * 18 + 6)) +
+        12 +
+        2 +
+        10;
+
+      if (currentY - estimatedHeight < marginBottom + footerHeight + 10) {
+        startNewPage();
+      }
+
+      currentY = drawSummaryPanel(currentCommands, currentY - 12);
+    } else {
+      if (currentY - 70 < marginBottom + footerHeight + 10) {
+        startNewPage();
+      }
+
+      currentY = drawSummaryCards(currentCommands, currentY - 12);
+    }
+  }
 
   // Draw secondary table if present
   if (dataset.secondaryTable) {

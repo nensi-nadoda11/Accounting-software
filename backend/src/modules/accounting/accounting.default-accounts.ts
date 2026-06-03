@@ -57,6 +57,15 @@ export const DEFAULT_SYSTEM_ACCOUNTS: DefaultAccountSeed[] = [
     description: "Default input GST account."
   },
   {
+    systemKey: "input_cess",
+    accountCode: "AST-CESSIN",
+    accountName: "Input Cess",
+    accountType: "asset",
+    accountSubtype: null,
+    normalBalance: "debit",
+    description: "Default input cess account."
+  },
+  {
     systemKey: "advance_to_supplier",
     accountCode: "AST-ADV-SUP",
     accountName: "Advance to Supplier",
@@ -91,6 +100,15 @@ export const DEFAULT_SYSTEM_ACCOUNTS: DefaultAccountSeed[] = [
     accountSubtype: null,
     normalBalance: "credit",
     description: "Default output GST payable account."
+  },
+  {
+    systemKey: "output_cess",
+    accountCode: "LIA-CESSOUT",
+    accountName: "Output Cess Payable",
+    accountType: "liability",
+    accountSubtype: null,
+    normalBalance: "credit",
+    description: "Default output cess payable account."
   },
   {
     systemKey: "loans",

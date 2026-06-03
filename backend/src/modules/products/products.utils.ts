@@ -176,10 +176,9 @@ export const calculateTaxInclusive = (
     };
   }
 
-  const baseAmount = roundHalfUp(finalAmount * 10000n, 10000n + totalRate);
-  const totalTaxAmount = finalAmount - baseAmount;
-  const gstAmount = roundHalfUp(totalTaxAmount * gstRateValue, totalRate);
-  const cessAmount = totalTaxAmount - gstAmount;
+  const gstAmount = roundHalfUp(finalAmount * gstRateValue, 10000n + totalRate);
+  const cessAmount = roundHalfUp(finalAmount * cessRateValue, 10000n + totalRate);
+  const baseAmount = finalAmount - gstAmount - cessAmount;
 
   return {
     baseSalePrice: scaledBigIntToDecimal(baseAmount, 2),

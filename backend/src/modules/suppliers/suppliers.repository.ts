@@ -51,6 +51,7 @@ type SupplierTransactionTotals = {
   totalRefundsReceived: string;
   debitAdjustments: string;
   creditAdjustments: string;
+  invoiceOutstanding: string;
   overduePayable: string;
   dueInvoicesCount: number;
 };
@@ -64,9 +65,18 @@ class SuppliersRepository {
     return sql<string>`
       CASE
         WHEN ${suppliers.openingBalanceType} = 'credit' THEN ${suppliers.openingBalanceAmount}
-        WHEN ${suppliers.openingBalanceType} = 'debit' THEN (${suppliers.openingBalanceAmount} * -1)
         ELSE 0
       END
+      +
+      coalesce((
+        select sum(case when ${purchaseInvoices.dueAmount} > 0 then ${purchaseInvoices.dueAmount} else 0 end)
+        from ${purchaseInvoices}
+        where
+          ${purchaseInvoices.companyId} = ${suppliers.companyId}
+          and ${purchaseInvoices.supplierId} = ${suppliers.id}
+          and ${purchaseInvoices.deletedAt} is null
+          and (${purchaseInvoices.purchaseStatus} = 'posted' or ${purchaseInvoices.purchaseStatus} = 'returned')
+      ), 0)
     `;
   }
 
@@ -314,6 +324,7 @@ class SuppliersRepository {
     const [purchaseRow] = await db
       .select({
         totalPurchases: sql<string>`coalesce(sum(${purchaseInvoices.grandTotal}), 0)`,
+        invoiceOutstanding: sql<string>`coalesce(sum(case when ${purchaseInvoices.dueAmount} > 0 then ${purchaseInvoices.dueAmount} else 0 end), 0)`,
         overduePayable: sql<string>`coalesce(sum(case when ${purchaseInvoices.dueDate} < current_date and ${purchaseInvoices.dueAmount} > 0 then ${purchaseInvoices.dueAmount} else 0 end), 0)`,
         dueInvoicesCount: sql<number>`coalesce(sum(case when ${purchaseInvoices.dueAmount} > 0 then 1 else 0 end), 0)`
       })
@@ -370,6 +381,7 @@ class SuppliersRepository {
       totalRefundsReceived: refundRow?.totalRefundsReceived ?? "0.00",
       debitAdjustments: "0.00",
       creditAdjustments: "0.00",
+      invoiceOutstanding: purchaseRow?.invoiceOutstanding ?? "0.00",
       overduePayable: purchaseRow?.overduePayable ?? "0.00",
       dueInvoicesCount: purchaseRow?.dueInvoicesCount ?? 0
     };

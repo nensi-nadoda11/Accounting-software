@@ -33,6 +33,7 @@ type ReturnCalculationInput = {
   items: Array<{
     taxableAmount: string | number;
     gstAmount: string | number;
+    cessAmount: string | number;
     lineTotal: string | number;
   }>;
   roundOffEnabled?: boolean | undefined;
@@ -292,11 +293,13 @@ export const calculatePaymentStatus = (input: {
 export const calculateReturnTotals = (input: ReturnCalculationInput) => {
   let subtotal = "0.00";
   let gstTotal = "0.00";
+  let cessTotal = "0.00";
   let grandTotalBeforeRoundOff = "0.00";
 
   for (const item of input.items) {
     subtotal = addDecimals(subtotal, item.taxableAmount, 2);
     gstTotal = addDecimals(gstTotal, item.gstAmount, 2);
+    cessTotal = addDecimals(cessTotal, item.cessAmount, 2);
     grandTotalBeforeRoundOff = addDecimals(grandTotalBeforeRoundOff, item.lineTotal, 2);
   }
 
@@ -306,6 +309,7 @@ export const calculateReturnTotals = (input: ReturnCalculationInput) => {
   return {
     subtotal,
     gstTotal,
+    cessTotal,
     roundOffAmount,
     grandTotal
   };

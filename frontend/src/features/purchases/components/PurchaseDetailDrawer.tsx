@@ -1,11 +1,4 @@
-import {
-  CheckCircle2,
-  FileText,
-  Pencil,
-  RotateCcw,
-  Wallet,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle2, FileText, Pencil, RotateCcw, Wallet, XCircle } from "lucide-react";
 
 import { AmountText } from "../../../components/ui/AmountText";
 import { Button } from "../../../components/ui/Button";
@@ -17,14 +10,15 @@ import { Table, TableWrapper } from "../../../components/ui/Table";
 import { formatDate } from "../../customers/customerUtils";
 import type { PurchaseInvoice } from "../../../types/purchase";
 import { PURCHASE_PAYMENT_STATUS_LABELS, PURCHASE_STATUS_LABELS } from "../purchaseOptions";
-import {
-  canAddPayment,
-  canCancelPurchase,
-  canCreateReturn,
-  canEditPurchase,
-  canPostPurchase,
-  formatQty,
-} from "../purchaseUtils";
+import { canAddPayment, canCancelPurchase, canCreateReturn, canEditPurchase, canPostPurchase, formatQty } from "../purchaseUtils";
+
+type SummaryRow = {
+  label: string;
+  value: string | number;
+  tone?: "default" | "danger";
+  span?: string;
+  emphasized?: boolean;
+};
 
 export const PurchaseDetailDrawer = ({
   open,
@@ -58,14 +52,49 @@ export const PurchaseDetailDrawer = ({
   canPaymentManage: boolean;
   canReturnManage: boolean;
   canExport: boolean;
-}) => (
-  <SideSheet
-    open={open}
-    onClose={onClose}
-    title={invoice ? invoice.purchaseNumber : "Purchase Detail"}
-    className="max-w-5xl"
-    footer={
-      invoice ? (
+}) => {
+  if (loading && !invoice) {
+    return (
+      <SideSheet open={open} onClose={onClose} title="Purchase Detail" className="max-w-5xl">
+        <LoadingState label="Loading purchase..." />
+      </SideSheet>
+    );
+  }
+
+  if (!invoice) {
+    return <SideSheet open={open} onClose={onClose} title="Purchase Detail" className="max-w-5xl" />;
+  }
+
+  const billSummaryRows: SummaryRow[] = [
+    { label: "Subtotal", value: invoice.subtotal },
+    { label: "Item Discount", value: invoice.itemDiscountTotal },
+    { label: "Invoice Discount", value: invoice.invoiceDiscountTotal },
+    { label: "Additional Charges", value: invoice.additionalCharges },
+    { label: "Freight", value: invoice.freightCharges },
+    { label: "Taxable", value: invoice.taxableAmount },
+    { label: "CGST", value: invoice.cgstTotal },
+    { label: "SGST", value: invoice.sgstTotal },
+    { label: "IGST", value: invoice.igstTotal },
+    { label: "Cess", value: invoice.cessTotal },
+    { label: "GST Total", value: invoice.gstTotal },
+    { label: "Round Off", value: invoice.roundOffAmount },
+    { label: "Grand Total", value: invoice.grandTotal, emphasized: true, span: "sm:col-span-2" },
+  ];
+
+  const paymentSummaryRows: SummaryRow[] = [
+    { label: "Paid", value: invoice.paidAmount },
+    { label: "Due", value: invoice.dueAmount, tone: "danger" },
+    { label: "Mode", value: invoice.paymentMode ?? "-" },
+    { label: "Reference", value: invoice.paymentReference ?? "-" },
+  ];
+
+  return (
+    <SideSheet
+      open={open}
+      onClose={onClose}
+      title={invoice.purchaseNumber}
+      className="max-w-5xl"
+      footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>
             Close
@@ -107,12 +136,8 @@ export const PurchaseDetailDrawer = ({
             </Button>
           ) : null}
         </>
-      ) : undefined
-    }
-  >
-    {loading && !invoice ? (
-      <LoadingState label="Loading purchase..." />
-    ) : invoice ? (
+      }
+    >
       <div className="space-y-5">
         <Card>
           <CardContent className="grid gap-4 md:grid-cols-4">
@@ -160,10 +185,18 @@ export const PurchaseDetailDrawer = ({
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">{formatQty(item.quantity)}</td>
                       <td className="px-4 py-4 whitespace-nowrap">{formatQty(item.freeQuantity)}</td>
-                      <td className="px-4 py-4 whitespace-nowrap"><AmountText value={item.purchaseRate} /></td>
-                      <td className="px-4 py-4 whitespace-nowrap"><AmountText value={item.taxableAmount} /></td>
-                      <td className="px-4 py-4 whitespace-nowrap"><AmountText value={Number(item.cgstAmount) + Number(item.sgstAmount) + Number(item.igstAmount) + Number(item.cessAmount)} /></td>
-                      <td className="px-4 py-4 whitespace-nowrap"><AmountText value={item.lineTotal} /></td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <AmountText value={item.purchaseRate} />
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <AmountText value={item.taxableAmount} />
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <AmountText value={Number(item.cgstAmount) + Number(item.sgstAmount) + Number(item.igstAmount) + Number(item.cessAmount)} />
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <AmountText value={item.lineTotal} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -172,49 +205,75 @@ export const PurchaseDetailDrawer = ({
           </TableWrapper>
         </Card>
 
-        <div className="grid gap-5 lg:grid-cols-3">
-          <Card>
-            <CardHeader title="Tax Breakup" />
-            <CardContent className="space-y-2 text-sm text-slate-600">
-              <div className="flex items-center justify-between"><span>Taxable</span><AmountText value={invoice.taxableAmount} /></div>
-              <div className="flex items-center justify-between"><span>CGST</span><AmountText value={invoice.cgstTotal} /></div>
-              <div className="flex items-center justify-between"><span>SGST</span><AmountText value={invoice.sgstTotal} /></div>
-              <div className="flex items-center justify-between"><span>IGST</span><AmountText value={invoice.igstTotal} /></div>
-              <div className="flex items-center justify-between"><span>Cess</span><AmountText value={invoice.cessTotal} /></div>
-              <div className="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Grand Total</span><AmountText value={invoice.grandTotal} /></div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader title="Payment Summary" />
-            <CardContent className="space-y-2 text-sm text-slate-600">
-              <div className="flex items-center justify-between"><span>Paid</span><AmountText value={invoice.paidAmount} /></div>
-              <div className="flex items-center justify-between"><span>Due</span><AmountText value={invoice.dueAmount} tone="danger" /></div>
-              <div className="flex items-center justify-between"><span>Mode</span><span className="text-slate-900">{invoice.paymentMode ?? "-"}</span></div>
-              <div className="flex items-center justify-between"><span>Reference</span><span className="text-slate-900">{invoice.paymentReference ?? "-"}</span></div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader title="Payments" />
-            <CardContent className="space-y-2">
-              {invoice.payments?.length ? (
-                invoice.payments.map((payment) => (
-                  <div key={payment.id} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-slate-900">{formatDate(payment.paymentDate)}</span>
-                      <AmountText value={payment.amount} />
+        <Card>
+          <CardHeader title="Bill Summary" />
+          <CardContent className="space-y-5">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Tax Breakup</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {billSummaryRows.map((row) => (
+                    <div
+                      key={row.label}
+                      className={[
+                        "rounded-xl border border-slate-100 bg-slate-50 px-3 py-3",
+                        row.span ?? "",
+                      ].join(" ")}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{row.label}</p>
+                      <AmountText
+                        value={row.value}
+                        tone={row.tone ?? "default"}
+                        className={row.emphasized ? "mt-1 text-base" : "mt-1"}
+                      />
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">{payment.referenceNumber || payment.paymentMode}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">No payments yet.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Payment Summary</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {paymentSummaryRows.map((row) => (
+                    <div key={row.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{row.label}</p>
+                      {typeof row.value === "number" || /^-?\d+(?:\.\d+)?$/.test(String(row.value)) ? (
+                        <AmountText value={row.value} tone={row.tone ?? "default"} className="mt-1" />
+                      ) : (
+                        <p className="mt-1 text-sm font-medium text-slate-900">{row.value}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-900">Payments</p>
+                <p className="text-xs uppercase tracking-wide text-slate-400">
+                  {invoice.payments?.length ? `${invoice.payments.length} record(s)` : "No payments"}
+                </p>
+              </div>
+              <div className="mt-3 space-y-2">
+                {invoice.payments?.length ? (
+                  invoice.payments.map((payment) => (
+                    <div key={payment.id} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-slate-900">{formatDate(payment.paymentDate)}</span>
+                        <AmountText value={payment.amount} />
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">{payment.referenceNumber || payment.paymentMode}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500">No payments yet.</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-    ) : null}
-  </SideSheet>
-);
+    </SideSheet>
+  );
+};

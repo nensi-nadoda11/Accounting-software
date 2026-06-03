@@ -34,12 +34,14 @@ import {
   purchaseInvoiceItems,
   purchaseInvoices,
   purchasePayments,
+  purchaseReturnItems,
   purchaseReturns,
   payrollItems,
   payrollRuns,
   salesInvoiceItems,
   salesInvoices,
   salesPayments,
+  salesReturnItems,
   salesReturns,
   salaryPayments,
   stockMovements,
@@ -1019,6 +1021,19 @@ export class AccountingRepository {
       return null;
     }
 
+    const items = await this
+      .getExecutor(executor)
+      .select({
+        quantity: salesReturnItems.quantity,
+        sourceQuantity: salesInvoiceItems.quantity,
+        taxableAmount: salesInvoiceItems.taxableAmount,
+        gstAmount: sql<string>`coalesce(${salesInvoiceItems.cgstAmount}, 0) + coalesce(${salesInvoiceItems.sgstAmount}, 0) + coalesce(${salesInvoiceItems.igstAmount}, 0)`,
+        cessAmount: salesInvoiceItems.cessAmount
+      })
+      .from(salesReturnItems)
+      .innerJoin(salesInvoiceItems, eq(salesReturnItems.salesInvoiceItemId, salesInvoiceItems.id))
+      .where(and(eq(salesReturnItems.companyId, companyId), eq(salesReturnItems.salesReturnId, salesReturnId)));
+
     const [inventoryRow] = await this
       .getExecutor(executor)
       .select({
@@ -1031,6 +1046,7 @@ export class AccountingRepository {
 
     return {
       ...returnRow,
+      items,
       inventoryValue: inventoryRow?.value ?? "0.00"
     };
   }
@@ -1105,6 +1121,19 @@ export class AccountingRepository {
       return null;
     }
 
+    const items = await this
+      .getExecutor(executor)
+      .select({
+        quantity: purchaseReturnItems.quantity,
+        sourceQuantity: sql<string>`coalesce(${purchaseInvoiceItems.quantity}, 0) + coalesce(${purchaseInvoiceItems.freeQuantity}, 0)`,
+        taxableAmount: purchaseInvoiceItems.taxableAmount,
+        gstAmount: sql<string>`coalesce(${purchaseInvoiceItems.cgstAmount}, 0) + coalesce(${purchaseInvoiceItems.sgstAmount}, 0) + coalesce(${purchaseInvoiceItems.igstAmount}, 0)`,
+        cessAmount: purchaseInvoiceItems.cessAmount
+      })
+      .from(purchaseReturnItems)
+      .innerJoin(purchaseInvoiceItems, eq(purchaseReturnItems.purchaseInvoiceItemId, purchaseInvoiceItems.id))
+      .where(and(eq(purchaseReturnItems.companyId, companyId), eq(purchaseReturnItems.purchaseReturnId, purchaseReturnId)));
+
     const [inventoryRow] = await this
       .getExecutor(executor)
       .select({
@@ -1121,6 +1150,7 @@ export class AccountingRepository {
 
     return {
       ...returnRow,
+      items,
       inventoryValue: inventoryRow?.value ?? "0.00"
     };
   }

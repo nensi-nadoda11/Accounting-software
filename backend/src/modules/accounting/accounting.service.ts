@@ -115,6 +115,38 @@ const addMoney = (left: string, right: string) =>
 const subtractMoney = (left: string, right: string) =>
   scaledBigIntToDecimal(decimalToScaledBigInt(left, 2) - decimalToScaledBigInt(right, 2), 2);
 
+const roundHalfUp = (dividend: bigint, divisor: bigint) => {
+  if (divisor === 0n) {
+    throw new Error("Division by zero");
+  }
+
+  const negative = dividend < 0n;
+  const absoluteDividend = negative ? dividend * -1n : dividend;
+  const quotient = absoluteDividend / divisor;
+  const remainder = absoluteDividend % divisor;
+  const rounded = remainder * 2n >= divisor ? quotient + 1n : quotient;
+
+  return negative ? rounded * -1n : rounded;
+};
+
+const prorateMoney = (totalAmount: string | number, totalQuantity: string | number, partialQuantity: string | number) => {
+  const amountScaled = decimalToScaledBigInt(totalAmount, 2);
+  const totalQuantityScaled = decimalToScaledBigInt(totalQuantity, 3);
+  const partialQuantityScaled = decimalToScaledBigInt(partialQuantity, 3);
+
+  if (totalQuantityScaled === 0n || partialQuantityScaled === 0n) {
+    return "0.00";
+  }
+
+  return scaledBigIntToDecimal(roundHalfUp(amountScaled * partialQuantityScaled, totalQuantityScaled), 2);
+};
+
+const readPayloadMoney = (payload: Record<string, unknown>, key: string) => normalizeMoney((payload[key] as string | number | null | undefined) ?? "0.00");
+const readPayloadString = (payload: Record<string, unknown>, key: string) => {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value : null;
+};
+
 class AccountingService {
   private async logAuditSafely(action: string, task: () => Promise<void>) {
     try {
@@ -811,6 +843,7 @@ class AccountingService {
       const salesAccount = await this.getSystemAccount(actor.companyId, "sales", executor);
       const serviceIncomeAccount = await this.getSystemAccount(actor.companyId, "service_income", executor);
       const outputGstAccount = await this.getSystemAccount(actor.companyId, "output_gst", executor);
+      const outputCessAccount = await this.getSystemAccount(actor.companyId, "output_cess", executor);
       const inventoryAccount = await this.getSystemAccount(actor.companyId, "inventory", executor);
       const cogsAccount = await this.getSystemAccount(actor.companyId, "cogs", executor);
       const roundOffAccount = await this.getSystemAccount(actor.companyId, "round_off_expense", executor);
@@ -862,6 +895,15 @@ class AccountingService {
           debit: "0.00",
           credit: normalizeMoney(context.invoice.gstTotal),
           description: `Output GST for ${context.invoice.invoiceNumber}`
+        });
+      }
+
+      if (compareDecimals(context.invoice.cessTotal, "0.00", 2) > 0) {
+        lines.push({
+          accountId: outputCessAccount.id,
+          debit: "0.00",
+          credit: normalizeMoney(context.invoice.cessTotal),
+          description: `Output cess for ${context.invoice.invoiceNumber}`
         });
       }
 
@@ -925,6 +967,7 @@ class AccountingService {
       const inventoryAccount = await this.getSystemAccount(actor.companyId, "inventory", executor);
       const purchaseExpenseAccount = await this.getSystemAccount(actor.companyId, "purchases", executor);
       const inputGstAccount = await this.getSystemAccount(actor.companyId, "input_gst", executor);
+      const inputCessAccount = await this.getSystemAccount(actor.companyId, "input_cess", executor);
       const paidAccount =
         compareDecimals(context.invoice.paidAmount, "0.00", 2) > 0
           ? await this.getSystemAccount(actor.companyId, context.invoice.paymentMode === "cash" ? "cash" : "bank", executor)
@@ -965,6 +1008,15 @@ class AccountingService {
           debit: inputTaxTotal,
           credit: "0.00",
           description: `Input tax for ${context.invoice.purchaseNumber}`
+        });
+      }
+
+      if (compareDecimals(context.invoice.cessTotal, "0.00", 2) > 0) {
+        lines.push({
+          accountId: inputCessAccount.id,
+          debit: normalizeMoney(context.invoice.cessTotal),
+          credit: "0.00",
+          description: `Input cess for ${context.invoice.purchaseNumber}`
         });
       }
 
@@ -1091,11 +1143,24 @@ class AccountingService {
         throw new AppError("Sales return not found for accounting event", 404);
       }
 
+      const payload = event.payload as Record<string, unknown>;
       const receivableAccount = await this.getSystemAccount(actor.companyId, "accounts_receivable", executor);
       const salesAccount = await this.getSystemAccount(actor.companyId, "sales", executor);
       const outputGstAccount = await this.getSystemAccount(actor.companyId, "output_gst", executor);
+      const outputCessAccount = await this.getSystemAccount(actor.companyId, "output_cess", executor);
       const inventoryAccount = await this.getSystemAccount(actor.companyId, "inventory", executor);
       const cogsAccount = await this.getSystemAccount(actor.companyId, "cogs", executor);
+      const roundOffAccount = await this.getSystemAccount(actor.companyId, "round_off_expense", executor);
+
+      const computedCessTotal = (context.items ?? []).reduce(
+        (sum: string, item: { quantity: string; sourceQuantity: string; cessAmount: string }) =>
+          addMoney(sum, prorateMoney(item.cessAmount, item.sourceQuantity, item.quantity)),
+        "0.00"
+      );
+      const cessTotal = compareDecimals(readPayloadMoney(payload, "cessTotal"), "0.00", 2) > 0
+        ? readPayloadMoney(payload, "cessTotal")
+        : computedCessTotal;
+      const roundOffAmount = readPayloadMoney(payload, "roundOffAmount");
 
       const lines: JournalLineInput[] = [
         {
@@ -1110,6 +1175,16 @@ class AccountingService {
           credit: "0.00",
           description: `Output GST reversal ${context.salesReturn.returnNumber}`
         },
+        ...(compareDecimals(cessTotal, "0.00", 2) > 0
+          ? [
+              {
+                accountId: outputCessAccount.id,
+                debit: cessTotal,
+                credit: "0.00",
+                description: `Output cess reversal ${context.salesReturn.returnNumber}`
+              }
+            ]
+          : []),
         {
           accountId: receivableAccount.id,
           debit: "0.00",
@@ -1118,6 +1193,16 @@ class AccountingService {
           partyId: context.salesReturn.customerId ?? null,
           description: `Customer adjustment ${context.salesReturn.returnNumber}`
         },
+        ...(compareDecimals(roundOffAmount, "0.00", 2) !== 0
+          ? [
+              {
+                accountId: roundOffAccount.id,
+                debit: compareDecimals(roundOffAmount, "0.00", 2) > 0 ? normalizeMoney(roundOffAmount) : "0.00",
+                credit: compareDecimals(roundOffAmount, "0.00", 2) < 0 ? normalizeMoney(roundOffAmount.slice(1)) : "0.00",
+                description: `Round off reversal ${context.salesReturn.returnNumber}`
+              }
+            ]
+          : []),
         {
           accountId: inventoryAccount.id,
           debit: normalizeMoney(context.inventoryValue),
@@ -1151,10 +1236,23 @@ class AccountingService {
         throw new AppError("Purchase return not found for accounting event", 404);
       }
 
+      const payload = event.payload as Record<string, unknown>;
       const payableAccount = await this.getSystemAccount(actor.companyId, "accounts_payable", executor);
       const inventoryAccount = await this.getSystemAccount(actor.companyId, "inventory", executor);
       const purchaseAccount = await this.getSystemAccount(actor.companyId, "purchases", executor);
       const inputGstAccount = await this.getSystemAccount(actor.companyId, "input_gst", executor);
+      const inputCessAccount = await this.getSystemAccount(actor.companyId, "input_cess", executor);
+      const roundOffAccount = await this.getSystemAccount(actor.companyId, "round_off_expense", executor);
+
+      const computedCessTotal = (context.items ?? []).reduce(
+        (sum: string, item: { quantity: string; sourceQuantity: string; cessAmount: string }) =>
+          addMoney(sum, prorateMoney(item.cessAmount, item.sourceQuantity, item.quantity)),
+        "0.00"
+      );
+      const cessTotal = compareDecimals(readPayloadMoney(payload, "cessTotal"), "0.00", 2) > 0
+        ? readPayloadMoney(payload, "cessTotal")
+        : computedCessTotal;
+      const roundOffAmount = readPayloadMoney(payload, "roundOffAmount");
 
       const lines: JournalLineInput[] = [
         {
@@ -1183,6 +1281,27 @@ class AccountingService {
           credit: normalizeMoney(context.purchaseReturn.gstTotal),
           description: `Input GST reversal ${context.purchaseReturn.returnNumber}`
         }
+        ,
+        ...(compareDecimals(cessTotal, "0.00", 2) > 0
+          ? [
+              {
+                accountId: inputCessAccount.id,
+                debit: "0.00",
+                credit: cessTotal,
+                description: `Input cess reversal ${context.purchaseReturn.returnNumber}`
+              }
+            ]
+          : []),
+        ...(compareDecimals(roundOffAmount, "0.00", 2) !== 0
+          ? [
+              {
+                accountId: roundOffAccount.id,
+                debit: compareDecimals(roundOffAmount, "0.00", 2) < 0 ? normalizeMoney(roundOffAmount.slice(1)) : "0.00",
+                credit: compareDecimals(roundOffAmount, "0.00", 2) > 0 ? normalizeMoney(roundOffAmount) : "0.00",
+                description: `Round off reversal ${context.purchaseReturn.returnNumber}`
+              }
+            ]
+          : [])
       ];
 
       return {
@@ -1195,6 +1314,102 @@ class AccountingService {
         referenceNumber: context.purchaseReturn.returnNumber,
         description: `Purchase return ${context.purchaseReturn.returnNumber}`,
         lines
+      };
+    }
+
+    if (event.eventType === "sales_return_refund_recorded") {
+      const payload = event.payload as Record<string, unknown>;
+      const amount = readPayloadMoney(payload, "amount");
+      if (compareDecimals(amount, "0.00", 2) <= 0) {
+        return markIgnored("Sales return refund amount is zero");
+      }
+
+      const bankOrCash = await this.getSystemAccount(
+        actor.companyId,
+        readPayloadString(payload, "paymentMode") === "cash" ? "cash" : "bank",
+        executor
+      );
+      const receivable = await this.getSystemAccount(actor.companyId, "accounts_receivable", executor);
+      const returnNumber = readPayloadString(payload, "returnNumber") ?? event.referenceNumber;
+      const refundDateValue = payload.refundDate as string | Date | null | undefined;
+      const refundDate = this.toDate(refundDateValue ?? event.createdAt, "refundDate");
+      const bankAccountId = readPayloadString(payload, "bankAccountId");
+
+      return {
+        kind: "journal" as const,
+        entryDate: refundDate,
+        voucherType: "payment" as const,
+        financialYearId: null,
+        referenceType: "sales_return_refund",
+        referenceId: event.referenceId,
+        referenceNumber: returnNumber,
+        description: `Sales return refund ${returnNumber ?? event.referenceId}`,
+        lines: [
+          {
+            accountId: receivable.id,
+            debit: amount,
+            credit: "0.00",
+            partyType: readPayloadString(payload, "customerId") ? "customer" : null,
+            partyId: readPayloadString(payload, "customerId"),
+            description: `Customer refund settlement ${returnNumber ?? event.referenceId}`
+          },
+          {
+            accountId: bankOrCash.id,
+            debit: "0.00",
+            credit: amount,
+            referenceType: bankOrCash.systemKey === "bank" && bankAccountId ? "company_bank_account" : null,
+            referenceId: bankOrCash.systemKey === "bank" ? bankAccountId : null,
+            description: `Customer refund payment ${returnNumber ?? event.referenceId}`
+          }
+        ]
+      };
+    }
+
+    if (event.eventType === "purchase_return_refund_recorded") {
+      const payload = event.payload as Record<string, unknown>;
+      const amount = readPayloadMoney(payload, "amount");
+      if (compareDecimals(amount, "0.00", 2) <= 0) {
+        return markIgnored("Purchase return refund amount is zero");
+      }
+
+      const bankOrCash = await this.getSystemAccount(
+        actor.companyId,
+        readPayloadString(payload, "paymentMode") === "cash" ? "cash" : "bank",
+        executor
+      );
+      const payable = await this.getSystemAccount(actor.companyId, "accounts_payable", executor);
+      const returnNumber = readPayloadString(payload, "returnNumber") ?? event.referenceNumber;
+      const refundDateValue = payload.refundDate as string | Date | null | undefined;
+      const refundDate = this.toDate(refundDateValue ?? event.createdAt, "refundDate");
+      const bankAccountId = readPayloadString(payload, "bankAccountId");
+
+      return {
+        kind: "journal" as const,
+        entryDate: refundDate,
+        voucherType: "receipt" as const,
+        financialYearId: null,
+        referenceType: "purchase_return_refund",
+        referenceId: event.referenceId,
+        referenceNumber: returnNumber,
+        description: `Purchase return refund ${returnNumber ?? event.referenceId}`,
+        lines: [
+          {
+            accountId: bankOrCash.id,
+            debit: amount,
+            credit: "0.00",
+            referenceType: bankOrCash.systemKey === "bank" && bankAccountId ? "company_bank_account" : null,
+            referenceId: bankOrCash.systemKey === "bank" ? bankAccountId : null,
+            description: `Supplier refund receipt ${returnNumber ?? event.referenceId}`
+          },
+          {
+            accountId: payable.id,
+            debit: "0.00",
+            credit: amount,
+            partyType: readPayloadString(payload, "supplierId") ? "supplier" : null,
+            partyId: readPayloadString(payload, "supplierId"),
+            description: `Supplier refund settlement ${returnNumber ?? event.referenceId}`
+          }
+        ]
       };
     }
 

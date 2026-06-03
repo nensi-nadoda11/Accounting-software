@@ -162,14 +162,14 @@ export const calculateTaxInclusive = (price: string, gstRate: string, cessRate: 
     };
   }
 
-  const baseAmount = roundHalfUp(finalAmount * 10000n, 10000n + totalRate);
-  const totalTaxAmount = finalAmount - baseAmount;
-  const gstAmount = roundHalfUp(totalTaxAmount * gstRateValue, totalRate);
+  const gstAmount = roundHalfUp(finalAmount * gstRateValue, 10000n + totalRate);
+  const cessAmount = roundHalfUp(finalAmount * cessRateValue, 10000n + totalRate);
+  const baseAmount = finalAmount - gstAmount - cessAmount;
 
   return {
     baseSalePrice: scaledBigIntToDecimal(baseAmount, 2),
     gstAmount: scaledBigIntToDecimal(gstAmount, 2),
-    cessAmount: scaledBigIntToDecimal(totalTaxAmount - gstAmount, 2),
+    cessAmount: scaledBigIntToDecimal(cessAmount, 2),
     finalSalePrice: scaledBigIntToDecimal(finalAmount, 2),
   };
 };

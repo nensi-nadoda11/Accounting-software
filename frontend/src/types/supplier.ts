@@ -138,6 +138,7 @@ export interface SupplierOutstandingSummary {
   totalPurchaseReturns: string;
   totalPaymentsMade: string;
   totalRefundsReceived: string;
+  invoiceOutstanding: string;
   outstandingPayable: string;
   overduePayable: string;
   creditLimit: string;

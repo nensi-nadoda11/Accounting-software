@@ -71,6 +71,11 @@ export type ReportSummaryItem = {
   value: string | number;
 };
 
+export type ReportSummarySection = {
+  title: string;
+  items: ReportSummaryItem[];
+};
+
 export type ReportExportDataset = {
   title: string;
   subtitle?: string | undefined;
@@ -78,6 +83,10 @@ export type ReportExportDataset = {
   rows: Array<Record<string, string | number | Date | null | undefined>>;
   metadata?: ReportMetaItem[] | undefined;
   summary?: ReportSummaryItem[] | undefined;
+  summaryTitle?: string | undefined;
+  summaryLayout?: "cards" | "panel" | undefined;
+  summaryPlacement?: "before" | "after" | undefined;
+  summarySections?: ReportSummarySection[] | undefined;
   notes?: string | undefined;
   terms?: string | undefined;
   secondaryTable?: {

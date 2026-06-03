@@ -8,15 +8,11 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { LoadingState } from "../../../components/ui/LoadingState";
 import { SideSheet } from "../../../components/ui/SideSheet";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
-import { Table, TableWrapper } from "../../../components/ui/Table";
 import { getErrorMessage } from "../../../lib/errors";
 import { suppliersApi } from "../../../services/suppliersApi";
 import type {
   Supplier,
   SupplierDetailResponse,
-  SupplierLedgerResponse,
-  SupplierPaymentsResponse,
-  SupplierPurchasesResponse,
 } from "../../../types/supplier";
 import {
   SUPPLIER_STATUS_LABELS,
@@ -25,11 +21,8 @@ import {
 } from "../supplierOptions";
 import {
   formatAddress,
-  formatDate,
   formatDateTime,
   formatInr,
-  getPurchaseInvoiceLabel,
-  getPurchaseTotalAmount,
   getTaxTypeTone,
   toProfileCards,
 } from "../supplierUtils";
@@ -76,9 +69,6 @@ export const SupplierDetailDrawer = ({
   canExport: boolean;
 }) => {
   const [detail, setDetail] = useState<SupplierDetailResponse | null>(null);
-  const [recentLedger, setRecentLedger] = useState<SupplierLedgerResponse | null>(null);
-  const [recentPurchases, setRecentPurchases] = useState<SupplierPurchasesResponse | null>(null);
-  const [recentPayments, setRecentPayments] = useState<SupplierPaymentsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preferredLoading, setPreferredLoading] = useState(false);
@@ -95,21 +85,13 @@ export const SupplierDetailDrawer = ({
         setLoading(true);
         setError(null);
 
-        const [detailResponse, ledgerResponse, purchasesResponse, paymentsResponse] = await Promise.all([
-          suppliersApi.get(supplierId),
-          canViewLedger ? suppliersApi.getLedger(supplierId, { page: 1, limit: 5 }) : Promise.resolve(null),
-          canViewPurchases ? suppliersApi.getPurchases(supplierId, { page: 1, limit: 5 }) : Promise.resolve(null),
-          canViewPayments ? suppliersApi.getPayments(supplierId, { page: 1, limit: 5 }) : Promise.resolve(null),
-        ]);
+        const detailResponse = await suppliersApi.get(supplierId);
 
         if (cancelled) {
           return;
         }
 
         setDetail(detailResponse.data);
-        setRecentLedger(ledgerResponse?.data ?? null);
-        setRecentPurchases(purchasesResponse?.data ?? null);
-        setRecentPayments(paymentsResponse?.data ?? null);
       } catch (loadError) {
         if (!cancelled) {
           setError(getErrorMessage(loadError, "Failed to load supplier details"));
@@ -126,7 +108,7 @@ export const SupplierDetailDrawer = ({
     return () => {
       cancelled = true;
     };
-  }, [canViewLedger, canViewPayments, canViewPurchases, open, reloadKey, supplierId]);
+  }, [open, reloadKey, supplierId]);
 
   const supplier = detail?.supplier ?? null;
   const outstanding = detail?.outstandingSummary ?? null;
@@ -329,98 +311,6 @@ export const SupplierDetailDrawer = ({
                     <p className="mt-1 text-sm font-medium text-slate-900">{item.value}</p>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-3">
-            <Card>
-              <CardHeader title="Recent Purchases" />
-              <CardContent className="space-y-3">
-                {!recentPurchases?.items.length ? (
-                  <EmptyState title="No purchases found" />
-                ) : (
-                  <TableWrapper className="border-slate-100">
-                    <Table>
-                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold">Invoice</th>
-                          <th className="px-4 py-3 font-semibold">Date</th>
-                          <th className="px-4 py-3 font-semibold">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                        {recentPurchases.items.map((item) => (
-                          <tr key={item.id}>
-                            <td className="px-4 py-3">{getPurchaseInvoiceLabel(item)}</td>
-                            <td className="px-4 py-3">{formatDate(item.date)}</td>
-                            <td className="px-4 py-3 font-medium text-slate-900">
-                              {getPurchaseTotalAmount(item) ? formatInr(getPurchaseTotalAmount(item)) : "-"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </TableWrapper>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader title="Recent Payments" />
-              <CardContent className="space-y-3">
-                {!recentPayments?.items.length ? (
-                  <EmptyState title="No payments found" />
-                ) : (
-                  <TableWrapper className="border-slate-100">
-                    <Table>
-                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold">Date</th>
-                          <th className="px-4 py-3 font-semibold">Reference</th>
-                          <th className="px-4 py-3 font-semibold">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                        {recentPayments.items.map((item) => (
-                          <tr key={item.id}>
-                            <td className="px-4 py-3">{formatDate(item.date)}</td>
-                            <td className="px-4 py-3">{item.referenceNo || item.receiptNo || "-"}</td>
-                            <td className="px-4 py-3 font-medium text-slate-900">{formatInr(item.amount)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </TableWrapper>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader title="Recent Ledger" />
-              <CardContent className="space-y-3">
-                {!recentLedger?.items.length ? (
-                  <EmptyState title="No ledger entries found" />
-                ) : (
-                  <TableWrapper className="border-slate-100">
-                    <Table>
-                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold">Date</th>
-                          <th className="px-4 py-3 font-semibold">Type</th>
-                          <th className="px-4 py-3 font-semibold">Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                        {recentLedger.items.map((item, index) => (
-                          <tr key={`${item.referenceNo ?? "entry"}-${index}`}>
-                            <td className="px-4 py-3">{formatDate(item.date)}</td>
-                            <td className="px-4 py-3">{item.description}</td>
-                            <td className="px-4 py-3 font-medium text-slate-900">{formatInr(item.balance)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </TableWrapper>
-                )}
               </CardContent>
             </Card>
           </div>

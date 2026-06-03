@@ -841,11 +841,19 @@ class SalesService {
       amount: normalizeMoney(revenueAmount)
     });
 
-    if (compareDecimals(invoice.gstTotal, "0.00", 2) > 0 || compareDecimals(invoice.cessTotal, "0.00", 2) > 0) {
+    if (compareDecimals(invoice.gstTotal, "0.00", 2) > 0) {
       entries.push({
         account: "Output GST",
         side: "credit",
-        amount: normalizeMoney(addDecimals(invoice.gstTotal, invoice.cessTotal, 2))
+        amount: normalizeMoney(invoice.gstTotal)
+      });
+    }
+
+    if (compareDecimals(invoice.cessTotal, "0.00", 2) > 0) {
+      entries.push({
+        account: "Output Cess",
+        side: "credit",
+        amount: normalizeMoney(invoice.cessTotal)
       });
     }
 
@@ -865,7 +873,11 @@ class SalesService {
     };
   }
 
-  private buildSalesReturnAccountingPayload(salesReturn: typeof import("../../db/schema").salesReturns.$inferSelect) {
+  private buildSalesReturnAccountingPayload(
+    salesReturn: typeof import("../../db/schema").salesReturns.$inferSelect,
+    cessTotal: string,
+    roundOffAmount: string
+  ) {
     return {
       salesReturnId: salesReturn.id,
       returnNumber: salesReturn.returnNumber,
@@ -881,6 +893,16 @@ class SalesService {
           account: "Output GST Reversal",
           side: "debit",
           amount: normalizeMoney(salesReturn.gstTotal)
+        },
+        {
+          account: "Output Cess Reversal",
+          side: "debit",
+          amount: normalizeMoney(cessTotal)
+        },
+        {
+          account: "Round Off",
+          side: compareDecimals(roundOffAmount, "0.00", 2) > 0 ? "debit" : "credit",
+          amount: normalizeMoney(roundOffAmount)
         },
         {
           account: "Customer",
@@ -2017,6 +2039,34 @@ class SalesService {
         throw new AppError("Failed to record sales return refund", 500);
       }
 
+      const refundEvent = await salesRepository.createAccountingEvent(
+        {
+          companyId: actor.companyId,
+          eventType: "sales_return_refund_recorded",
+          referenceType: "sales_return_refund",
+          referenceId: refund.id,
+          payload: {
+            salesReturnId: salesReturn.salesReturn.id,
+            returnNumber: salesReturn.salesReturn.returnNumber,
+            customerId: salesReturn.salesReturn.customerId,
+            refundDate: refund.refundDate,
+            amount: refund.amount,
+            paymentMode: refund.paymentMode,
+            bankAccountId: refund.bankAccountId,
+            referenceNumber: refund.referenceNumber,
+            notes: refund.notes
+          },
+          status: "pending"
+        },
+        transaction
+      );
+
+      if (!refundEvent) {
+        throw new AppError("Failed to create sales return refund accounting event", 500);
+      }
+
+      await accountingService.postEventInTransaction(actor, refundEvent.id, transaction);
+
       return { refund };
     });
 
@@ -2058,6 +2108,7 @@ class SalesService {
         taxableAmount: string;
         gstRate: string;
         gstAmount: string;
+        cessAmount: string;
         lineTotal: string;
       }> = [];
 
@@ -2079,6 +2130,7 @@ class SalesService {
           source.item.quantity,
           requestedQty
         );
+        const cessAmount = this.prorateMoney(source.item.cessAmount, source.item.quantity, requestedQty);
         const lineTotal = this.prorateMoney(source.item.lineTotal, source.item.quantity, requestedQty);
         const returnRate =
           compareDecimals(source.item.quantity, "0.000", 3) > 0
@@ -2092,6 +2144,7 @@ class SalesService {
           taxableAmount,
           gstRate: normalizeMoney(source.item.gstRate),
           gstAmount,
+          cessAmount,
           lineTotal
         });
       }
@@ -2105,6 +2158,7 @@ class SalesService {
         items: returnLines.map((line) => ({
           taxableAmount: line.taxableAmount,
           gstAmount: line.gstAmount,
+          cessAmount: line.cessAmount,
           lineTotal: line.lineTotal
         })),
         roundOffEnabled: settings?.roundOffEnabled ?? true
@@ -2153,6 +2207,7 @@ class SalesService {
           warehouseId: input.warehouseId ?? invoice.warehouseId,
           subtotal: totals.subtotal,
           gstTotal: totals.gstTotal,
+          cessTotal: totals.cessTotal,
           roundOffAmount: totals.roundOffAmount,
           grandTotal: totals.grandTotal,
           reason: input.reason,
@@ -2212,17 +2267,21 @@ class SalesService {
         transaction
       );
 
-      await salesRepository.createAccountingEvent(
+      const accountingEvent = await salesRepository.createAccountingEvent(
         {
           companyId: actor.companyId,
           eventType: "sales_return_created",
           referenceType: "sales_return",
           referenceId: salesReturn.id,
-          payload: this.buildSalesReturnAccountingPayload(salesReturn),
+          payload: this.buildSalesReturnAccountingPayload(salesReturn, totals.cessTotal, totals.roundOffAmount),
           status: "pending"
         },
         transaction
       );
+
+      if (accountingEvent) {
+        await accountingService.postEventInTransaction(actor, accountingEvent.id, transaction);
+      }
 
       if (compareDecimals(normalizeMoney(input.refundAmountPaid), "0.00", 2) > 0) {
         const refund = await salesRepository.createReturnRefund(
@@ -2244,6 +2303,34 @@ class SalesService {
         if (!refund) {
           throw new AppError("Failed to record sales return refund", 500);
         }
+
+        const refundEvent = await salesRepository.createAccountingEvent(
+          {
+            companyId: actor.companyId,
+            eventType: "sales_return_refund_recorded",
+            referenceType: "sales_return_refund",
+            referenceId: refund.id,
+            payload: {
+              salesReturnId: salesReturn.id,
+              returnNumber: salesReturn.returnNumber,
+              customerId: salesReturn.customerId,
+              refundDate: refund.refundDate,
+              amount: refund.amount,
+              paymentMode: refund.paymentMode,
+              bankAccountId: refund.bankAccountId,
+              referenceNumber: refund.referenceNumber,
+              notes: refund.notes
+            },
+            status: "pending"
+          },
+          transaction
+        );
+
+        if (!refundEvent) {
+          throw new AppError("Failed to create sales return refund accounting event", 500);
+        }
+
+        await accountingService.postEventInTransaction(actor, refundEvent.id, transaction);
       }
 
       const totalReturned = addDecimals(

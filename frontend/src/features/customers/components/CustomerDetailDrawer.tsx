@@ -6,12 +6,11 @@ import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { LoadingState } from "../../../components/ui/LoadingState";
-import { Table, TableWrapper } from "../../../components/ui/Table";
 import { getErrorMessage } from "../../../lib/errors";
 import { customersApi } from "../../../services/customersApi";
-import type { Customer, CustomerDetailResponse, CustomerLedgerResponse, CustomerPaymentsResponse } from "../../../types/customer";
+import type { Customer, CustomerDetailResponse } from "../../../types/customer";
 import { CUSTOMER_STATUS_LABELS, CUSTOMER_TYPE_LABELS, TAX_TYPE_LABELS } from "../customerOptions";
-import { formatAddress, formatDate, formatDateTime, formatInr, formatPercent, toSummaryCards } from "../customerUtils";
+import { formatAddress, formatDateTime, formatInr, formatPercent, toSummaryCards } from "../customerUtils";
 import { CustomerSideSheet } from "./CustomerSideSheet";
 
 const toneForStatus = (status: Customer["status"]) => {
@@ -62,8 +61,6 @@ export const CustomerDetailDrawer = ({
   canExport: boolean;
 }) => {
   const [detail, setDetail] = useState<CustomerDetailResponse | null>(null);
-  const [recentLedger, setRecentLedger] = useState<CustomerLedgerResponse | null>(null);
-  const [recentPayments, setRecentPayments] = useState<CustomerPaymentsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,23 +76,13 @@ export const CustomerDetailDrawer = ({
         setLoading(true);
         setError(null);
 
-        const [detailResponse, ledgerResponse, paymentsResponse] = await Promise.all([
-          customersApi.get(customerId),
-          canViewLedger
-            ? customersApi.getLedger(customerId, { page: 1, limit: 5 })
-            : Promise.resolve(null),
-          canViewPayments
-            ? customersApi.getPayments(customerId, { page: 1, limit: 5 })
-            : Promise.resolve(null),
-        ]);
+        const detailResponse = await customersApi.get(customerId);
 
         if (cancelled) {
           return;
         }
 
         setDetail(detailResponse.data);
-        setRecentLedger(ledgerResponse?.data ?? null);
-        setRecentPayments(paymentsResponse?.data ?? null);
       } catch (loadError) {
         if (!cancelled) {
           setError(getErrorMessage(loadError, "Failed to load customer details"));
@@ -112,7 +99,7 @@ export const CustomerDetailDrawer = ({
     return () => {
       cancelled = true;
     };
-  }, [canViewLedger, canViewPayments, customerId, open, reloadKey]);
+  }, [customerId, open, reloadKey]);
 
   const customer = detail?.customer ?? null;
   const outstanding = detail?.outstandingSummary ?? null;
@@ -272,67 +259,6 @@ export const CustomerDetailDrawer = ({
                   customer.shippingPincode,
                   customer.shippingCountry,
                 ])}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card>
-              <CardHeader title="Recent Ledger" />
-              <CardContent className="space-y-3">
-                {!recentLedger?.items.length ? (
-                  <EmptyState title="No ledger entries found" />
-                ) : (
-                  <TableWrapper className="border-slate-100">
-                    <Table>
-                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold">Date</th>
-                          <th className="px-4 py-3 font-semibold">Type</th>
-                          <th className="px-4 py-3 font-semibold">Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                        {recentLedger.items.map((item, index) => (
-                          <tr key={`${item.referenceNo ?? "entry"}-${index}`}>
-                            <td className="px-4 py-3">{formatDate(item.date)}</td>
-                            <td className="px-4 py-3">{item.description}</td>
-                            <td className="px-4 py-3 font-medium text-slate-900">{formatInr(item.balance)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </TableWrapper>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader title="Recent Payments" />
-              <CardContent className="space-y-3">
-                {!recentPayments?.items.length ? (
-                  <EmptyState title="No payments found" />
-                ) : (
-                  <TableWrapper className="border-slate-100">
-                    <Table>
-                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold">Date</th>
-                          <th className="px-4 py-3 font-semibold">Reference</th>
-                          <th className="px-4 py-3 font-semibold">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                        {recentPayments.items.map((item) => (
-                          <tr key={item.id}>
-                            <td className="px-4 py-3">{formatDate(item.date)}</td>
-                            <td className="px-4 py-3">{item.referenceNo || item.receiptNo || "-"}</td>
-                            <td className="px-4 py-3 font-medium text-slate-900">{formatInr(item.amount)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </TableWrapper>
-                )}
               </CardContent>
             </Card>
           </div>

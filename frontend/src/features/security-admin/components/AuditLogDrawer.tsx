@@ -1,6 +1,5 @@
-import { format } from "date-fns";
-
 import { SideSheet } from "../../../components/ui/SideSheet";
+import { formatPreferredDateTime } from "../../../lib/date-format";
 import type { AuditLog } from "../../../types/securityAdmin";
 
 const JsonPanel = ({ title, value }: { title: string; value: Record<string, unknown> | null }) => (
@@ -40,7 +39,7 @@ export const AuditLogDrawer = ({
           </div>
           <div className="rounded-2xl border border-slate-200 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Timestamps</p>
-            <p className="mt-2 text-sm text-slate-900">{format(new Date(log.createdAt), "dd MMM yyyy, hh:mm:ss a")}</p>
+            <p className="mt-2 text-sm text-slate-900">{formatPreferredDateTime(log.createdAt, { includeSeconds: true })}</p>
           </div>
         </div>
 

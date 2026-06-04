@@ -558,6 +558,10 @@ class PurchasesService {
     return this.normalizePrefix(settings?.purchaseInvoicePrefix, "PUR");
   }
 
+  private async getInvoiceSettings(companyId: string) {
+    return companyRepository.findInvoiceSettingsByCompanyId(companyId);
+  }
+
   private async getNextPurchaseNumber(companyId: string, executor: PurchaseTransactionExecutor) {
     await purchasesRepository.acquireScopedLock("purchase-number", companyId, executor);
     const latest = await purchasesRepository.findLatestPurchaseNumber(companyId, executor);
@@ -849,6 +853,7 @@ class PurchasesService {
       input.items,
       executor
     );
+    const settings = await this.getInvoiceSettings(actor.companyId);
 
     const totals = calculateInvoiceTotals({
       items: items.map((item) => ({
@@ -864,7 +869,7 @@ class PurchasesService {
       invoiceDiscountTotal: input.invoiceDiscountTotal ?? 0,
       additionalCharges: input.additionalCharges ?? 0,
       freightCharges: input.freightCharges ?? 0,
-      roundOffEnabled: true
+      roundOffEnabled: settings?.roundOffEnabled ?? true
     });
 
     const paidAmount = normalizeMoney(input.paidAmount ?? 0);

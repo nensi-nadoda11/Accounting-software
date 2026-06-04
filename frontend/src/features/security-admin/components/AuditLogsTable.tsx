@@ -1,5 +1,4 @@
 import { Download, Eye } from "lucide-react";
-import { format } from "date-fns";
 
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
@@ -10,6 +9,7 @@ import { Select } from "../../../components/ui/Select";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
 import { Table, TableWrapper } from "../../../components/ui/Table";
 import { TableActionIconButton } from "../../../components/ui/TableActionIconButton";
+import { formatPreferredDateTime } from "../../../lib/date-format";
 import type { AuditFilters, AuditLog, PaginationMeta } from "../../../types/securityAdmin";
 
 export const AuditLogsTable = ({
@@ -85,7 +85,7 @@ export const AuditLogsTable = ({
             <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
               {logs.map((log) => (
                 <tr key={log.id}>
-                  <td className="px-4 py-3 whitespace-nowrap">{format(new Date(log.createdAt), "dd MMM yyyy, hh:mm a")}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatPreferredDateTime(log.createdAt)}</td>
                   <td className="px-4 py-3">{log.userName}</td>
                   <td className="px-4 py-3">{log.userRole ?? "-"}</td>
                   <td className="px-4 py-3 capitalize">{log.module.replaceAll("_", " ")}</td>

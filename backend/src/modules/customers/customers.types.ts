@@ -8,6 +8,7 @@ export const CUSTOMER_LEDGER_TRANSACTION_TYPES = [
   "opening_balance",
   "sale",
   "sales_return",
+  "sales_return_refund",
   "payment",
   "debit_adjustment",
   "credit_adjustment"

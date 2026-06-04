@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../db";
-import { customers, payments, salesInvoices, salesPayments, salesReturns } from "../../db/schema";
+import { customers, payments, salesInvoices, salesPayments, salesReturnRefunds, salesReturns } from "../../db/schema";
 
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbExecutor = typeof db | TransactionClient;
@@ -472,7 +472,20 @@ class CustomersRepository {
       paymentConditions.push(sql`${salesPayments.paymentDate} <= ${filters.dateTo}`);
     }
 
-    const [invoiceRows, returnRows, paymentRows, genericPaymentRows] = await Promise.all([
+    const refundConditions: SQL[] = [
+      eq(salesReturnRefunds.companyId, companyId),
+      eq(salesReturnRefunds.customerId, customerId)
+    ];
+
+    if (filters?.dateFrom) {
+      refundConditions.push(sql`${salesReturnRefunds.refundDate} >= ${filters.dateFrom}`);
+    }
+
+    if (filters?.dateTo) {
+      refundConditions.push(sql`${salesReturnRefunds.refundDate} <= ${filters.dateTo}`);
+    }
+
+    const [invoiceRows, returnRows, paymentRows, genericPaymentRows, refundRows] = await Promise.all([
       filters?.transactionType && filters.transactionType !== "sale"
         ? Promise.resolve([])
         : db
@@ -546,10 +559,27 @@ class CustomersRepository {
                 ...(filters?.dateFrom ? [sql`${payments.paymentDate} >= ${filters.dateFrom}`] : []),
                 ...(filters?.dateTo ? [sql`${payments.paymentDate} <= ${filters.dateTo}`] : [])
               )
-            )
+            ),
+      filters?.transactionType && filters.transactionType !== "sales_return_refund"
+        ? Promise.resolve([])
+        : db
+            .select({
+              date: salesReturnRefunds.refundDate,
+              createdAt: salesReturnRefunds.createdAt,
+              transactionType: sql<string>`'sales_return_refund'`,
+              referenceNo: sql<string | null>`coalesce(${salesReturnRefunds.referenceNumber}, ${salesReturns.returnNumber})`,
+              description: sql<string>`concat('Sales return refund ', ${salesReturnRefunds.paymentMode})`,
+              debit: salesReturnRefunds.amount,
+              credit: sql<string>`'0.00'`,
+              paymentMode: salesReturnRefunds.paymentMode,
+              remarks: salesReturnRefunds.notes
+            })
+            .from(salesReturnRefunds)
+            .innerJoin(salesReturns, eq(salesReturnRefunds.salesReturnId, salesReturns.id))
+            .where(and(...refundConditions))
     ]);
 
-    const rows = [...invoiceRows, ...returnRows, ...paymentRows, ...genericPaymentRows].sort((left, right) => {
+    const rows = [...invoiceRows, ...returnRows, ...paymentRows, ...genericPaymentRows, ...refundRows].sort((left, right) => {
       const dateDiff = left.date.getTime() - right.date.getTime();
       if (dateDiff !== 0) {
         return dateDiff;

@@ -1,7 +1,7 @@
-import { format } from "date-fns";
 import { AxiosError } from "axios";
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
 
+import { formatPreferredDate, formatPreferredDateTime } from "../../lib/date-format";
 import type {
   Product,
   ProductCategory,
@@ -216,14 +216,10 @@ export const formatPercent = (value: string | number | null | undefined) =>
   `${percentFormatter.format(Number(value ?? 0))}%`;
 
 export const formatDate = (value: string | Date | null | undefined, formatString = "dd MMM yyyy") => {
-  if (!value) {
-    return "-";
-  }
-
-  return format(new Date(value), formatString);
+  return formatPreferredDate(value, formatString);
 };
 
-export const formatDateTime = (value: string | Date | null | undefined) => formatDate(value, "dd MMM yyyy, hh:mm a");
+export const formatDateTime = (value: string | Date | null | undefined) => formatPreferredDateTime(value);
 
 export const toInputString = (value: string | number | null | undefined) => {
   if (value === null || value === undefined) {

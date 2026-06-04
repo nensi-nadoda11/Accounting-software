@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 
+import { formatPreferredDate } from "../../lib/date-format";
 import type {
   CompanyBranding,
   CompanyBrandingAssetType,
@@ -25,7 +26,7 @@ export const maskAccountNumber = (value: string) => {
   return `${"*".repeat(Math.max(value.length - 4, 0))}${value.slice(-4)}`;
 };
 
-export const formatDateCell = (value: string) => format(new Date(value), "dd MMM yyyy");
+export const formatDateCell = (value: string) => formatPreferredDate(value);
 
 export const toDateInputValue = (value: string) => format(new Date(value), "yyyy-MM-dd");
 

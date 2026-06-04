@@ -878,12 +878,13 @@ class SalesService {
     cessTotal: string,
     roundOffAmount: string
   ) {
-    return {
-      salesReturnId: salesReturn.id,
-      returnNumber: salesReturn.returnNumber,
-      salesInvoiceId: salesReturn.salesInvoiceId,
-      customerId: salesReturn.customerId,
-      entries: [
+      return {
+        salesReturnId: salesReturn.id,
+        returnNumber: salesReturn.returnNumber,
+        salesInvoiceId: salesReturn.salesInvoiceId,
+        customerId: salesReturn.customerId,
+        roundOffAmount: normalizeMoney(salesReturn.roundOffAmount),
+        entries: [
         {
           account: "Sales Return",
           side: "debit",
@@ -2207,7 +2208,6 @@ class SalesService {
           warehouseId: input.warehouseId ?? invoice.warehouseId,
           subtotal: totals.subtotal,
           gstTotal: totals.gstTotal,
-          cessTotal: totals.cessTotal,
           roundOffAmount: totals.roundOffAmount,
           grandTotal: totals.grandTotal,
           reason: input.reason,

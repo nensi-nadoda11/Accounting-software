@@ -1,5 +1,6 @@
 import type { AxiosError } from "axios";
 
+import { runtimePreferences } from "../../lib/runtime-preferences";
 import type { CompanyInvoiceSettings, CompanyProfile } from "../../types/company";
 import type { Customer } from "../../types/customer";
 import type { Product } from "../../types/product";
@@ -213,9 +214,9 @@ const calculateLineValues = (input: CalculationItemInput) => {
   if (input.priceTaxType === "inclusive") {
     const combinedRate = gstRateScaled + cessRateScaled;
     if (combinedRate > 0n && discountedTotal > 0n) {
-      taxableMoney = roundHalfUp(discountedTotal * TEN_THOUSAND, TEN_THOUSAND + combinedRate);
-      gstAmountMoney = calculateTaxAmount(taxableMoney, input.gstRate ?? 0);
-      cessAmountMoney = calculateTaxAmount(taxableMoney, input.cessRate ?? 0);
+      gstAmountMoney = roundHalfUp(discountedTotal * gstRateScaled, TEN_THOUSAND + combinedRate);
+      cessAmountMoney = roundHalfUp(discountedTotal * cessRateScaled, TEN_THOUSAND + combinedRate);
+      taxableMoney = clampAtZero(discountedTotal - gstAmountMoney - cessAmountMoney);
     }
   } else {
     gstAmountMoney = calculateTaxAmount(taxableMoney, input.gstRate ?? 0);
@@ -324,6 +325,7 @@ export const calculateSalesPreview = (input: {
   dueDate?: string | null;
   roundOffEnabled?: boolean;
 }): SalesPreviewTotals => {
+  const roundOffEnabled = runtimePreferences.resolveRoundOffEnabled(input.roundOffEnabled);
   const rawLines = input.items.map((item) => calculateLineValues(item));
   const invoiceDiscountTotal = normalizeMoney(input.invoiceDiscountTotal ?? 0);
   const allocatedDiscounts = allocateInvoiceDiscount(
@@ -376,7 +378,7 @@ export const calculateSalesPreview = (input: {
   const packingCharges = normalizeMoney(input.packingCharges ?? 0);
   const otherCharges = normalizeMoney(input.otherCharges ?? 0);
   const beforeRoundOff = addScaled(addScaled(addScaled(lineGrandTotal, deliveryCharges, 2), packingCharges, 2), otherCharges, 2);
-  const roundOffAmount = input.roundOffEnabled === false ? "0.00" : calculateRoundOff(beforeRoundOff);
+  const roundOffAmount = roundOffEnabled ? calculateRoundOff(beforeRoundOff) : "0.00";
   const grandTotal = addScaled(beforeRoundOff, roundOffAmount, 2);
   const paidAmount = normalizeMoney(input.paidAmount ?? 0);
 

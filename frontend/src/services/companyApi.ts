@@ -1,4 +1,5 @@
 import { client } from "../lib/api/client";
+import { runtimePreferences } from "../lib/runtime-preferences";
 import type {
   CompanyInvoiceSettings,
   CompanyProfile,
@@ -15,10 +16,16 @@ export const companyApi = {
   getTaxSettings: async () => (await client.get<ApiResponse<CompanyTaxSettings>>("/company/tax-settings")).data,
   updateTaxSettings: async (payload: Partial<CompanyTaxSettings>) =>
     (await client.patch<ApiResponse<CompanyTaxSettings>>("/company/tax-settings", payload)).data,
-  getInvoiceSettings: async () =>
-    (await client.get<ApiResponse<CompanyInvoiceSettings>>("/company/invoice-settings")).data,
-  updateInvoiceSettings: async (payload: Partial<CompanyInvoiceSettings>) =>
-    (await client.patch<ApiResponse<CompanyInvoiceSettings>>("/company/invoice-settings", payload)).data,
+  getInvoiceSettings: async () => {
+    const response = await client.get<ApiResponse<CompanyInvoiceSettings>>("/company/invoice-settings");
+    runtimePreferences.setRoundOffEnabled(response.data.data.roundOffEnabled);
+    return response.data;
+  },
+  updateInvoiceSettings: async (payload: Partial<CompanyInvoiceSettings>) => {
+    const response = await client.patch<ApiResponse<CompanyInvoiceSettings>>("/company/invoice-settings", payload);
+    runtimePreferences.setRoundOffEnabled(response.data.data.roundOffEnabled);
+    return response.data;
+  },
   previewInvoiceNumber: async () =>
     (await client.get<ApiResponse<InvoicePreview>>("/company/invoice-settings/preview-number")).data,
   getSetupStatus: async () => (await client.get<ApiResponse<CompanySetupStatus>>("/company/setup-status")).data,

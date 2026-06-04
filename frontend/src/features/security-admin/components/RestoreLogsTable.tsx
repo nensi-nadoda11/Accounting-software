@@ -1,5 +1,3 @@
-import { format } from "date-fns";
-
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { LoadingState } from "../../../components/ui/LoadingState";
@@ -7,6 +5,7 @@ import { Pagination } from "../../../components/ui/Pagination";
 import { Select } from "../../../components/ui/Select";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
 import { Table, TableWrapper } from "../../../components/ui/Table";
+import { formatPreferredDateTime } from "../../../lib/date-format";
 import type { PaginationMeta, RestoreLog, RestoreLogFilters } from "../../../types/securityAdmin";
 
 export const RestoreLogsTable = ({
@@ -65,7 +64,7 @@ export const RestoreLogsTable = ({
                     <StatusBadge status={log.status} />
                   </td>
                   <td className="px-4 py-3">{log.errorMessage ?? "-"}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{format(new Date(log.createdAt), "dd MMM yyyy, hh:mm a")}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatPreferredDateTime(log.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

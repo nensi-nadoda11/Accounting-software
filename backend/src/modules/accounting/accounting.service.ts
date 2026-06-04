@@ -142,6 +142,10 @@ const prorateMoney = (totalAmount: string | number, totalQuantity: string | numb
 };
 
 const readPayloadMoney = (payload: Record<string, unknown>, key: string) => normalizeMoney((payload[key] as string | number | null | undefined) ?? "0.00");
+const absoluteMoney = (value: string | number | null | undefined) => {
+  const normalized = normalizeMoney(value);
+  return normalized.startsWith("-") ? normalized.slice(1) : normalized;
+};
 const readPayloadString = (payload: Record<string, unknown>, key: string) => {
   const value = payload[key];
   return typeof value === "string" && value.trim() ? value : null;
@@ -909,10 +913,11 @@ class AccountingService {
 
       if (compareDecimals(context.invoice.roundOffAmount, "0.00", 2) !== 0) {
         const amount = normalizeMoney(context.invoice.roundOffAmount);
+        const absoluteAmount = absoluteMoney(amount);
         lines.push({
           accountId: roundOffAccount.id,
-          debit: compareDecimals(amount, "0.00", 2) < 0 ? amount : "0.00",
-          credit: compareDecimals(amount, "0.00", 2) > 0 ? amount : "0.00",
+          debit: compareDecimals(amount, "0.00", 2) < 0 ? absoluteAmount : "0.00",
+          credit: compareDecimals(amount, "0.00", 2) > 0 ? absoluteAmount : "0.00",
           description: `Round off for ${context.invoice.invoiceNumber}`
         });
       }
@@ -1160,7 +1165,8 @@ class AccountingService {
       const cessTotal = compareDecimals(readPayloadMoney(payload, "cessTotal"), "0.00", 2) > 0
         ? readPayloadMoney(payload, "cessTotal")
         : computedCessTotal;
-      const roundOffAmount = readPayloadMoney(payload, "roundOffAmount");
+      const roundOffAmount = normalizeMoney(context.salesReturn.roundOffAmount);
+      const absoluteRoundOffAmount = absoluteMoney(roundOffAmount);
 
       const lines: JournalLineInput[] = [
         {
@@ -1197,8 +1203,8 @@ class AccountingService {
           ? [
               {
                 accountId: roundOffAccount.id,
-                debit: compareDecimals(roundOffAmount, "0.00", 2) > 0 ? normalizeMoney(roundOffAmount) : "0.00",
-                credit: compareDecimals(roundOffAmount, "0.00", 2) < 0 ? normalizeMoney(roundOffAmount.slice(1)) : "0.00",
+                debit: compareDecimals(roundOffAmount, "0.00", 2) > 0 ? absoluteRoundOffAmount : "0.00",
+                credit: compareDecimals(roundOffAmount, "0.00", 2) < 0 ? absoluteRoundOffAmount : "0.00",
                 description: `Round off reversal ${context.salesReturn.returnNumber}`
               }
             ]
@@ -1252,7 +1258,7 @@ class AccountingService {
       const cessTotal = compareDecimals(readPayloadMoney(payload, "cessTotal"), "0.00", 2) > 0
         ? readPayloadMoney(payload, "cessTotal")
         : computedCessTotal;
-      const roundOffAmount = readPayloadMoney(payload, "roundOffAmount");
+      const roundOffAmount = normalizeMoney(context.purchaseReturn.roundOffAmount);
 
       const lines: JournalLineInput[] = [
         {
@@ -1330,7 +1336,7 @@ class AccountingService {
         executor
       );
       const receivable = await this.getSystemAccount(actor.companyId, "accounts_receivable", executor);
-      const returnNumber = readPayloadString(payload, "returnNumber") ?? event.referenceNumber;
+      const returnNumber = readPayloadString(payload, "returnNumber") ?? event.referenceId;
       const refundDateValue = payload.refundDate as string | Date | null | undefined;
       const refundDate = this.toDate(refundDateValue ?? event.createdAt, "refundDate");
       const bankAccountId = readPayloadString(payload, "bankAccountId");
@@ -1378,7 +1384,7 @@ class AccountingService {
         executor
       );
       const payable = await this.getSystemAccount(actor.companyId, "accounts_payable", executor);
-      const returnNumber = readPayloadString(payload, "returnNumber") ?? event.referenceNumber;
+      const returnNumber = readPayloadString(payload, "returnNumber") ?? event.referenceId;
       const refundDateValue = payload.refundDate as string | Date | null | undefined;
       const refundDate = this.toDate(refundDateValue ?? event.createdAt, "refundDate");
       const bankAccountId = readPayloadString(payload, "bankAccountId");

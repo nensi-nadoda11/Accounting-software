@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import { ShieldCheck, UserCog } from "lucide-react";
 
 import { getErrorMessage } from "../../lib/errors";
+import { formatPreferredDateTime } from "../../lib/date-format";
 import { ROLE_LABELS } from "../../constants/permissions";
 import { usersApi } from "../../services/usersApi";
 import type { PaginatedUsersResponse } from "../../types/api";
@@ -154,7 +154,7 @@ export const UsersPage = () => {
                     <td className="px-5 py-4">
                       <Badge tone={statusTone[item.status]}>{item.status.replace("_", " ")}</Badge>
                     </td>
-                    <td className="px-5 py-4">{item.lastLoginAt ? format(new Date(item.lastLoginAt), "dd MMM yyyy, hh:mm a") : "-"}</td>
+                    <td className="px-5 py-4">{item.lastLoginAt ? formatPreferredDateTime(item.lastLoginAt) : "-"}</td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-2">
                         <Button

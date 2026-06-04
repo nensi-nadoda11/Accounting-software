@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
 import { CircleCheckBig, Lock, Pencil, Plus } from "lucide-react";
 import type { z } from "zod";
 
@@ -18,6 +17,7 @@ import { TableActionIcons } from "../../components/ui/TableActionIcons";
 import type { CompanyFinancialYear } from "../../types/company";
 import { FinancialYearModal } from "./components/FinancialYearModal";
 import { financialYearSchema } from "./companySchemas";
+import { formatDateCell } from "./companyUtils";
 
 type FinancialYearValues = z.infer<typeof financialYearSchema>;
 
@@ -101,8 +101,8 @@ export const FinancialYearsPage = () => {
                 {items.map((item) => (
                   <tr key={item.id} className={item.isActive ? "bg-emerald-50/40" : undefined}>
                     <td className="px-5 py-4 font-medium text-slate-900">{item.name}</td>
-                    <td className="px-5 py-4">{format(new Date(item.startDate), "dd MMM yyyy")}</td>
-                    <td className="px-5 py-4">{format(new Date(item.endDate), "dd MMM yyyy")}</td>
+                    <td className="px-5 py-4">{formatDateCell(item.startDate)}</td>
+                    <td className="px-5 py-4">{formatDateCell(item.endDate)}</td>
                     <td className="px-5 py-4">
                       <StatusBadge status={item.isActive ? "active" : "inactive"} label={item.isActive ? "Active" : "Inactive"} />
                     </td>

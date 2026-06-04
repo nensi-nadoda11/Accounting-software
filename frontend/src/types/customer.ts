@@ -9,6 +9,7 @@ export type CustomerLedgerTransactionType =
   | "opening_balance"
   | "sale"
   | "sales_return"
+  | "sales_return_refund"
   | "payment"
   | "debit_adjustment"
   | "credit_adjustment";

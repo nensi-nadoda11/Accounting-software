@@ -1,4 +1,5 @@
 import { client } from "../lib/api/client";
+import { runtimePreferences } from "../lib/runtime-preferences";
 import type { ApiResponse } from "../types/api";
 import type {
   InvoiceTemplate,
@@ -125,9 +126,16 @@ export const settingsApi = {
     (await client.post<ApiResponse<InvoiceTemplate>>(`/settings/invoice-templates/${id}/default`)).data,
   deleteInvoiceTemplate: async (id: string) =>
     (await client.delete<ApiResponse<Record<string, never>>>(`/settings/invoice-templates/${id}`)).data,
-  getTaxSettings: async () => (await client.get<ApiResponse<TaxSettings>>("/settings/tax")).data,
-  updateTaxSettings: async (payload: Partial<TaxSettings>) =>
-    (await client.patch<ApiResponse<TaxSettings>>("/settings/tax", payload)).data,
+  getTaxSettings: async () => {
+    const response = await client.get<ApiResponse<TaxSettings>>("/settings/tax");
+    runtimePreferences.setRoundOffEnabled(response.data.data.roundOffEnabled);
+    return response.data;
+  },
+  updateTaxSettings: async (payload: Partial<TaxSettings>) => {
+    const response = await client.patch<ApiResponse<TaxSettings>>("/settings/tax", payload);
+    runtimePreferences.setRoundOffEnabled(response.data.data.roundOffEnabled);
+    return response.data;
+  },
   listPaymentModes: async () =>
     (await client.get<ApiResponse<PaymentMode[]>>("/settings/payment-modes")).data,
   createPaymentMode: async (payload: Omit<PaymentMode, "id" | "companyId" | "createdAt" | "updatedAt">) =>
@@ -140,9 +148,16 @@ export const settingsApi = {
     (await client.post<ApiResponse<PaymentMode>>(`/settings/payment-modes/${id}/default`)).data,
   deletePaymentMode: async (id: string) =>
     (await client.delete<ApiResponse<Record<string, never>>>(`/settings/payment-modes/${id}`)).data,
-  getUiPreferences: async () => (await client.get<ApiResponse<UiPreference>>("/settings/ui-preferences")).data,
-  updateUiPreferences: async (payload: Partial<UiPreference>) =>
-    (await client.patch<ApiResponse<UiPreference>>("/settings/ui-preferences", payload)).data,
+  getUiPreferences: async () => {
+    const response = await client.get<ApiResponse<UiPreference>>("/settings/ui-preferences");
+    runtimePreferences.setDateFormat(response.data.data.dateFormat);
+    return response.data;
+  },
+  updateUiPreferences: async (payload: Partial<UiPreference>) => {
+    const response = await client.patch<ApiResponse<UiPreference>>("/settings/ui-preferences", payload);
+    runtimePreferences.setDateFormat(response.data.data.dateFormat);
+    return response.data;
+  },
   getProfileSettings: async () =>
     (await client.get<ApiResponse<ProfileSettings>>("/settings/profile-settings")).data,
   updateProfileSettings: async (payload: { fullName: string; mobileNumber?: string | null }) =>

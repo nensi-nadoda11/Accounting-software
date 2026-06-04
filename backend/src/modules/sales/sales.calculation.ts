@@ -115,9 +115,9 @@ const calculateLineValues = (input: LineCalculationInput) => {
   if (input.priceTaxType === "inclusive") {
     const combinedRate = gstRateScaled + cessRateScaled;
     if (combinedRate > 0n && discountedTotal > 0n) {
-      taxableMoney = roundHalfUp(discountedTotal * TEN_THOUSAND, TEN_THOUSAND + combinedRate);
-      gstAmountMoney = calculateTaxAmount(taxableMoney, input.gstRate ?? 0);
-      cessAmountMoney = calculateTaxAmount(taxableMoney, input.cessRate ?? 0);
+      gstAmountMoney = roundHalfUp(discountedTotal * gstRateScaled, TEN_THOUSAND + combinedRate);
+      cessAmountMoney = roundHalfUp(discountedTotal * cessRateScaled, TEN_THOUSAND + combinedRate);
+      taxableMoney = clampAtZero(discountedTotal - gstAmountMoney - cessAmountMoney);
     }
   } else {
     gstAmountMoney = calculateTaxAmount(taxableMoney, input.gstRate ?? 0);

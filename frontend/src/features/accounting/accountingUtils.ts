@@ -1,5 +1,4 @@
-import { format } from "date-fns";
-
+import { formatPreferredDate, formatPreferredDateTime } from "../../lib/date-format";
 import type {
   Account,
   AccountNormalBalance,
@@ -8,26 +7,12 @@ import type {
   JournalVoucherType,
 } from "../../types/accounting";
 
-const titleFormatter = new Intl.DateTimeFormat("en-IN", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
-
 export const formatAccountingDate = (value: string | Date | null | undefined, pattern = "dd MMM yyyy") => {
-  if (!value) {
-    return "-";
-  }
-
-  return format(new Date(value), pattern);
+  return formatPreferredDate(value, pattern);
 };
 
 export const formatAccountingDateTime = (value: string | Date | null | undefined) => {
-  if (!value) {
-    return "-";
-  }
-
-  return titleFormatter.format(new Date(value));
+  return formatPreferredDateTime(value);
 };
 
 export const toDateInputValue = (value: Date) => value.toISOString().slice(0, 10);

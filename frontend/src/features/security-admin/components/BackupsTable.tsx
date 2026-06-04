@@ -1,5 +1,4 @@
 import { Database, Download, RotateCcw, Trash2 } from "lucide-react";
-import { format } from "date-fns";
 
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
@@ -10,6 +9,7 @@ import { Select } from "../../../components/ui/Select";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
 import { Table, TableWrapper } from "../../../components/ui/Table";
 import { TableActionIconButton } from "../../../components/ui/TableActionIconButton";
+import { formatPreferredDateTime } from "../../../lib/date-format";
 import type { Backup, BackupFilters, PaginationMeta } from "../../../types/securityAdmin";
 
 const formatBytes = (value: number | null) => {
@@ -120,7 +120,7 @@ export const BackupsTable = ({
                     <StatusBadge status={backup.status} />
                   </td>
                   <td className="px-4 py-3">{backup.createdByName}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{format(new Date(backup.createdAt), "dd MMM yyyy, hh:mm a")}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatPreferredDateTime(backup.createdAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
                       {canDownload ? (

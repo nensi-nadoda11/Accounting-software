@@ -1,5 +1,4 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
 import { Bell, KeyRound, LogOut } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
@@ -7,6 +6,7 @@ import type { z } from "zod";
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
+import { formatDateTime } from "../../customers/customerUtils";
 import type { ProfileSettings } from "../../../types/settings";
 import { passwordChangeSchema, profileSettingsSchema } from "../settingsFinalSchemas";
 
@@ -60,7 +60,7 @@ export const ProfileSettingsForm = ({
             <Input label="Company" value={value.company?.name || "-"} readOnly />
             <Input
               label="Last Login"
-              value={value.session.lastLoginAt ? format(new Date(value.session.lastLoginAt), "dd MMM yyyy, hh:mm a") : "-"}
+              value={value.session.lastLoginAt ? formatDateTime(value.session.lastLoginAt) : "-"}
               readOnly
             />
           </div>

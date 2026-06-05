@@ -130,6 +130,11 @@ export const INVENTORY_TABS = [
     permissions: ["inventory.view", "warehouse.manage", "batch.view", "inventory.valuation.view"],
   },
   {
+    label: "Stock Check",
+    href: "/app/inventory/stock-check",
+    permissions: ["stock_check.view", "stock_check.create", "stock_check.approve", "stock_check.export"],
+  },
+  {
     label: "Products",
     href: "/app/inventory/products",
     permissions: ["product.view", "category.manage", "unit.manage", "product.price.view"],
@@ -238,11 +243,6 @@ const SIDEBAR_ROUTE_CONFIGS: ReadonlyArray<{
     title: "Purchases",
     tabs: PURCHASES_TABS,
     matches: ["/app/purchases"],
-  },
-  {
-    title: "Inventory",
-    tabs: INVENTORY_TABS,
-    matches: ["/app/inventory"],
   },
   {
     title: "Payroll",

@@ -1647,6 +1647,109 @@ class InventoryService {
     };
   }
 
+  public async applyStockCheckAdjustment(
+    actor: InventoryActor,
+    input: {
+      productId: string;
+      batchId?: string | null | undefined;
+      warehouseId: string;
+      adjustmentType: Extract<StockAdjustmentType, "increase" | "decrease">;
+      quantity: string;
+      reason: string;
+      adjustmentDate: Date;
+      remarks?: string | null | undefined;
+      referenceId: string;
+      referenceNumber: string;
+    },
+    executor: Parameters<Parameters<typeof db.transaction>[0]>[0]
+  ) {
+    const productRow = await this.getProductOrThrow(actor.companyId, input.productId, executor);
+    this.assertGoodsInventoryProduct(productRow);
+    const warehouse = await this.getWarehouseOrThrow(actor.companyId, input.warehouseId, false, executor);
+    this.assertActiveWarehouse(warehouse);
+
+    const quantity = normalizeQuantity(input.quantity);
+    this.assertDecimalQuantityAllowed(quantity, Boolean(productRow.unitDecimalAllowed));
+
+    const batch = input.batchId ? (await this.getBatchOrThrow(actor.companyId, input.batchId, false, executor)).batch : null;
+    if (batch && (batch.productId !== productRow.product.id || batch.warehouseId !== warehouse.id)) {
+      throw new AppError("Batch does not belong to the selected product and warehouse", 400);
+    }
+
+    if (productRow.product.batchTrackingEnabled && !batch) {
+      throw new AppError("Batch is required for batch-tracked products", 400);
+    }
+
+    const existingBalance = await inventoryRepository.findStockBalance(
+      actor.companyId,
+      productRow.product.id,
+      warehouse.id,
+      batch?.id ?? null,
+      executor
+    );
+
+    if (
+      input.adjustmentType === "decrease" &&
+      !productRow.product.negativeStockAllowed &&
+      compareDecimals(existingBalance?.availableQuantity ?? "0.000", quantity, 3) < 0
+    ) {
+      throw new AppError("Adjustment quantity cannot exceed available stock", 409);
+    }
+
+    const derivedRate = existingBalance?.averageCost
+      ? normalizeMoney(existingBalance.averageCost)
+      : normalizeMoney(productRow.product.purchasePrice);
+
+    const adjustment = await inventoryRepository.createStockAdjustment(
+      {
+        companyId: actor.companyId,
+        productId: productRow.product.id,
+        warehouseId: warehouse.id,
+        batchId: batch?.id ?? null,
+        adjustmentType: input.adjustmentType,
+        quantity,
+        rate: derivedRate,
+        value: multiplyQtyRate(quantity, derivedRate),
+        reason: input.reason,
+        adjustmentDate: input.adjustmentDate,
+        status: "completed",
+        createdBy: actor.id
+      },
+      executor
+    );
+
+    if (!adjustment) {
+      throw new AppError("Failed to create stock adjustment", 500);
+    }
+
+    const mutation = await this.applyStockMutation(
+      actor,
+      {
+        product: productRow.product,
+        warehouse,
+        batch,
+        movementType: input.adjustmentType === "increase" ? "adjustment_in" : "adjustment_out",
+        movementDate: input.adjustmentDate,
+        inQuantity: input.adjustmentType === "increase" ? quantity : "0.000",
+        outQuantity: input.adjustmentType === "increase" ? "0.000" : quantity,
+        rate: derivedRate,
+        remarks: input.remarks ?? input.reason,
+        referenceType: "stock_check",
+        referenceId: input.referenceId,
+        referenceNumber: input.referenceNumber,
+        allowNegativeStock: productRow.product.negativeStockAllowed
+      },
+      executor
+    );
+
+    return {
+      adjustment,
+      ...mutation,
+      product: productRow.product,
+      warehouse
+    };
+  }
+
   public async receivePurchaseStock(
     actor: InventoryActor,
     input: {

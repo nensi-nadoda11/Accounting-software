@@ -20,6 +20,7 @@ import salesRoutes from "../modules/sales/sales.routes";
 import securityAdminAuditRoutes from "../modules/security-admin/audit.routes";
 import securityAdminBackupRoutes from "../modules/security-admin/backup.routes";
 import settingsRoutes from "../modules/settings/settings.routes";
+import stockCheckRoutes from "../modules/stock-check/stockCheck.routes";
 import usersRoutes from "./users.routes";
 
 const router = Router();
@@ -42,6 +43,7 @@ router.use("/sales", salesRoutes);
 router.use("/security-admin", securityAdminAuditRoutes);
 router.use("/security-admin", securityAdminBackupRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/stock-check", stockCheckRoutes);
 router.use("/suppliers", suppliersRoutes);
 router.use("/users", usersRoutes);
 router.use("/profile", profileRoutes);

@@ -589,11 +589,12 @@ export const ExpensesPage = () => {
   const handleCategorySubmit = async (values: ExpenseCategoryValues) => {
     try {
       setCategorySubmitting(true);
+      const payload = { ...values, color: null, icon: null };
       if (categoryEditing) {
-        await expensesApi.updateCategory(categoryEditing.id, values);
+        await expensesApi.updateCategory(categoryEditing.id, payload);
         toast.success("Category updated");
       } else {
-        await expensesApi.createCategory(values);
+        await expensesApi.createCategory(payload);
         toast.success("Category created");
       }
 

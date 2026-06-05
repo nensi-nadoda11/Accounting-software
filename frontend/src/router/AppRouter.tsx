@@ -38,6 +38,7 @@ const CompanyProfilePage = lazyNamed<Record<string, never>>(() => import("../fea
 const FinancialYearsPage = lazyNamed<Record<string, never>>(() => import("../features/company/FinancialYearsPage"), "FinancialYearsPage");
 const InvoiceSettingsPage = lazyNamed<Record<string, never>>(() => import("../features/company/InvoiceSettingsPage"), "InvoiceSettingsPage");
 const InventoryStockPage = lazyNamed<Record<string, never>>(() => import("../features/inventory/InventoryStockPage"), "InventoryStockPage");
+const StockCheckPage = lazyNamed<Record<string, never>>(() => import("../features/stock-check/StockCheckPage"), "StockCheckPage");
 const PreferencesPage = lazyNamed<Record<string, never>>(() => import("../features/company/PreferencesPage"), "PreferencesPage");
 const PurchasePage = lazyNamed<{ tab: PurchasePageTab }>(() => import("../features/purchases/PurchasePage"), "PurchasePage");
 const ReportsPage = lazyNamed<Record<string, never>>(() => import("../features/reports/ReportsPage"), "ReportsPage");
@@ -299,6 +300,14 @@ export const AppRouter = () => (
             element={
               <PermissionRoute permissions={["inventory.view", "warehouse.manage", "batch.view", "inventory.valuation.view"]}>
                 <InventoryStockPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="inventory/stock-check"
+            element={
+              <PermissionRoute permissions={["stock_check.view", "stock_check.create", "stock_check.approve", "stock_check.export"]}>
+                <StockCheckPage />
               </PermissionRoute>
             }
           />

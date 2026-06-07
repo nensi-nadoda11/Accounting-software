@@ -24,6 +24,7 @@ import { DashboardAlertsPanel } from "./components/DashboardAlertsPanel";
 import { DashboardChartCard } from "./components/DashboardChartCard";
 import { DashboardGstSnapshot } from "./components/DashboardGstSnapshot";
 import { DashboardInventorySnapshot } from "./components/DashboardInventorySnapshot";
+import { DashboardLatestCashVerification } from "./components/DashboardLatestCashVerification";
 import { DashboardPayrollSnapshot } from "./components/DashboardPayrollSnapshot";
 import { DashboardPendingTasks } from "./components/DashboardPendingTasks";
 import { DashboardQuickActions } from "./components/DashboardQuickActions";
@@ -52,7 +53,8 @@ type DashboardWidget =
   | "inventory"
   | "gst"
   | "payroll"
-  | "accounting";
+  | "accounting"
+  | "cash-verification";
 
 const toInputDate = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -82,10 +84,10 @@ const chartConfig: Array<{ key: DashboardChartKey; title: string; color: string 
 ];
 
 const widgetFallbackByRole: Record<Role, DashboardWidget[]> = {
-  admin: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory", "gst", "payroll", "accounting"],
-  accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "gst", "payroll", "accounting"],
-  staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory"],
-  auditor: ["summary", "charts", "alerts", "recent-activities", "gst", "payroll", "accounting"]
+  admin: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory", "gst", "payroll", "accounting", "cash-verification"],
+  accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "gst", "payroll", "accounting", "cash-verification"],
+  staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory", "cash-verification"],
+  auditor: ["summary", "charts", "alerts", "recent-activities", "gst", "payroll", "accounting", "cash-verification"]
 };
 
 const chartKeysByRole: Record<Role, DashboardChartKey[]> = {
@@ -164,6 +166,7 @@ export const DashboardPage = () => {
   const showGstSnapshot = activeWidgets.has("gst");
   const showPayrollSnapshot = activeWidgets.has("payroll");
   const showAccountingSnapshot = activeWidgets.has("accounting");
+  const showCashVerification = activeWidgets.has("cash-verification");
 
   const visibleActions = useMemo(
     () => (roleDashboard.data?.quickActions ?? []).filter((action) => !action.permission || auth.hasPermission(action.permission as never)),
@@ -481,6 +484,13 @@ export const DashboardPage = () => {
               )}
             </div>
           ) : null}
+          {showCashVerification ? (
+            roleDashboard.data ? (
+              <DashboardLatestCashVerification verification={roleDashboard.data.latestCashVerification} />
+            ) : (
+              <LoadingState label="Loading cash verification..." />
+            )
+          ) : null}
         </>
       ) : null}
 
@@ -503,7 +513,7 @@ export const DashboardPage = () => {
               )
             ) : null}
           </div>
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-4 xl:grid-cols-4">
             {showAccountingSnapshot ? (
               roleDashboard.data ? (
                 <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} />
@@ -523,6 +533,13 @@ export const DashboardPage = () => {
                 <DashboardPayrollSnapshot snapshot={roleDashboard.data.payrollSnapshot} />
               ) : (
                 <LoadingState label="Loading payroll snapshot..." />
+              )
+            ) : null}
+            {showCashVerification ? (
+              roleDashboard.data ? (
+                <DashboardLatestCashVerification verification={roleDashboard.data.latestCashVerification} />
+              ) : (
+                <LoadingState label="Loading cash verification..." />
               )
             ) : null}
           </div>
@@ -549,7 +566,7 @@ export const DashboardPage = () => {
               )
             ) : null}
           </div>
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-4 xl:grid-cols-4">
             {showAccountingSnapshot ? (
               roleDashboard.data ? (
                 <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} />
@@ -569,6 +586,13 @@ export const DashboardPage = () => {
                 <DashboardPayrollSnapshot snapshot={roleDashboard.data.payrollSnapshot} />
               ) : (
                 <LoadingState label="Loading payroll snapshot..." />
+              )
+            ) : null}
+            {showCashVerification ? (
+              roleDashboard.data ? (
+                <DashboardLatestCashVerification verification={roleDashboard.data.latestCashVerification} />
+              ) : (
+                <LoadingState label="Loading cash verification..." />
               )
             ) : null}
           </div>
@@ -621,6 +645,13 @@ export const DashboardPage = () => {
                 <DashboardAccountingSnapshot snapshot={roleDashboard.data.accountingSnapshot} />
               ) : (
                 <LoadingState label="Loading accounting snapshot..." />
+              )
+            ) : null}
+            {showCashVerification ? (
+              roleDashboard.data ? (
+                <DashboardLatestCashVerification verification={roleDashboard.data.latestCashVerification} />
+              ) : (
+                <LoadingState label="Loading cash verification..." />
               )
             ) : null}
           </div>

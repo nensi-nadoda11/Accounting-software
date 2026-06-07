@@ -24,6 +24,7 @@ const RegisterPage = lazyNamed<Record<string, never>>(() => import("../features/
 const ResetPasswordPage = lazyNamed<Record<string, never>>(() => import("../features/auth/ResetPasswordPage"), "ResetPasswordPage");
 const VerifyOtpPage = lazyNamed<Record<string, never>>(() => import("../features/auth/VerifyOtpPage"), "VerifyOtpPage");
 const AccountingCorePage = lazyNamed<Record<string, never>>(() => import("../features/accounting/AccountingCorePage"), "AccountingCorePage");
+const CashVerificationPage = lazyNamed<Record<string, never>>(() => import("../features/cash-verification/CashVerificationPage"), "CashVerificationPage");
 const ExpensesPage = lazyNamed<Record<string, never>>(() => import("../features/expenses/ExpensesPage"), "ExpensesPage");
 const GstManagementPage = lazyNamed<Record<string, never>>(() => import("../features/gst/GstManagementPage"), "GstManagementPage");
 const PaymentsPage = lazyNamed<Record<string, never>>(() => import("../features/payments/PaymentsPage"), "PaymentsPage");
@@ -160,9 +161,21 @@ export const AppRouter = () => (
                   "ledger.view",
                   "cashbook.view",
                   "bankbook.view",
+                  "cash_verification.view",
+                  "cash_verification.create",
+                  "cash_verification.verify",
+                  "cash_verification.export",
                 ]}
               >
                 <AccountingCorePage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="accounting/cash-verification"
+            element={
+              <PermissionRoute permissions={["cash_verification.view", "cash_verification.create", "cash_verification.verify", "cash_verification.export"]}>
+                <CashVerificationPage />
               </PermissionRoute>
             }
           />

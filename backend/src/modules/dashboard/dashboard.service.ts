@@ -39,6 +39,15 @@ const clampMoney = (value: string | null | undefined) => {
   return parsed.toFixed(2);
 };
 
+const formatMoney = (value: string | null | undefined) => {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed)) {
+    return "0.00";
+  }
+
+  return parsed.toFixed(2);
+};
+
 const clampCount = (value: number | null | undefined) => {
   if (!Number.isFinite(value ?? NaN) || (value ?? 0) < 0) {
     return 0;
@@ -490,16 +499,26 @@ export class DashboardService {
       inventorySnapshot,
       gstSnapshot,
       payrollSnapshot,
-      accountingSnapshot
+      accountingSnapshot,
+      latestCashVerification: data.latestCashVerification
+        ? {
+            id: data.latestCashVerification.id,
+            verificationNo: data.latestCashVerification.verificationNo,
+            verificationDate: data.latestCashVerification.verificationDate,
+            differenceAmount: formatMoney(data.latestCashVerification.differenceAmount),
+            status: data.latestCashVerification.status,
+            recordStatus: data.latestCashVerification.recordStatus
+          }
+        : null
     };
   }
 
   private getRoleWidgets(role: DashboardActor["role"]) {
     const widgetMap: Record<DashboardActor["role"], string[]> = {
-      admin: ["summary", "charts", "quick-actions", "alerts", "recent-activities", "pending-tasks", "top-products", "inventory", "gst", "payroll", "accounting"],
-      accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "gst", "payroll", "accounting"],
-      staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory"],
-      auditor: ["summary", "charts", "alerts", "recent-activities", "gst", "payroll", "accounting"]
+      admin: ["summary", "charts", "quick-actions", "alerts", "recent-activities", "pending-tasks", "top-products", "inventory", "gst", "payroll", "accounting", "cash-verification"],
+      accountant: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "gst", "payroll", "accounting", "cash-verification"],
+      staff: ["summary", "charts", "quick-actions", "alerts", "pending-tasks", "inventory", "cash-verification"],
+      auditor: ["summary", "charts", "alerts", "recent-activities", "gst", "payroll", "accounting", "cash-verification"]
     };
 
     return widgetMap[role];

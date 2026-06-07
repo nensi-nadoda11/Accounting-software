@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, gte, inArray, isNull, lte, ne, sql } from "d
 import { db } from "../../db";
 import {
   auditLogs,
+  cashVerifications,
   chartOfAccounts,
   expenses,
   gstItcStatus,
@@ -485,11 +486,26 @@ export class DashboardRepository {
       .from(inventoryAlerts)
       .where(eq(inventoryAlerts.companyId, companyId));
 
+    const latestCashVerification = await db
+      .select({
+        id: cashVerifications.id,
+        verificationNo: cashVerifications.verificationNo,
+        verificationDate: cashVerifications.verificationDate,
+        differenceAmount: cashVerifications.differenceAmount,
+        status: cashVerifications.status,
+        recordStatus: cashVerifications.recordStatus
+      })
+      .from(cashVerifications)
+      .where(eq(cashVerifications.companyId, companyId))
+      .orderBy(desc(cashVerifications.verificationDate), desc(cashVerifications.createdAt))
+      .limit(1);
+
     return {
       inventory: inventory[0] ? { ...inventory[0], expiringCount: expiryRow[0]?.expiringCount ?? 0 } : null,
       gst: gst[0] ? { ...gst[0], unclaimedItc: itcRow[0]?.unclaimedItc ?? "0.00" } : null,
       payroll: payroll[0] ?? null,
-      accounting: accounting[0] ?? null
+      accounting: accounting[0] ?? null,
+      latestCashVerification: latestCashVerification[0] ?? null
     };
   }
 

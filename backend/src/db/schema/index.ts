@@ -1,5 +1,6 @@
 export * from "./accounting";
 export * from "./audit-logs";
+export * from "./cash-verification";
 export * from "./companies";
 export * from "./company-settings";
 export * from "./customers";

@@ -72,7 +72,16 @@ export const ACCOUNTING_TABS = [
       "ledger.view",
       "cashbook.view",
       "bankbook.view",
+      "cash_verification.view",
+      "cash_verification.create",
+      "cash_verification.verify",
+      "cash_verification.export",
     ],
+  },
+  {
+    label: "Cash Verification",
+    href: "/app/accounting/cash-verification",
+    permissions: ["cash_verification.view", "cash_verification.create", "cash_verification.verify", "cash_verification.export"],
   },
   {
     label: "Expenses",
@@ -257,6 +266,9 @@ const SIDEBAR_ROUTE_CONFIGS: ReadonlyArray<{
 ] as const;
 
 export const getNestedSidebarConfigForPathname = (pathname: string): NestedSidebarConfig | null =>
+  pathname.startsWith("/app/accounting/cash-verification")
+    ? null
+    :
   SIDEBAR_ROUTE_CONFIGS.find((config) =>
     config.matches.some((route) => pathname === route || pathname.startsWith(`${route}/`)),
   ) ?? null;

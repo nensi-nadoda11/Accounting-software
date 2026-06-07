@@ -128,6 +128,15 @@ export type DashboardAccountingSnapshot = {
   netProfit: string;
 };
 
+export type DashboardLatestCashVerification = {
+  id: string;
+  verificationNo: string;
+  verificationDate: string;
+  differenceAmount: string;
+  status: "matched" | "short_cash" | "excess_cash";
+  recordStatus: "draft" | "completed" | "approved" | "cancelled";
+} | null;
+
 export type DashboardRoleDashboard = {
   role: Role;
   widgets: string[];
@@ -136,6 +145,7 @@ export type DashboardRoleDashboard = {
   gstSnapshot: DashboardGstSnapshot;
   payrollSnapshot: DashboardPayrollSnapshot;
   accountingSnapshot: DashboardAccountingSnapshot;
+  latestCashVerification: DashboardLatestCashVerification;
 };
 
 export type DashboardRecentActivitiesResponse = {

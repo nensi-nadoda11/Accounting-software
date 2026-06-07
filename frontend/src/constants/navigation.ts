@@ -1,6 +1,6 @@
 import type { PermissionKey } from "../types/auth";
 
-export type TopNavMenu = "dashboard" | "accounting" | "sales" | "purchases" | "inventory" | "hr-payroll" | "reports" | "settings";
+export type TopNavMenu = "dashboard" | "accounting" | "sales" | "purchases" | "inventory" | "hr-payroll" | "reports" | "audit" | "settings";
 
 type NavPermissionChecker = (permission: PermissionKey | PermissionKey[]) => boolean;
 type PermissionAwareRoute = {
@@ -25,6 +25,7 @@ export const TOP_NAV_ITEMS: ReadonlyArray<{ label: string; href: string; menu: T
   { label: "Inventory", href: "/app/inventory", menu: "inventory" },
   { label: "Payroll", href: "/app/hr-payroll", menu: "hr-payroll" },
   { label: "Reports", href: "/app/reports", menu: "reports" },
+  { label: "Audit", href: "/app/audit", menu: "audit" },
   { label: "Settings", href: "/app/settings", menu: "settings" },
 ] as const;
 
@@ -181,6 +182,14 @@ export const REPORTS_TABS = [
   { label: "Accounting", href: "/app/reports?tab=accounting", permissions: ["reports.accounting.view"] },
 ] as const satisfies readonly SectionNavItem[];
 
+export const AUDIT_TABS = [
+  {
+    label: "Site Audit",
+    href: "/app/audit/site-audit",
+    permissions: ["site_audit.view", "site_audit.create", "site_audit.update", "site_audit.approve", "site_audit.export"],
+  },
+] as const satisfies readonly SectionNavItem[];
+
 const DASHBOARD_ROUTES = [{ href: "/app/dashboard", permissions: ["dashboard.view"] }] as const satisfies readonly PermissionAwareRoute[];
 
 const isRouteAccessible = (route: PermissionAwareRoute, hasPermission: NavPermissionChecker) =>
@@ -202,6 +211,8 @@ const getRoutesForMenu = (menu: TopNavMenu): readonly PermissionAwareRoute[] => 
       return HR_PAYROLL_TABS;
     case "reports":
       return REPORTS_TABS;
+    case "audit":
+      return AUDIT_TABS;
     case "settings":
       return SETTINGS_TABS;
     default:
@@ -224,6 +235,9 @@ export const getSubTabsForPathname = (pathname: string): readonly SectionNavItem
   }
   if (pathname.startsWith("/app/accounting")) {
     return ACCOUNTING_TABS;
+  }
+  if (pathname.startsWith("/app/audit")) {
+    return AUDIT_TABS;
   }
   return SETTINGS_TABS;
 };
@@ -266,7 +280,7 @@ const SIDEBAR_ROUTE_CONFIGS: ReadonlyArray<{
 ] as const;
 
 export const getNestedSidebarConfigForPathname = (pathname: string): NestedSidebarConfig | null =>
-  pathname.startsWith("/app/accounting/cash-verification")
+  pathname.startsWith("/app/accounting/cash-verification") || pathname.startsWith("/app/audit/site-audit")
     ? null
     :
   SIDEBAR_ROUTE_CONFIGS.find((config) =>

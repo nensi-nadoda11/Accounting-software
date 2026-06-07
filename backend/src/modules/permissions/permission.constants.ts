@@ -126,6 +126,11 @@ export const ALL_PERMISSIONS = [
   "profile.manage",
   "audit.view",
   "audit.export",
+  "site_audit.view",
+  "site_audit.create",
+  "site_audit.update",
+  "site_audit.approve",
+  "site_audit.export",
   "backup.create",
   "backup.download",
   "backup.restore",
@@ -223,6 +228,10 @@ const accountantPermissions: PermissionKey[] = [
   "tax.settings.manage",
   "payment.settings.manage",
   "audit.view"
+  ,
+  "site_audit.view",
+  "site_audit.create",
+  "site_audit.update"
 ];
 
 const staffPermissions: PermissionKey[] = [
@@ -254,6 +263,7 @@ const staffPermissions: PermissionKey[] = [
   "expense.create",
   "cash_verification.view",
   "cash_verification.create",
+  "site_audit.view",
   "notifications.view",
   "profile.manage"
 ];
@@ -283,6 +293,10 @@ const auditorPermissions: PermissionKey[] = [
   "reports.accounting.view",
   "audit.view",
   "audit.export",
+  "site_audit.view",
+  "site_audit.create",
+  "site_audit.update",
+  "site_audit.export",
   "accounting.view",
   "accounting.reports.view",
   "ledger.view",

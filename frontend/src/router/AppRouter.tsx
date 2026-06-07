@@ -45,6 +45,7 @@ const PurchasePage = lazyNamed<{ tab: PurchasePageTab }>(() => import("../featur
 const ReportsPage = lazyNamed<Record<string, never>>(() => import("../features/reports/ReportsPage"), "ReportsPage");
 const SalesPage = lazyNamed<{ tab: SalesPageTab }>(() => import("../features/sales/SalesPage"), "SalesPage");
 const SecurityAdminPage = lazyNamed<Record<string, never>>(() => import("../features/security-admin/SecurityAdminPage"), "SecurityAdminPage");
+const SiteAuditPage = lazyNamed<Record<string, never>>(() => import("../features/site-audit/SiteAuditPage"), "SiteAuditPage");
 const TaxSettingsPage = lazyNamed<Record<string, never>>(() => import("../features/company/TaxSettingsPage"), "TaxSettingsPage");
 const ProductsPage = lazyNamed<Record<string, never>>(() => import("../features/products/ProductsPage"), "ProductsPage");
 const SettingsFinalPage = lazyNamed<Record<string, never>>(() => import("../features/settings-final/SettingsFinalPage"), "SettingsFinalPage");
@@ -230,6 +231,15 @@ export const AppRouter = () => (
             element={
               <PermissionRoute permissions={["reports.view", "report.view"]}>
                 <ReportsPage />
+              </PermissionRoute>
+            }
+          />
+          <Route path="audit" element={<Navigate to="/app/audit/site-audit" replace />} />
+          <Route
+            path="audit/site-audit"
+            element={
+              <PermissionRoute permissions={["site_audit.view", "site_audit.create", "site_audit.update", "site_audit.approve", "site_audit.export"]}>
+                <SiteAuditPage />
               </PermissionRoute>
             }
           />

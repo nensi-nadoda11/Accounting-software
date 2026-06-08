@@ -224,8 +224,8 @@ export class DashboardService {
       monthPurchase: clampMoney(data.purchaseTotals?.currentPurchase),
       receivable: clampMoney(data.salesTotals?.receivable),
       payable: clampMoney(data.purchaseTotals?.payable),
-      cashBalance: clampMoney(data.accountBalances?.cashBalance),
-      bankBalance: clampMoney(data.accountBalances?.bankBalance),
+      cashBalance: formatMoney(data.accountBalances?.cashBalance),
+      bankBalance: formatMoney(data.accountBalances?.bankBalance),
       totalProducts: clampCount(data.productTotals?.totalProducts),
       lowStockCount: clampCount(data.productTotals?.lowStockCount),
       expiringCount: clampCount(data.productTotals?.expiringCount),
@@ -484,12 +484,12 @@ export class DashboardService {
     };
 
     const accountingSnapshot: DashboardAccountingSnapshot = {
-      cashBalance: clampMoney(data.accounting?.cashBalance),
-      bankBalance: clampMoney(data.accounting?.bankBalance),
-      receivable: clampMoney(data.accounting?.receivable),
-      payable: clampMoney(data.accounting?.payable),
-      monthlyExpense: clampMoney(data.accounting?.monthlyExpense),
-      netProfit: clampMoney(data.accounting?.netProfit)
+      cashBalance: formatMoney(data.accounting?.cashBalance),
+      bankBalance: formatMoney(data.accounting?.bankBalance),
+      receivable: formatMoney(data.accounting?.receivable),
+      payable: formatMoney(data.accounting?.payable),
+      monthlyExpense: formatMoney(data.accounting?.monthlyExpense),
+      netProfit: formatMoney(data.accounting?.netProfit)
     };
 
     return {

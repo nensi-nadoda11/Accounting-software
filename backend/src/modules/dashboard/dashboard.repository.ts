@@ -9,6 +9,8 @@ import {
   gstItcStatus,
   gstMonthlySummaries,
   inventoryAlerts,
+  journalEntries,
+  journalEntryLines,
   notifications,
   payments,
   payrollItems,
@@ -39,6 +41,34 @@ const chartBucketLiterals = {
   week: "'week'",
   month: "'month'"
 } as const;
+
+const ledgerBalanceForSystemKey = (systemKey: string) => sql<string>`
+  coalesce(sum(
+    case
+      when ${chartOfAccounts.systemKey} = ${systemKey} and ${journalEntries.id} is not null then
+        case
+          when ${chartOfAccounts.normalBalance} = 'debit'
+            then ${journalEntryLines.debit} - ${journalEntryLines.credit}
+          else ${journalEntryLines.credit} - ${journalEntryLines.debit}
+        end
+      else 0
+    end
+  ), 0)
+`;
+
+const ledgerBalanceForAccountType = (accountType: string) => sql<string>`
+  coalesce(sum(
+    case
+      when ${chartOfAccounts.accountType} = ${accountType} and ${journalEntries.id} is not null then
+        case
+          when ${chartOfAccounts.normalBalance} = 'debit'
+            then ${journalEntryLines.debit} - ${journalEntryLines.credit}
+          else ${journalEntryLines.credit} - ${journalEntryLines.debit}
+        end
+      else 0
+    end
+  ), 0)
+`;
 
 export class DashboardRepository {
   public async getSummary(
@@ -129,11 +159,22 @@ export class DashboardRepository {
 
     const accountBalances = await db
       .select({
-        cashBalance: sql<string>`coalesce(sum(case when ${chartOfAccounts.systemKey} = 'cash' then ${chartOfAccounts.currentBalance} else 0 end), 0)`,
-        bankBalance: sql<string>`coalesce(sum(case when ${chartOfAccounts.systemKey} = 'bank' then ${chartOfAccounts.currentBalance} else 0 end), 0)`,
-        netProfit: sql<string>`coalesce(sum(case when ${chartOfAccounts.accountType} = 'income' then ${chartOfAccounts.currentBalance} else 0 end), 0) - coalesce(sum(case when ${chartOfAccounts.accountType} = 'expense' then ${chartOfAccounts.currentBalance} else 0 end), 0)`
+        cashBalance: ledgerBalanceForSystemKey("cash"),
+        bankBalance: ledgerBalanceForSystemKey("bank"),
+        netProfit: sql<string>`${ledgerBalanceForAccountType("income")} - ${ledgerBalanceForAccountType("expense")}`
       })
       .from(chartOfAccounts)
+      .leftJoin(
+        journalEntryLines,
+        and(eq(journalEntryLines.companyId, companyId), eq(journalEntryLines.accountId, chartOfAccounts.id))
+      )
+      .leftJoin(
+        journalEntries,
+        and(
+          eq(journalEntries.id, journalEntryLines.journalEntryId),
+          sql`${journalEntries.status} in ('posted', 'reversed')`
+        )
+      )
       .where(and(eq(chartOfAccounts.companyId, companyId), isNull(chartOfAccounts.deletedAt), eq(chartOfAccounts.status, "active")));
 
     const gstTotals = await db
@@ -462,14 +503,25 @@ export class DashboardRepository {
 
     const accounting = await db
       .select({
-        cashBalance: sql<string>`coalesce(sum(case when ${chartOfAccounts.systemKey} = 'cash' then ${chartOfAccounts.currentBalance} else 0 end), 0)`,
-        bankBalance: sql<string>`coalesce(sum(case when ${chartOfAccounts.systemKey} = 'bank' then ${chartOfAccounts.currentBalance} else 0 end), 0)`,
-        receivable: sql<string>`coalesce(sum(case when ${chartOfAccounts.systemKey} = 'accounts_receivable' then ${chartOfAccounts.currentBalance} else 0 end), 0)`,
-        payable: sql<string>`coalesce(sum(case when ${chartOfAccounts.systemKey} = 'accounts_payable' then ${chartOfAccounts.currentBalance} else 0 end), 0)`,
-        monthlyExpense: sql<string>`coalesce(sum(case when ${chartOfAccounts.accountType} = 'expense' then ${chartOfAccounts.currentBalance} else 0 end), 0)`,
-        netProfit: sql<string>`coalesce(sum(case when ${chartOfAccounts.accountType} = 'income' then ${chartOfAccounts.currentBalance} else 0 end), 0) - coalesce(sum(case when ${chartOfAccounts.accountType} = 'expense' then ${chartOfAccounts.currentBalance} else 0 end), 0)`
+        cashBalance: ledgerBalanceForSystemKey("cash"),
+        bankBalance: ledgerBalanceForSystemKey("bank"),
+        receivable: ledgerBalanceForSystemKey("accounts_receivable"),
+        payable: ledgerBalanceForSystemKey("accounts_payable"),
+        monthlyExpense: ledgerBalanceForAccountType("expense"),
+        netProfit: sql<string>`${ledgerBalanceForAccountType("income")} - ${ledgerBalanceForAccountType("expense")}`
       })
       .from(chartOfAccounts)
+      .leftJoin(
+        journalEntryLines,
+        and(eq(journalEntryLines.companyId, companyId), eq(journalEntryLines.accountId, chartOfAccounts.id))
+      )
+      .leftJoin(
+        journalEntries,
+        and(
+          eq(journalEntries.id, journalEntryLines.journalEntryId),
+          sql`${journalEntries.status} in ('posted', 'reversed')`
+        )
+      )
       .where(and(eq(chartOfAccounts.companyId, companyId), isNull(chartOfAccounts.deletedAt), eq(chartOfAccounts.status, "active")));
 
     const itcRow = await db

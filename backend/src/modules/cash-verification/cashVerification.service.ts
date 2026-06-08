@@ -10,6 +10,7 @@ import type { ReportExportDataset } from "../reports/reports.types";
 import { cashVerificationRepository } from "./cashVerification.repository";
 import type {
   CreateCashVerificationInput,
+  CurrentCashBalanceQuery,
   ExportCashVerificationQuery,
   ListCashVerificationsQuery,
   UpdateCashVerificationInput
@@ -129,8 +130,9 @@ class CashVerificationService {
     return difference < 0n ? "short_cash" : "excess_cash";
   }
 
-  private async getExpectedCash(companyId: string, executor?: TransactionClient) {
-    const balance = await cashVerificationRepository.getCashLedgerBalance(companyId, executor);
+  private async getExpectedCash(companyId: string, asOfDate?: Date | string, executor?: TransactionClient) {
+    const dateOnly = asOfDate ? toDateOnly(new Date(asOfDate)) : undefined;
+    const balance = await cashVerificationRepository.getCashLedgerBalance(companyId, dateOnly, executor);
     if (!balance) {
       throw new AppError("Cash ledger account is missing or inactive", 409);
     }
@@ -139,6 +141,7 @@ class CashVerificationService {
 
     return {
       expectedCash: normalizeMoney(ledgerBalance),
+      asOfDate: dateOnly ?? null,
       currentCashLedger: {
         accountId: balance.accountId,
         accountCode: balance.accountCode,
@@ -261,12 +264,13 @@ class CashVerificationService {
     };
   }
 
-  public async getCurrentBalance(actor: Pick<CashVerificationActor, "companyId">) {
-    const balance = await this.getExpectedCash(actor.companyId);
+  public async getCurrentBalance(actor: Pick<CashVerificationActor, "companyId">, query: CurrentCashBalanceQuery = {}) {
+    const balance = await this.getExpectedCash(actor.companyId, query.asOfDate);
     const latest = await cashVerificationRepository.getLatest(actor.companyId);
 
     return {
       expectedCash: balance.expectedCash,
+      asOfDate: balance.asOfDate,
       currentCashLedger: balance.currentCashLedger,
       lastVerification: latest ? this.mapRow(latest) : null
     };
@@ -274,12 +278,12 @@ class CashVerificationService {
 
   public async create(actor: CashVerificationActor, input: CreateCashVerificationInput, context: CashVerificationRequestContext) {
     const actualCash = normalizeMoney(input.actualCash);
-    const balance = await this.getExpectedCash(actor.companyId);
-    const differenceAmount = subtractMoney(actualCash, balance.expectedCash);
-    const status = this.calculateStatus(differenceAmount);
 
     const created = await db.transaction(async (transaction) => {
       await cashVerificationRepository.acquireScopedLock("cash-verification-sequence", actor.companyId, transaction);
+      const balance = await this.getExpectedCash(actor.companyId, input.verificationDate, transaction);
+      const differenceAmount = subtractMoney(actualCash, balance.expectedCash);
+      const status = this.calculateStatus(differenceAmount);
       const verificationNo = normalizeVerificationNo(
         await cashVerificationRepository.findLatestVerificationNo(actor.companyId, transaction)
       );
@@ -342,7 +346,8 @@ class CashVerificationService {
       throw new AppError("Only draft cash verifications can be edited", 400);
     }
 
-    const balance = await this.getExpectedCash(actor.companyId);
+    const verificationDate = input.verificationDate ?? new Date(existing.verificationDate);
+    const balance = await this.getExpectedCash(actor.companyId, verificationDate);
     const actualCash = normalizeMoney(input.actualCash ?? existing.actualCash);
     const differenceAmount = subtractMoney(actualCash, balance.expectedCash);
     const status = this.calculateStatus(differenceAmount);

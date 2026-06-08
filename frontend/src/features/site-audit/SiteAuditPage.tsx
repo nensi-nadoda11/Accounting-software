@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Button } from "../../components/ui/Button";
@@ -44,9 +44,6 @@ const checklistLabels: Array<{ checklistKey: SiteAuditChecklistKey; checklistLab
   { checklistKey: "purchase_records_verified", checklistLabel: "Purchase Records Verified" },
   { checklistKey: "sales_records_verified", checklistLabel: "Sales Records Verified" },
   { checklistKey: "expense_records_verified", checklistLabel: "Expense Records Verified" },
-  { checklistKey: "gst_records_verified", checklistLabel: "GST Records Verified" },
-  { checklistKey: "damaged_stock_verified", checklistLabel: "Damaged Stock Verified" },
-  { checklistKey: "user_activity_verified", checklistLabel: "User Activity Verified" },
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -68,6 +65,7 @@ export const SiteAuditPage = () => {
   const auth = useAuth();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const pendingUrlNavigationRef = useRef<"list" | "create" | "view" | "edit" | null>(null);
 
   const canView = auth.hasPermission("site_audit.view");
   const canCreate = auth.hasPermission("site_audit.create");
@@ -205,6 +203,7 @@ export const SiteAuditPage = () => {
       setDetailLoading(true);
       const response = await siteAuditApi.get(siteAuditId);
       const detail = response.data.siteAudit;
+      pendingUrlNavigationRef.current = nextMode;
       setActiveDetail(detail);
       setMode(nextMode);
       setSearchParams(nextMode === "view" ? { id: siteAuditId } : { edit: siteAuditId });
@@ -221,14 +220,39 @@ export const SiteAuditPage = () => {
   useEffect(() => {
     const id = searchParams.get("id");
     const edit = searchParams.get("edit");
+    const isCreateRoute = searchParams.get("mode") === "create";
+    const pendingUrlNavigation = pendingUrlNavigationRef.current;
+
+    if (pendingUrlNavigation) {
+      const reachedPendingUrl =
+        (pendingUrlNavigation === "list" && !id && !edit && !isCreateRoute) ||
+        (pendingUrlNavigation === "create" && isCreateRoute) ||
+        (pendingUrlNavigation === "view" && Boolean(id)) ||
+        (pendingUrlNavigation === "edit" && Boolean(edit));
+
+      if (reachedPendingUrl) {
+        pendingUrlNavigationRef.current = null;
+      }
+      return;
+    }
+
+    if (!id && !edit && !isCreateRoute && mode !== "list") {
+      setMode("list");
+      setActiveDetail(null);
+      resetForm();
+      void loadList();
+      return;
+    }
+
     if (id && mode === "list") {
       void loadDetail(id, "view");
     } else if (edit && mode === "list") {
       void loadDetail(edit, "edit");
     }
-  }, [loadDetail, mode, searchParams]);
+  }, [loadDetail, loadList, mode, resetForm, searchParams]);
 
   const startCreate = () => {
+    pendingUrlNavigationRef.current = "create";
     resetForm();
     setActiveDetail(null);
     setMode("create");
@@ -236,10 +260,11 @@ export const SiteAuditPage = () => {
   };
 
   const backToList = useCallback(() => {
+    pendingUrlNavigationRef.current = "list";
+    setSearchParams({}, { replace: true });
     setMode("list");
     setActiveDetail(null);
     resetForm();
-    setSearchParams({});
     void loadList();
   }, [loadList, resetForm, setSearchParams]);
 
@@ -476,6 +501,7 @@ export const SiteAuditPage = () => {
           uploading={uploading}
           onBack={backToList}
           onEdit={() => {
+            pendingUrlNavigationRef.current = "edit";
             fillFormFromDetail(activeDetail);
             setMode("edit");
             setSearchParams({ edit: activeDetail.id });

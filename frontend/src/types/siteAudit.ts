@@ -10,10 +10,7 @@ export type SiteAuditChecklistKey =
   | "cash_verified"
   | "purchase_records_verified"
   | "sales_records_verified"
-  | "expense_records_verified"
-  | "gst_records_verified"
-  | "damaged_stock_verified"
-  | "user_activity_verified";
+  | "expense_records_verified";
 
 export interface SiteAuditUserRef {
   id: string;

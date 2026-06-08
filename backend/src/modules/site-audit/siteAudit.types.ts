@@ -7,10 +7,7 @@ export type SiteAuditChecklistKey =
   | "cash_verified"
   | "purchase_records_verified"
   | "sales_records_verified"
-  | "expense_records_verified"
-  | "gst_records_verified"
-  | "damaged_stock_verified"
-  | "user_activity_verified";
+  | "expense_records_verified";
 
 export type SiteAuditActor = {
   id: string;
@@ -28,8 +25,5 @@ export const SITE_AUDIT_CHECKLIST: Array<{ key: SiteAuditChecklistKey; label: st
   { key: "cash_verified", label: "Cash Verified" },
   { key: "purchase_records_verified", label: "Purchase Records Verified" },
   { key: "sales_records_verified", label: "Sales Records Verified" },
-  { key: "expense_records_verified", label: "Expense Records Verified" },
-  { key: "gst_records_verified", label: "GST Records Verified" },
-  { key: "damaged_stock_verified", label: "Damaged Stock Verified" },
-  { key: "user_activity_verified", label: "User Activity Verified" }
+  { key: "expense_records_verified", label: "Expense Records Verified" }
 ];

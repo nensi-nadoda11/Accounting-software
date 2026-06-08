@@ -118,10 +118,10 @@ export const CashVerificationPage = () => {
     }
   }, [loadList, mode]);
 
-  const loadExpectedCash = useCallback(async () => {
+  const loadExpectedCash = useCallback(async (asOfDate?: string) => {
     try {
       setBalanceLoading(true);
-      const response = await cashVerificationApi.getCurrentBalance();
+      const response = await cashVerificationApi.getCurrentBalance(asOfDate);
       setExpectedCash(response.data.expectedCash);
     } catch (balanceError) {
       toast.error(getErrorMessage(balanceError, "Failed to load cash ledger balance"));
@@ -136,6 +136,12 @@ export const CashVerificationPage = () => {
     }
   }, [canView, loadExpectedCash]);
 
+  useEffect(() => {
+    if (canView && (mode === "create" || mode === "edit") && formDate) {
+      void loadExpectedCash(formDate);
+    }
+  }, [canView, formDate, loadExpectedCash, mode]);
+
   const resetForm = useCallback(() => {
     setEditingId(null);
     setFormDate(today());
@@ -145,11 +151,13 @@ export const CashVerificationPage = () => {
   }, []);
 
   const startCreate = () => {
+    const defaultDate = today();
     resetForm();
+    setFormDate(defaultDate);
     setActiveDetail(null);
     setMode("create");
     setSearchParams({ mode: "create" });
-    void loadExpectedCash();
+    void loadExpectedCash(defaultDate);
   };
 
   const backToList = useCallback(() => {
@@ -175,7 +183,7 @@ export const CashVerificationPage = () => {
         setExpectedCash(detail.expectedCash);
         setActualCash(detail.actualCash);
         setRemarks(detail.remarks ?? "");
-        void loadExpectedCash();
+        void loadExpectedCash(String(detail.verificationDate).slice(0, 10));
       }
     } catch (detailError) {
       toast.error(getErrorMessage(detailError, "Failed to load cash verification"));
@@ -198,6 +206,10 @@ export const CashVerificationPage = () => {
     const parsedActual = Number(actualCash);
     if (!formDate) {
       toast.error("Verification date is required");
+      return;
+    }
+    if (new Date(formDate) > new Date()) {
+      toast.error("Verification date cannot be future");
       return;
     }
     if (actualCash.trim() === "") {

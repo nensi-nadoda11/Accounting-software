@@ -12,13 +12,15 @@ const trimToNull = (value: unknown) => {
 const optionalNullableString = (max = 1000) =>
   z.preprocess(trimToNull, z.string().trim().max(max).nullable().optional());
 
+const notFutureDate = (value: Date) => value <= new Date();
+
 export const cashVerificationIdParamSchema = z.object({
   id: z.uuid()
 });
 
 export const createCashVerificationSchema = z
   .object({
-    verificationDate: z.coerce.date(),
+    verificationDate: z.coerce.date().refine(notFutureDate, "Verification date cannot be future"),
     actualCash: z.coerce.number().min(0, "Actual cash cannot be negative"),
     remarks: optionalNullableString(1000)
   })
@@ -26,11 +28,15 @@ export const createCashVerificationSchema = z
 
 export const updateCashVerificationSchema = z
   .object({
-    verificationDate: z.coerce.date().optional(),
+    verificationDate: z.coerce.date().refine(notFutureDate, "Verification date cannot be future").optional(),
     actualCash: z.coerce.number().min(0, "Actual cash cannot be negative").optional(),
     remarks: optionalNullableString(1000)
   })
   .strict();
+
+export const currentCashBalanceQuerySchema = z.object({
+  asOfDate: z.coerce.date().refine(notFutureDate, "As of date cannot be future").optional()
+});
 
 export const listCashVerificationsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
@@ -48,5 +54,6 @@ export const exportCashVerificationQuerySchema = z.object({
 
 export type CreateCashVerificationInput = z.infer<typeof createCashVerificationSchema>;
 export type UpdateCashVerificationInput = z.infer<typeof updateCashVerificationSchema>;
+export type CurrentCashBalanceQuery = z.infer<typeof currentCashBalanceQuerySchema>;
 export type ListCashVerificationsQuery = z.infer<typeof listCashVerificationsQuerySchema>;
 export type ExportCashVerificationQuery = z.infer<typeof exportCashVerificationQuerySchema>;

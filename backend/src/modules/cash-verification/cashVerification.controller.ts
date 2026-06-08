@@ -22,7 +22,7 @@ export class CashVerificationController {
   };
 
   public getCurrentBalance = async (request: Request, response: Response): Promise<void> => {
-    const data = await cashVerificationService.getCurrentBalance({ companyId: request.currentUser!.companyId! });
+    const data = await cashVerificationService.getCurrentBalance({ companyId: request.currentUser!.companyId! }, request.query as never);
     response.json(successResponse("Current cash balance fetched successfully", data));
   };
 

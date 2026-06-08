@@ -10,6 +10,7 @@ import { cashVerificationController } from "./cashVerification.controller";
 import {
   cashVerificationIdParamSchema,
   createCashVerificationSchema,
+  currentCashBalanceQuerySchema,
   exportCashVerificationQuerySchema,
   listCashVerificationsQuerySchema,
   updateCashVerificationSchema
@@ -36,6 +37,7 @@ router.post(
 router.get(
   "/current-balance",
   requirePermission(["cash_verification.view", "cash_verification.create"]),
+  validateRequest({ query: currentCashBalanceQuerySchema }),
   asyncHandler(cashVerificationController.getCurrentBalance)
 );
 

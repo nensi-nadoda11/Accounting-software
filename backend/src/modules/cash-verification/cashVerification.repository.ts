@@ -69,7 +69,7 @@ class CashVerificationRepository {
     return row?.verificationNo ?? null;
   }
 
-  public async getCashLedgerBalance(companyId: string, executor?: DbExecutor) {
+  public async getCashLedgerBalance(companyId: string, asOfDate?: string, executor?: DbExecutor) {
     const [row] = await this
       .getExecutor(executor)
       .select({
@@ -90,7 +90,8 @@ class CashVerificationRepository {
         journalEntries,
         and(
           eq(journalEntries.id, journalEntryLines.journalEntryId),
-          sql`${journalEntries.status} in ('posted', 'reversed')`
+          sql`${journalEntries.status} in ('posted', 'reversed')`,
+          ...(asOfDate ? [sql`${journalEntries.entryDate} <= ${asOfDate}`] : [])
         )
       )
       .where(

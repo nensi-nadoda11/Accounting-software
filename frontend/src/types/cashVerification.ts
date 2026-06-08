@@ -76,6 +76,7 @@ export interface CashVerificationDetailResponse {
 
 export interface CashVerificationCurrentBalanceResponse {
   expectedCash: string;
+  asOfDate: string | null;
   currentCashLedger: CashLedgerBalance;
   lastVerification: CashVerificationListItem | null;
 }

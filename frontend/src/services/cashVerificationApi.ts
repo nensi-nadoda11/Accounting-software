@@ -61,8 +61,12 @@ export const cashVerificationApi = {
   get: async (cashVerificationId: string) =>
     (await client.get<ApiResponse<CashVerificationDetailResponse>>(`/cash-verification/${cashVerificationId}`)).data,
 
-  getCurrentBalance: async () =>
-    (await client.get<ApiResponse<CashVerificationCurrentBalanceResponse>>("/cash-verification/current-balance")).data,
+  getCurrentBalance: async (asOfDate?: string) =>
+    (
+      await client.get<ApiResponse<CashVerificationCurrentBalanceResponse>>("/cash-verification/current-balance", {
+        params: { asOfDate: asOfDate || undefined },
+      })
+    ).data,
 
   create: async (payload: CashVerificationInput) =>
     (await client.post<ApiResponse<CashVerificationDetailResponse>>("/cash-verification", payload)).data,
